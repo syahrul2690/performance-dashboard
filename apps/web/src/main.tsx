@@ -1,0 +1,23 @@
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
+import { ThemeProvider } from './context/ThemeContext';
+import { AuthProvider } from './context/AuthContext';
+import { NotifProvider } from './context/NotifContext';
+import App from './App';
+import './styles/prototype.css';
+import './styles/app.css';
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <BrowserRouter>
+      <ThemeProvider>
+        <AuthProvider>
+          <NotifProvider>
+            <App />
+          </NotifProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </BrowserRouter>
+  </StrictMode>,
+);

@@ -1,0 +1,21 @@
+{
+  "name": "pusmanpro-dashboard",
+  "private": true,
+  "version": "1.0.0",
+  "description": "SIMPP — PUSMANPRO Performance Dashboard (monorepo, integrates with ruptl-dashboard stack)",
+  "scripts": {
+    "dev:api": "pnpm --filter @pusmanpro/api start:dev",
+    "dev:web": "pnpm --filter @pusmanpro/web dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "db:migrate": "pnpm --filter @pusmanpro/api prisma migrate dev",
+    "db:deploy": "pnpm --filter @pusmanpro/api prisma migrate deploy",
+    "db:seed": "pnpm --filter @pusmanpro/api db:seed",
+    "db:studio": "pnpm --filter @pusmanpro/api prisma studio",
+    "db:generate": "pnpm --filter @pusmanpro/api prisma generate"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@10.33.2"
+}

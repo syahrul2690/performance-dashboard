@@ -1,0 +1,42 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: pusmanpro
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pusmanpro}
+      POSTGRES_DB: pusmanpro_db
+    volumes:
+      - pusmanpro_pgdata_prod:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://pusmanpro:${POSTGRES_PASSWORD:-pusmanpro}@db:5432/pusmanpro_db
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-Pusmanpro@2026}
+      COOKIE_SECURE: 'true'
+      API_PORT: '3000'
+      NODE_ENV: production
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - '80:80'
+      - '443:443'
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  pusmanpro_pgdata_prod:

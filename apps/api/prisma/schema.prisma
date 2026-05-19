@@ -1,0 +1,254 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  STAFF
+  ASMAN
+  MANAJER
+  SRMANAJER
+  GM
+}
+
+enum ReportStatus {
+  DRAFT
+  IN_REVIEW
+  NEEDS_REVISION
+  APPROVED
+}
+
+enum KMDocStatus {
+  IN_REVIEW_C1
+  IN_REVIEW_C2
+  IN_REVIEW_SM
+  APPROVED
+  RETURNED
+}
+
+enum KMDocType {
+  WF1
+  WF1B
+  WF2
+  WF3
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  role         Role
+  unit         String
+  passwordHash String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  refreshTokens RefreshToken[]
+  auditLogs     AuditLog[]
+  notifications Notification[]
+  prefs         UserPrefs?
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+model UserPrefs {
+  id                String  @id @default(cuid())
+  userId            String  @unique
+  theme             String  @default("light")
+  notifyEmail       Boolean @default(true)
+  notifyInApp       Boolean @default(true)
+  notifyWhatsapp    Boolean @default(false)
+  digestFrequency   String  @default("daily")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_prefs")
+}
+
+model Period {
+  id        String   @id @default(cuid())
+  yearMonth String   @unique
+  label     String
+  isActive  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@map("periods")
+}
+
+// Executive + domain KPI snapshots stored as typed JSON blobs per period.
+// This mirrors the prototype's DATA structure exactly so the seed is a simple JSON.parse.
+model ExecutiveSnapshot {
+  id        String   @id @default(cuid())
+  periodId  String
+  data      Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([periodId])
+  @@map("executive_snapshots")
+}
+
+model FinancialSnapshot {
+  id        String   @id @default(cuid())
+  periodId  String
+  data      Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([periodId])
+  @@map("financial_snapshots")
+}
+
+model OperationalSnapshot {
+  id        String   @id @default(cuid())
+  periodId  String
+  data      Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([periodId])
+  @@map("operational_snapshots")
+}
+
+model StrategicSnapshot {
+  id        String   @id @default(cuid())
+  periodId  String
+  data      Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([periodId])
+  @@map("strategic_snapshots")
+}
+
+model HumanCapitalSnapshot {
+  id        String   @id @default(cuid())
+  periodId  String
+  data      Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([periodId])
+  @@map("human_capital_snapshots")
+}
+
+model RiskSnapshot {
+  id        String   @id @default(cuid())
+  periodId  String
+  data      Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([periodId])
+  @@map("risk_snapshots")
+}
+
+model Report {
+  id           String       @id @default(cuid())
+  unit         String
+  periodId     String
+  currentStage Int          @default(1)
+  status       ReportStatus @default(DRAFT)
+  nextApprover String?
+  history      Json         @default("[]")
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@unique([unit, periodId])
+  @@map("reports")
+}
+
+model KMDocument {
+  id          String      @id @default(cuid())
+  docId       String      @unique
+  tipe        KMDocType
+  bidangUnit  String
+  holder      String
+  status      KMDocStatus
+  deadline    DateTime?
+  slaRemain   Int?
+  attachments Json        @default("[]")
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  reviews KMReview[]
+
+  @@map("km_documents")
+}
+
+model KMReview {
+  id         String   @id @default(cuid())
+  docId      String
+  actor      String
+  action     String
+  note       String?
+  createdAt  DateTime @default(now())
+
+  document KMDocument @relation(fields: [docId], references: [docId], onDelete: Cascade)
+
+  @@map("km_reviews")
+}
+
+model InputRealisasi {
+  id          String   @id @default(cuid())
+  periodId    String
+  unitCode    String
+  submitter   String
+  values      Json
+  status      String   @default("draft")
+  submittedAt DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([periodId, unitCode])
+  @@map("input_realisasi")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String?
+  type      String
+  title     String
+  msg       String
+  route     String?
+  targetId  String?
+  unread    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("notifications")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  actor     String
+  action    String
+  entity    String?
+  targetId  String?
+  note      String?
+  diff      Json?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("audit_logs")
+}

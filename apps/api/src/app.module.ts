@@ -1,0 +1,41 @@
+import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { CacheModule } from '@nestjs/cache-manager';
+import { PrismaModule } from './prisma/prisma.module';
+import { AuthModule } from './auth/auth.module';
+import { MetaModule } from './meta/meta.module';
+import { ExecutiveModule } from './executive/executive.module';
+import { FinancialModule } from './financial/financial.module';
+import { OperationalModule } from './operational/operational.module';
+import { StrategicModule } from './strategic/strategic.module';
+import { HumanCapitalModule } from './human-capital/human-capital.module';
+import { RiskModule } from './risk/risk.module';
+import { ApprovalsModule } from './approvals/approvals.module';
+import { WorkflowKmModule } from './workflow-km/workflow-km.module';
+import { InputRealisasiModule } from './input-realisasi/input-realisasi.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { AuditModule } from './audit/audit.module';
+import { KpiModule } from './kpi/kpi.module';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    CacheModule.register({ isGlobal: true, ttl: 300_000 }),
+    PrismaModule,
+    AuthModule,
+    MetaModule,
+    ExecutiveModule,
+    FinancialModule,
+    OperationalModule,
+    StrategicModule,
+    HumanCapitalModule,
+    RiskModule,
+    ApprovalsModule,
+    WorkflowKmModule,
+    InputRealisasiModule,
+    NotificationsModule,
+    AuditModule,
+    KpiModule,
+  ],
+})
+export class AppModule {}

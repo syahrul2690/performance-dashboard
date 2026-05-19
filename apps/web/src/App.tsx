@@ -1,0 +1,43 @@
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { AppShell } from './components/AppShell';
+import { Protected } from './components/Protected';
+import { LoginPage } from './pages/LoginPage';
+import { ExecutivePage } from './pages/ExecutivePage';
+import { FinancialPage } from './pages/FinancialPage';
+import { OperationalPage } from './pages/OperationalPage';
+import { StrategicPage } from './pages/StrategicPage';
+import { HumanCapitalPage } from './pages/HumanCapitalPage';
+import { RiskPage } from './pages/RiskPage';
+import { ApprovalsPage } from './pages/ApprovalsPage';
+import { WorkflowKmUsulanPage } from './pages/WorkflowKmUsulanPage';
+import { WorkflowKmRealisasiPage } from './pages/WorkflowKmRealisasiPage';
+import { InputRealisasiPage } from './pages/InputRealisasiPage';
+import { SettingsPage } from './pages/SettingsPage';
+
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route
+        element={
+          <Protected>
+            <AppShell />
+          </Protected>
+        }
+      >
+        <Route index element={<ExecutivePage />} />
+        <Route path="financial" element={<FinancialPage />} />
+        <Route path="operational" element={<OperationalPage />} />
+        <Route path="strategic" element={<StrategicPage />} />
+        <Route path="human-capital" element={<HumanCapitalPage />} />
+        <Route path="risk" element={<RiskPage />} />
+        <Route path="approvals" element={<ApprovalsPage />} />
+        <Route path="workflow-km/usulan" element={<WorkflowKmUsulanPage />} />
+        <Route path="workflow-km/realisasi" element={<WorkflowKmRealisasiPage />} />
+        <Route path="input-realisasi" element={<InputRealisasiPage />} />
+        <Route path="settings" element={<SettingsPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Route>
+    </Routes>
+  );
+}
