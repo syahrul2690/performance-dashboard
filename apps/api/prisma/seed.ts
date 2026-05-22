@@ -157,6 +157,52 @@ async function main() {
   }
   console.log('  km_documents:', kmDocs);
 
+  // Kontrak Manajemen — sample entries for demo
+  const sampleKontrak = [
+    {
+      unitCode: 'KP',
+      bidang: 'Bidang Teknik',
+      holder: 'Ahmad Teknik',
+      kpiItems: [
+        { indikator: 'Progress Konstruksi Jaringan', target: '95', satuan: '%', bobot: '30' },
+        { indikator: 'Availability Sistem', target: '99.5', satuan: '%', bobot: '25' },
+        { indikator: 'Rasio Pemeliharaan', target: '1.2', satuan: '%', bobot: '20' },
+      ],
+      status: 'submitted',
+      submitter: 'Staff Officer',
+    },
+    {
+      unitCode: 'KP',
+      bidang: 'Bidang Keuangan',
+      holder: 'Siti Keuangan',
+      kpiItems: [
+        { indikator: 'Efisiensi Biaya Operasional', target: '85', satuan: '%', bobot: '35' },
+        { indikator: 'Realisasi Anggaran', target: '90', satuan: '%', bobot: '30' },
+      ],
+      status: 'draft',
+      submitter: 'Staff Officer',
+    },
+  ];
+
+  let kmCount = 0;
+  for (const k of sampleKontrak) {
+    await prisma.kontrakManajemen.upsert({
+      where: { periodId_unitCode: { periodId: period.id, unitCode: k.unitCode + '_' + k.bidang } },
+      update: {},
+      create: {
+        periodId: period.id,
+        unitCode: k.unitCode + '_' + k.bidang,
+        bidang: k.bidang,
+        holder: k.holder,
+        kpiItems: k.kpiItems as object,
+        status: k.status,
+        submitter: k.submitter,
+      },
+    });
+    kmCount++;
+  }
+  console.log('  kontrak_manajemen:', kmCount);
+
   // Seed a few global notifications
   const gmUser = await prisma.user.findFirst({ where: { role: Role.GM } });
   if (gmUser) {

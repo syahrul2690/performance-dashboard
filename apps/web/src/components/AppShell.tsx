@@ -1,40 +1,57 @@
-import { useState, useEffect } from 'react';
-import { NavLink, useNavigate, Outlet } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { NavLink, useNavigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useNotif } from '../context/NotifContext';
 import {
-  LayoutDashboard, DollarSign, Settings, Activity, Target,
-  Users, CheckSquare, AlertTriangle, FileText, ClipboardList,
-  Bell, Moon, Sun, LogOut, ChevronDown, Menu, X,
-  Zap, Search, Download,
+  LayoutDashboard, TrendingUp, Settings, Activity, Target,
+  Users, CheckSquare, AlertTriangle, FileText, ClipboardEdit,
+  Bell, Moon, Sun, LogOut, ChevronDown, Menu, ChevronsLeft,
+  Tv2, Search, Download, User, HelpCircle, FilePlus, LineChart,
+  FileSpreadsheet, Image, Printer, ExternalLink,
 } from 'lucide-react';
 
 const NAV_ITEMS = [
   { section: 'Aksi Saya', items: [
     { to: '/approvals', label: 'Persetujuan', icon: CheckSquare },
-    { to: '/input-realisasi', label: 'Input Realisasi', icon: ClipboardList },
+    { to: '/input-kontrak', label: 'Input Kontrak Manajemen', icon: FileText },
+    { to: '/input-realisasi', label: 'Input Realisasi Bulanan', icon: ClipboardEdit },
   ]},
   { section: 'Dashboard', items: [
     { to: '/', label: 'Executive Summary', icon: LayoutDashboard, end: true },
-    { to: '/financial', label: 'Cost & Capex', icon: DollarSign },
-    { to: '/operational', label: 'Operasional KPI', icon: Activity },
-    { to: '/strategic', label: 'Target Strategis', icon: Target },
+    { to: '/financial', label: 'Cost & Capex', icon: TrendingUp },
+    { to: '/operational', label: 'Operational KPIs', icon: Activity },
+    { to: '/strategic', label: 'Strategic Targets', icon: Target },
     { to: '/human-capital', label: 'Human Capital', icon: Users },
     { to: '/risk', label: 'Manajemen Risiko', icon: AlertTriangle },
   ]},
-  { section: 'Workflow KM', items: [
-    { to: '/workflow-km/usulan', label: 'Usulan KM', icon: FileText },
-    { to: '/workflow-km/realisasi', label: 'Realisasi KM', icon: FileText },
+  { section: 'Workflow Kontrak Manajemen', items: [
+    { to: '/workflow-km/usulan', label: 'Proses Usulan KM', icon: FilePlus },
+    { to: '/workflow-km/realisasi', label: 'Proses Realisasi KM', icon: LineChart },
   ]},
   { section: 'Pengaturan', items: [
-    { to: '/settings', label: 'Pengaturan', icon: Settings },
+    { to: '/settings', label: 'Settings', icon: Settings },
   ]},
 ];
 
 const ROLE_LABELS: Record<string, string> = {
   STAFF: 'Staff', ASMAN: 'Asman', MANAJER: 'Manajer',
-  SRMANAJER: 'Sr. Manajer', GM: 'GM',
+  SRMANAJER: 'Sr. Manajer', GM: 'General Manager',
+};
+
+const ROUTE_NAMES: Record<string, string> = {
+  '/': 'Executive Summary',
+  '/financial': 'Cost & Capex',
+  '/operational': 'Operational KPIs',
+  '/strategic': 'Strategic Targets',
+  '/human-capital': 'Human Capital',
+  '/risk': 'Manajemen Risiko',
+  '/approvals': 'Persetujuan',
+  '/input-realisasi': 'Input Realisasi',
+  '/input-kontrak': 'Input Kontrak Manajemen',
+  '/workflow-km/usulan': 'Proses Usulan KM',
+  '/workflow-km/realisasi': 'Proses Realisasi KM',
+  '/settings': 'Settings',
 };
 
 export function AppShell() {
@@ -42,170 +59,297 @@ export function AppShell() {
   const { theme, toggle: toggleTheme } = useTheme();
   const { items: notifs, unreadCount, markAllRead } = useNotif();
   const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const location = useLocation();
+  const [collapsed, setCollapsed] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [roleMenuOpen, setRoleMenuOpen] = useState(false);
   const [warRoomActive, setWarRoomActive] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
+  const userRef = useRef<HTMLDivElement>(null);
+  const exportRef = useRef<HTMLDivElement>(null);
+  const roleRef = useRef<HTMLDivElement>(null);
+
+  const currentPageName = ROUTE_NAMES[location.pathname] ?? 'Dashboard';
+  const effectiveRole = viewAs ?? user?.role ?? 'STAFF';
+  const avatarInitials = user?.name?.split(' ').map((w) => w[0]).slice(0, 2).join('') ?? '?';
 
   const handleLogout = async () => {
     await logout();
     navigate('/login');
   };
 
-  // Close dropdowns on outside click
   useEffect(() => {
-    const handler = () => { setNotifOpen(false); setUserMenuOpen(false); };
-    document.addEventListener('click', handler);
-    return () => document.removeEventListener('click', handler);
+    const handler = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
+      if (userRef.current && !userRef.current.contains(e.target as Node)) setUserMenuOpen(false);
+      if (exportRef.current && !exportRef.current.contains(e.target as Node)) setExportOpen(false);
+      if (roleRef.current && !roleRef.current.contains(e.target as Node)) setRoleMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
   }, []);
 
   return (
-    <div className={`app-shell ${sidebarOpen ? 'sidebar-open' : 'sidebar-collapsed'}`}>
-      {/* Sidebar */}
-      <aside className="sidebar">
-        <div className="sidebar-header">
-          <img src="/brand/logo_pln_simpp_data.png" alt="SIMPP" className="sidebar-logo" />
-          {sidebarOpen && <span className="sidebar-brand">PUSMANPRO</span>}
-          <button className="sidebar-toggle btn-ghost" onClick={() => setSidebarOpen((v) => !v)}>
-            {sidebarOpen ? <X size={16} /> : <Menu size={16} />}
-          </button>
+    <div className="app" data-sidebar={collapsed ? 'collapsed' : 'expanded'}>
+
+      {/* ==================== SIDEBAR ==================== */}
+      <aside className="sidebar" aria-label="Navigasi utama">
+        <div className="sidebar-brand">
+          <img
+            className="logo sidebar-brand-img"
+            src="/brand/logo_pln_simpp_data.png"
+            alt="SIMPP"
+            style={{width:52,height:52,objectFit:'contain',flexShrink:0,borderRadius:10,background:'#FFFFFF',padding:4}}
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+          />
+          <div className="sidebar-brand-text">
+            <span className="sidebar-brand-name">SIMPP</span>
+            <span className="sidebar-brand-sub">PUSMANPRO Performance Hub</span>
+          </div>
         </div>
 
-        <nav className="sidebar-nav">
+        <nav className="sidebar-nav" aria-label="Halaman">
           {NAV_ITEMS.map((section) => (
-            <div key={section.section} className="nav-section">
-              {sidebarOpen && <div className="nav-section-label">{section.section}</div>}
+            <div key={section.section}>
+              <div className="nav-section-label">{section.section}</div>
               {section.items.map(({ to, label, icon: Icon, end }) => (
                 <NavLink
                   key={to}
                   to={to}
                   end={end}
-                  className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-                  title={!sidebarOpen ? label : undefined}
+                  className="nav-item"
+                  aria-current={location.pathname === to || (!end && location.pathname.startsWith(to) && to !== '/') ? 'page' : undefined}
+                  title={collapsed ? label : undefined}
                 >
-                  <Icon size={18} />
-                  {sidebarOpen && <span>{label}</span>}
+                  <Icon size={18} className="nav-icon" />
+                  <span className="nav-label">{label}</span>
                 </NavLink>
               ))}
             </div>
           ))}
         </nav>
+
+        <div className="sidebar-footer">
+          <div className="user-card" role="button" tabIndex={0} aria-label="Profil pengguna">
+            <div className="user-avatar" aria-hidden="true">{avatarInitials}</div>
+            <div className="user-info">
+              <span className="user-name">{user?.name ?? '—'}</span>
+              <span className="user-role">{ROLE_LABELS[user?.role ?? ''] ?? user?.role}</span>
+            </div>
+          </div>
+          <button
+            className="sidebar-collapse-btn"
+            aria-label="Ciutkan atau perluas sidebar"
+            onClick={() => setCollapsed((v) => !v)}
+          >
+            <ChevronsLeft size={16} style={{transition:'transform 0.2s', transform: collapsed ? 'rotate(180deg)' : 'none'}} />
+            <span className="sidebar-collapse-label">Ciutkan</span>
+          </button>
+        </div>
       </aside>
 
-      {/* Main column */}
-      <div className="main-column">
-        {/* Topbar */}
-        <header className="topbar">
-          <div className="topbar-left">
+      <div className="sidebar-overlay" aria-hidden="true" />
+
+      {/* ==================== TOPBAR ==================== */}
+      <header className="topbar" role="banner">
+        <div className="topbar-left">
+          <button className="icon-btn hamburger-btn" aria-label="Buka menu" onClick={() => setCollapsed((v) => !v)}>
+            <Menu size={18} />
+          </button>
+          <nav className="breadcrumb" aria-label="Breadcrumb">
+            <span className="breadcrumb-prev">Dashboard</span>
+            <span className="breadcrumb-sep breadcrumb-prev">/</span>
+            <span className="breadcrumb-current">{currentPageName}</span>
+          </nav>
+        </div>
+
+        <div className="topbar-center">
+          <div className="segmented" role="group" aria-label="Periode pelaporan">
+            <button aria-pressed="false">Bulan</button>
+            <button aria-pressed="true">Semester</button>
+            <button aria-pressed="false">Tahun</button>
+          </div>
+        </div>
+
+        <div className="topbar-right">
+          {/* Role badge / View As */}
+          <div className="dropdown-anchor" ref={roleRef}>
             <button
-              className="btn btn-primary btn-sm war-room-btn"
-              onClick={() => setWarRoomActive(true)}
+              className="role-badge"
+              aria-label="Mode pengguna"
+              aria-haspopup="true"
+              aria-expanded={roleMenuOpen}
+              onClick={() => setRoleMenuOpen((v) => !v)}
             >
-              <Zap size={14} /> War Room
+              <span className="dot" />
+              <span>Mode: <strong>{ROLE_LABELS[effectiveRole] ?? effectiveRole}</strong></span>
+              <ChevronDown size={12} style={{opacity:0.6}} />
             </button>
-          </div>
-
-          <div className="topbar-right">
-            {/* View As */}
-            {user && (
-              <div className="topbar-item view-as" onClick={(e) => e.stopPropagation()}>
-                <span className={`role-badge role-${user.role.toLowerCase()}`}>
-                  {viewAs ? ROLE_LABELS[viewAs] ?? viewAs : ROLE_LABELS[user.role] ?? user.role}
-                </span>
-                <select
-                  className="view-as-select"
-                  value={viewAs ?? user.role}
-                  onChange={(e) => setViewAs(e.target.value === user.role ? null : e.target.value)}
-                >
-                  {Object.entries(ROLE_LABELS).map(([k, v]) => (
-                    <option key={k} value={k}>{v}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {/* Search */}
-            <button className="btn-ghost topbar-icon" title="Ctrl+K">
-              <Search size={18} />
-            </button>
-
-            {/* Export */}
-            <button className="btn-ghost topbar-icon" title="Export">
-              <Download size={18} />
-            </button>
-
-            {/* Theme toggle */}
-            <button className="btn-ghost topbar-icon" onClick={toggleTheme} title="Toggle tema">
-              {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
-            </button>
-
-            {/* Notifications */}
-            <div className="topbar-item" onClick={(e) => { e.stopPropagation(); setNotifOpen((v) => !v); }}>
-              <button className="btn-ghost topbar-icon notif-btn">
-                <Bell size={18} />
-                {unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
-              </button>
-              {notifOpen && (
-                <div className="notif-dropdown" onClick={(e) => e.stopPropagation()}>
-                  <div className="notif-header">
-                    <span>Notifikasi</span>
-                    <button className="btn-ghost btn-sm" onClick={markAllRead}>Tandai semua dibaca</button>
-                  </div>
-                  <div className="notif-list">
-                    {notifs.length === 0 && <div className="notif-empty">Tidak ada notifikasi</div>}
-                    {notifs.map((n) => (
-                      <div key={n.id} className={`notif-item ${n.unread ? 'unread' : ''}`}
-                        onClick={() => { if (n.route) navigate(n.route); setNotifOpen(false); }}
-                      >
-                        <div className="notif-title">{n.title}</div>
-                        <div className="notif-msg">{n.msg}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* User menu */}
-            <div className="topbar-item" onClick={(e) => { e.stopPropagation(); setUserMenuOpen((v) => !v); }}>
-              <button className="btn-ghost user-menu-btn">
-                <span className="avatar">{user?.name?.[0] ?? '?'}</span>
-                {user && <span className="user-name">{user.name}</span>}
-                <ChevronDown size={14} />
-              </button>
-              {userMenuOpen && (
-                <div className="user-dropdown" onClick={(e) => e.stopPropagation()}>
-                  <div className="user-dropdown-info">
-                    <div className="user-dropdown-name">{user?.name}</div>
-                    <div className="user-dropdown-email">{user?.email}</div>
-                  </div>
-                  <NavLink to="/settings" className="user-dropdown-item" onClick={() => setUserMenuOpen(false)}>
-                    <Settings size={14} /> Pengaturan
-                  </NavLink>
-                  <button className="user-dropdown-item danger" onClick={handleLogout}>
-                    <LogOut size={14} /> Keluar
+            <div className="dropdown-menu" data-open={String(roleMenuOpen)} role="menu">
+              <div className="role-switcher-section">
+                <div className="role-switcher-label">View As (Demo)</div>
+                {Object.entries(ROLE_LABELS).map(([k, v]) => (
+                  <button
+                    key={k}
+                    className="role-option"
+                    role="menuitemradio"
+                    aria-pressed={effectiveRole === k}
+                    onClick={() => { setViewAs(k === user?.role ? null : k); setRoleMenuOpen(false); }}
+                  >
+                    <User size={14} />
+                    <span className="role-label">{v}</span>
+                    <span className="role-level">{k}</span>
                   </button>
-                </div>
-              )}
+                ))}
+              </div>
             </div>
           </div>
-        </header>
 
-        {/* Page content */}
-        <main className="page-content">
+          {/* Search */}
+          <button className="icon-btn" aria-label="Cari (Ctrl+K)" title="Ctrl+K">
+            <Search size={18} />
+          </button>
+
+          {/* Notifications */}
+          <div className="dropdown-anchor" ref={notifRef}>
+            <button
+              className="icon-btn"
+              aria-label="Notifikasi"
+              aria-haspopup="true"
+              aria-expanded={notifOpen}
+              onClick={() => setNotifOpen((v) => !v)}
+            >
+              <Bell size={18} />
+              {unreadCount > 0 && <span className="badge" aria-hidden="true" />}
+            </button>
+            <div className="dropdown-menu wide" data-open={String(notifOpen)} role="menu">
+              <div className="dropdown-header">
+                <span className="dropdown-title">Notifikasi</span>
+                <button className="dropdown-action" onClick={markAllRead}>Tandai semua dibaca</button>
+              </div>
+              <div className="notif-list">
+                {notifs.length === 0 && (
+                  <div style={{padding:'24px',textAlign:'center',color:'var(--color-text-muted)',fontSize:'var(--text-xs)'}}>
+                    Tidak ada notifikasi
+                  </div>
+                )}
+                {notifs.map((n) => (
+                  <div
+                    key={n.id}
+                    className={`notif-item${n.unread ? ' unread' : ''}`}
+                    onClick={() => { if (n.route) navigate(n.route); setNotifOpen(false); }}
+                  >
+                    <div className={`notif-icon ${n.type === 'alert' ? 'warning' : 'info'}`}>
+                      <Bell size={14} />
+                    </div>
+                    <div className="notif-body">
+                      <div className="notif-title">{n.title}</div>
+                      <div className="notif-msg">{n.msg}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="dropdown-divider" />
+              <button className="dropdown-item">
+                <ExternalLink size={14} />
+                <span>Lihat semua notifikasi</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Export */}
+          <div className="dropdown-anchor" ref={exportRef}>
+            <button
+              className="btn btn-secondary"
+              aria-haspopup="true"
+              aria-expanded={exportOpen}
+              onClick={() => setExportOpen((v) => !v)}
+            >
+              <Download size={14} />
+              <span className="btn-export-text">Ekspor</span>
+              <ChevronDown size={12} />
+            </button>
+            <div className="dropdown-menu" data-open={String(exportOpen)} role="menu">
+              <button className="dropdown-item"><FileText size={14} /><span>Ekspor PDF</span></button>
+              <button className="dropdown-item"><FileSpreadsheet size={14} /><span>Ekspor CSV</span></button>
+              <button className="dropdown-item"><Image size={14} /><span>Unduh Chart (PNG)</span></button>
+              <div className="dropdown-divider" />
+              <button className="dropdown-item"><Printer size={14} /><span>Print</span></button>
+            </div>
+          </div>
+
+          {/* War Room */}
+          <button
+            className="btn btn-ghost"
+            aria-label="War Room Mode"
+            title="War Room Mode — auto-rotate fullscreen"
+            onClick={() => setWarRoomActive(true)}
+          >
+            <Tv2 size={16} />
+            <span className="btn-warroom-text">War Room</span>
+          </button>
+
+          {/* Theme toggle */}
+          <button className="icon-btn" aria-label="Ubah tema" onClick={toggleTheme}>
+            {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+          </button>
+
+          {/* User menu */}
+          <div className="dropdown-anchor" ref={userRef}>
+            <button
+              className="icon-btn"
+              aria-haspopup="true"
+              aria-expanded={userMenuOpen}
+              aria-label="Menu pengguna"
+              onClick={() => setUserMenuOpen((v) => !v)}
+            >
+              <div className="user-avatar" aria-hidden="true">{avatarInitials}</div>
+            </button>
+            <div className="dropdown-menu wider" data-open={String(userMenuOpen)} role="menu">
+              <div className="user-menu-header">
+                <div className="user-avatar">{avatarInitials}</div>
+                <div className="user-menu-info">
+                  <div className="user-menu-name">{user?.name}</div>
+                  <div className="user-menu-email">{user?.email}</div>
+                </div>
+              </div>
+              <div className="dropdown-divider" />
+              <button className="dropdown-item"><User size={14} /><span>Profil saya</span></button>
+              <NavLink to="/settings" className="dropdown-item" onClick={() => setUserMenuOpen(false)}>
+                <Settings size={14} /><span>Pengaturan</span>
+              </NavLink>
+              <button className="dropdown-item"><HelpCircle size={14} /><span>Bantuan</span></button>
+              <div className="dropdown-divider" />
+              <button className="dropdown-item danger" onClick={handleLogout}>
+                <LogOut size={14} /><span>Keluar</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* ==================== MAIN ==================== */}
+      <main id="main-content" className="main" tabIndex={-1}>
+        <div className="main-inner" id="main-inner">
           <Outlet />
-        </main>
-      </div>
+        </div>
+      </main>
 
       {/* War Room overlay */}
       {warRoomActive && (
         <div className="warroom-overlay">
-          <button className="warroom-close btn-ghost" onClick={() => setWarRoomActive(false)}>
-            <X size={24} />
+          <button
+            className="warroom-close"
+            style={{position:'absolute',top:20,right:20,color:'rgba(255,255,255,0.7)',background:'none',border:'none',cursor:'pointer'}}
+            onClick={() => setWarRoomActive(false)}
+          >
+            ✕
           </button>
-          <div className="warroom-placeholder">
-            <Zap size={48} />
-            <p>War Room — Coming in next build</p>
+          <div style={{textAlign:'center',opacity:0.4}}>
+            <Tv2 size={48} color="#fff" />
+            <p style={{color:'#fff',marginTop:12,fontSize:16}}>War Room — Coming in next build</p>
           </div>
         </div>
       )}

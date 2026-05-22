@@ -5,6 +5,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
 import { NotifProvider } from './context/NotifContext';
 import App from './App';
+import './lib/charts';
 import './styles/prototype.css';
 import './styles/app.css';
 

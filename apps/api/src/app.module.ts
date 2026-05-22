@@ -13,6 +13,7 @@ import { RiskModule } from './risk/risk.module';
 import { ApprovalsModule } from './approvals/approvals.module';
 import { WorkflowKmModule } from './workflow-km/workflow-km.module';
 import { InputRealisasiModule } from './input-realisasi/input-realisasi.module';
+import { InputKontrakModule } from './input-kontrak/input-kontrak.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AuditModule } from './audit/audit.module';
 import { KpiModule } from './kpi/kpi.module';
@@ -33,6 +34,7 @@ import { KpiModule } from './kpi/kpi.module';
     ApprovalsModule,
     WorkflowKmModule,
     InputRealisasiModule,
+    InputKontrakModule,
     NotificationsModule,
     AuditModule,
     KpiModule,
