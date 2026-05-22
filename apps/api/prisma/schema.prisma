@@ -53,7 +53,25 @@ model User {
   notifications Notification[]
   prefs         UserPrefs?
 
+  roleVariantId String?
+  roleVariant   RoleVariant? @relation(fields: [roleVariantId], references: [id])
+
   @@map("users")
+}
+
+// Katalog varian peran (jabatan + lingkup) per tier — selaras dengan
+// taksonomi organisasi prototipe. Enum Role tetap = 5 tier (level izin).
+model RoleVariant {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  label     String
+  tier      Role
+  scope     String
+  createdAt DateTime @default(now())
+
+  users User[]
+
+  @@map("role_variants")
 }
 
 model RefreshToken {
@@ -251,4 +269,48 @@ model AuditLog {
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@map("audit_logs")
+}
+
+model ProsesBisnisSnapshot {
+  id        String   @id @default(cuid())
+  periodId  String
+  data      Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([periodId])
+  @@map("proses_bisnis_snapshots")
+}
+
+model OrganisasiSnapshot {
+  id        String   @id @default(cuid())
+  periodId  String
+  data      Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([periodId])
+  @@map("organisasi_snapshots")
+}
+
+model GcgEsgSnapshot {
+  id        String   @id @default(cuid())
+  periodId  String
+  data      Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([periodId])
+  @@map("gcg_esg_snapshots")
+}
+
+model PetaSnapshot {
+  id        String   @id @default(cuid())
+  periodId  String
+  data      Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([periodId])
+  @@map("peta_snapshots")
 }

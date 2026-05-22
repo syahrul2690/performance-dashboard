@@ -107,12 +107,11 @@ export function ExecutivePage() {
           <div className="card-header"><h3 className="card-title">Alert Aktif</h3></div>
           <div className="alerts-list">
             {d.alerts.map((a) => (
-              <div key={a.id} className={`alert-item severity-${a.severity}`}>
-                <span className={`badge badge-${a.severity === 'critical' ? 'danger' : a.severity === 'warning' ? 'warning' : 'info'}`}>
-                  {a.severity}
+              <div key={a.timestamp} className={`alert-item severity-${a.type}`}>
+                <span className={`badge badge-${a.type === 'critical' || a.type === 'danger' ? 'danger' : a.type === 'warning' ? 'warning' : a.type === 'success' ? 'success' : 'info'}`}>
+                  {a.type}
                 </span>
-                <span className="alert-unit">[{a.unit}]</span>
-                <span className="alert-msg">{a.msg}</span>
+                <span className="alert-msg">{a.title}</span>
               </div>
             ))}
           </div>

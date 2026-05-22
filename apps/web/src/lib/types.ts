@@ -1,5 +1,13 @@
 export type Role = 'STAFF' | 'ASMAN' | 'MANAJER' | 'SRMANAJER' | 'GM';
 
+export interface RoleVariant {
+  id: string;
+  code: string;
+  label: string;
+  tier: Role;
+  scope: string;
+}
+
 export interface User {
   id: string;
   email: string;
@@ -9,6 +17,8 @@ export interface User {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  roleVariantId?: string | null;
+  roleVariant?: RoleVariant | null;
 }
 
 export interface Period {
@@ -58,11 +68,12 @@ export interface Initiative {
 }
 
 export interface Alert {
-  id: string;
-  severity: string;
-  unit: string;
-  msg: string;
-  kpi?: string;
+  type: string;
+  title: string;
+  timestamp: string;
+  route: string;
+  action: string;
+  targetId: string;
 }
 
 export interface ExecutiveData {

@@ -16,6 +16,10 @@ import { InputRealisasiModule } from './input-realisasi/input-realisasi.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AuditModule } from './audit/audit.module';
 import { KpiModule } from './kpi/kpi.module';
+import { ProsesBisnisModule } from './proses-bisnis/proses-bisnis.module';
+import { OrganisasiModule } from './organisasi/organisasi.module';
+import { GcgEsgModule } from './gcg-esg/gcg-esg.module';
+import { PetaModule } from './peta/peta.module';
 
 @Module({
   imports: [
@@ -36,6 +40,10 @@ import { KpiModule } from './kpi/kpi.module';
     NotificationsModule,
     AuditModule,
     KpiModule,
+    ProsesBisnisModule,
+    OrganisasiModule,
+    GcgEsgModule,
+    PetaModule,
   ],
 })
 export class AppModule {}

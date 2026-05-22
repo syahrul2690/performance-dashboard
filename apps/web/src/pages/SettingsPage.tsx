@@ -53,6 +53,11 @@ export function SettingsPage() {
                   <span className={`badge badge-info role-${user?.role?.toLowerCase()}`}>{user?.role}</span>
                   <span className="text-muted"> · {user?.unit}</span>
                 </div>
+                {user?.roleVariant && (
+                  <div className="profile-variant text-muted">
+                    {user.roleVariant.label} — {user.roleVariant.scope}
+                  </div>
+                )}
               </div>
             </div>
           </div>

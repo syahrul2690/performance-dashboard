@@ -7,7 +7,9 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcryptjs';
-import { User } from '@prisma/client';
+import { User, RoleVariant } from '@prisma/client';
+
+type UserWithVariant = User & { roleVariant?: RoleVariant | null };
 
 @Injectable()
 export class AuthService {
@@ -18,7 +20,10 @@ export class AuthService {
   ) {}
 
   async login(email: string, password: string) {
-    const user = await this.prisma.user.findUnique({ where: { email } });
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      include: { roleVariant: true },
+    });
     if (!user || !user.isActive) throw new UnauthorizedException('Invalid credentials');
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) throw new UnauthorizedException('Invalid credentials');
@@ -28,7 +33,7 @@ export class AuthService {
   async refresh(refreshToken: string) {
     const stored = await this.prisma.refreshToken.findUnique({
       where: { token: refreshToken },
-      include: { user: true },
+      include: { user: { include: { roleVariant: true } } },
     });
     if (!stored || stored.expiresAt < new Date()) {
       if (stored) await this.prisma.refreshToken.delete({ where: { token: refreshToken } });
@@ -46,7 +51,7 @@ export class AuthService {
     }
   }
 
-  private async issueTokens(user: User) {
+  private async issueTokens(user: UserWithVariant) {
     const payload = { sub: user.id, email: user.email, role: user.role };
     const accessSecret = this.config.get<string>('JWT_ACCESS_SECRET', 'change_me_access');
     const refreshSecret = this.config.get<string>('JWT_REFRESH_SECRET', 'change_me_refresh');
@@ -62,7 +67,7 @@ export class AuthService {
     return { accessToken, refreshToken, user: this.sanitize(user) };
   }
 
-  sanitize(user: User) {
+  sanitize(user: UserWithVariant) {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { passwordHash, ...rest } = user;
     return rest;

@@ -12,12 +12,31 @@ const seedData = JSON.parse(
 const DATA = seedData.DATA as Record<string, unknown>;
 const ROLES = seedData.ROLES as Record<string, { name: string; unit: string; email?: string }>;
 
+const extra = JSON.parse(
+  fs.readFileSync(path.join(__dirname, 'seed-extra.json'), 'utf8'),
+) as {
+  procBiz: object;
+  organisasi: object;
+  gcgEsg: object;
+  peta: object;
+  roleVariants: Array<{ code: string; label: string; tier: string; scope: string }>;
+};
+
 const ROLE_MAP: Record<string, Role> = {
   staff: Role.STAFF,
   asman: Role.ASMAN,
   manajer: Role.MANAJER,
   srmanajer: Role.SRMANAJER,
   gm: Role.GM,
+};
+
+// Varian peran representatif untuk tiap user demo
+const REP_VARIANT: Record<string, string> = {
+  staff: 'staff_general',
+  asman: 'asman_generic',
+  manajer: 'man_project_control',
+  srmanajer: 'sm_pc',
+  gm: 'gm_pusmanpro',
 };
 
 const DEMO_PASSWORD = process.env.DEMO_PASSWORD || 'Pusmanpro@2026';
@@ -27,12 +46,25 @@ async function main() {
 
   const hash = await bcrypt.hash(DEMO_PASSWORD, 10);
 
+  // Role variants catalog — taksonomi peran selaras prototipe
+  for (const rv of extra.roleVariants) {
+    await prisma.roleVariant.upsert({
+      where: { code: rv.code },
+      update: { label: rv.label, tier: ROLE_MAP[rv.tier], scope: rv.scope },
+      create: { code: rv.code, label: rv.label, tier: ROLE_MAP[rv.tier], scope: rv.scope },
+    });
+  }
+  console.log('  role_variants:', extra.roleVariants.length);
+
   // Users — one per role from ROLES constant
   for (const [roleKey, info] of Object.entries(ROLES)) {
     const email = info.email || `${roleKey}@pusmanpro.pln.co.id`;
+    const variant = await prisma.roleVariant.findUnique({
+      where: { code: REP_VARIANT[roleKey] },
+    });
     await prisma.user.upsert({
       where: { email },
-      update: {},
+      update: { roleVariantId: variant?.id ?? null },
       create: {
         email,
         name: info.name,
@@ -40,6 +72,7 @@ async function main() {
         unit: info.unit || 'KP',
         passwordHash: hash,
         isActive: true,
+        roleVariantId: variant?.id ?? null,
         prefs: { create: {} },
       },
     });
@@ -91,6 +124,31 @@ async function main() {
     where: { periodId: period.id },
     update: { data: DATA.risk as object },
     create: { ...meta, data: DATA.risk as object },
+  });
+
+  // New sections ported from prototype
+  await prisma.prosesBisnisSnapshot.upsert({
+    where: { periodId: period.id },
+    update: { data: extra.procBiz },
+    create: { ...meta, data: extra.procBiz },
+  });
+
+  await prisma.organisasiSnapshot.upsert({
+    where: { periodId: period.id },
+    update: { data: extra.organisasi },
+    create: { ...meta, data: extra.organisasi },
+  });
+
+  await prisma.gcgEsgSnapshot.upsert({
+    where: { periodId: period.id },
+    update: { data: extra.gcgEsg },
+    create: { ...meta, data: extra.gcgEsg },
+  });
+
+  await prisma.petaSnapshot.upsert({
+    where: { periodId: period.id },
+    update: { data: extra.peta },
+    create: { ...meta, data: extra.peta },
   });
 
   // Reports (approvals)

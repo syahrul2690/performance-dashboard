@@ -12,4 +12,7 @@ export class MetaController {
 
   @Get('periods')
   periods() { return this.meta.getPeriods(); }
+
+  @Get('role-variants')
+  roleVariants() { return this.meta.getRoleVariants(); }
 }

@@ -18,7 +18,13 @@ api.interceptors.response.use(
         refreshing = api
           .post('/auth/refresh')
           .then(() => { queue.forEach((r) => r()); queue.length = 0; })
-          .catch(() => { queue.length = 0; window.location.href = '/login'; })
+          .catch(() => {
+            queue.forEach((r) => r());
+            queue.length = 0;
+            if (window.location.pathname !== '/login') {
+              window.location.href = '/login';
+            }
+          })
           .finally(() => { refreshing = null; });
       }
       await new Promise<void>((res) => queue.push(res));
@@ -38,6 +44,7 @@ export const auth = {
 export const meta = {
   period: () => api.get('/meta/period').then((r) => r.data),
   periods: () => api.get('/meta/periods').then((r) => r.data),
+  roleVariants: () => api.get('/meta/role-variants').then((r) => r.data),
 };
 
 export const executive = {
@@ -68,6 +75,26 @@ export const humanCapital = {
 export const risk = {
   get: (periodId?: string) =>
     api.get('/risk', { params: { periodId } }).then((r) => r.data),
+};
+
+export const prosesBisnis = {
+  get: (periodId?: string) =>
+    api.get('/proses-bisnis', { params: { periodId } }).then((r) => r.data),
+};
+
+export const organisasi = {
+  get: (periodId?: string) =>
+    api.get('/organisasi', { params: { periodId } }).then((r) => r.data),
+};
+
+export const gcgEsg = {
+  get: (periodId?: string) =>
+    api.get('/gcg-esg', { params: { periodId } }).then((r) => r.data),
+};
+
+export const peta = {
+  get: (periodId?: string) =>
+    api.get('/peta', { params: { periodId } }).then((r) => r.data),
 };
 
 export const approvals = {

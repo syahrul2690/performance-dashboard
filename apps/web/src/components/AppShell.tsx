@@ -7,7 +7,7 @@ import {
   LayoutDashboard, DollarSign, Settings, Activity, Target,
   Users, CheckSquare, AlertTriangle, FileText, ClipboardList,
   Bell, Moon, Sun, LogOut, ChevronDown, Menu, X,
-  Zap, Search, Download,
+  Zap, Search, Download, Workflow, Network, Leaf, MapPin,
 } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -19,9 +19,13 @@ const NAV_ITEMS = [
     { to: '/', label: 'Executive Summary', icon: LayoutDashboard, end: true },
     { to: '/financial', label: 'Cost & Capex', icon: DollarSign },
     { to: '/operational', label: 'Operasional KPI', icon: Activity },
+    { to: '/proses-bisnis', label: 'Proses Bisnis L2', icon: Workflow },
+    { to: '/struktur-organisasi', label: 'Struktur Organisasi', icon: Network },
+    { to: '/gcg-esg', label: 'GCG & ESG', icon: Leaf },
     { to: '/strategic', label: 'Target Strategis', icon: Target },
     { to: '/human-capital', label: 'Human Capital', icon: Users },
     { to: '/risk', label: 'Manajemen Risiko', icon: AlertTriangle },
+    { to: '/peta', label: 'Peta Geografis UPMK', icon: MapPin },
   ]},
   { section: 'Workflow KM', items: [
     { to: '/workflow-km/usulan', label: 'Usulan KM', icon: FileText },
@@ -178,6 +182,11 @@ export function AppShell() {
                   <div className="user-dropdown-info">
                     <div className="user-dropdown-name">{user?.name}</div>
                     <div className="user-dropdown-email">{user?.email}</div>
+                    {user?.roleVariant && (
+                      <div className="user-dropdown-email">
+                        {user.roleVariant.label} · {user.roleVariant.scope}
+                      </div>
+                    )}
                   </div>
                   <NavLink to="/settings" className="user-dropdown-item" onClick={() => setUserMenuOpen(false)}>
                     <Settings size={14} /> Pengaturan

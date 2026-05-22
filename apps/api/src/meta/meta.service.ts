@@ -12,4 +12,10 @@ export class MetaService {
   async getPeriods() {
     return this.prisma.period.findMany({ orderBy: { yearMonth: 'desc' } });
   }
+
+  async getRoleVariants() {
+    return this.prisma.roleVariant.findMany({
+      orderBy: [{ tier: 'asc' }, { label: 'asc' }],
+    });
+  }
 }

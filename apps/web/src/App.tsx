@@ -8,6 +8,10 @@ import { OperationalPage } from './pages/OperationalPage';
 import { StrategicPage } from './pages/StrategicPage';
 import { HumanCapitalPage } from './pages/HumanCapitalPage';
 import { RiskPage } from './pages/RiskPage';
+import { ProsesBisnisPage } from './pages/ProsesBisnisPage';
+import { OrganisasiPage } from './pages/OrganisasiPage';
+import { GcgEsgPage } from './pages/GcgEsgPage';
+import { PetaPage } from './pages/PetaPage';
 import { ApprovalsPage } from './pages/ApprovalsPage';
 import { WorkflowKmUsulanPage } from './pages/WorkflowKmUsulanPage';
 import { WorkflowKmRealisasiPage } from './pages/WorkflowKmRealisasiPage';
@@ -31,6 +35,10 @@ export default function App() {
         <Route path="strategic" element={<StrategicPage />} />
         <Route path="human-capital" element={<HumanCapitalPage />} />
         <Route path="risk" element={<RiskPage />} />
+        <Route path="proses-bisnis" element={<ProsesBisnisPage />} />
+        <Route path="struktur-organisasi" element={<OrganisasiPage />} />
+        <Route path="gcg-esg" element={<GcgEsgPage />} />
+        <Route path="peta" element={<PetaPage />} />
         <Route path="approvals" element={<ApprovalsPage />} />
         <Route path="workflow-km/usulan" element={<WorkflowKmUsulanPage />} />
         <Route path="workflow-km/realisasi" element={<WorkflowKmRealisasiPage />} />
