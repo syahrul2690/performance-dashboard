@@ -34,8 +34,14 @@ interface PetaData {
 
 function statusColor(status: string): string {
   if (status === 'Baik') return '#46BD0D';
-  if (status === 'Hati-hati') return '#F9AF1C';
+  if (status === 'Hati-hati') return '#FBA806';
   return '#EC1C24';
+}
+
+function scoreClass(score: number): string {
+  if (score >= 100) return 'good';
+  if (score >= 95) return 'warn';
+  return 'bad';
 }
 
 function makeIcon(label: string, color: string): L.DivIcon {
@@ -64,7 +70,6 @@ export function PetaPage() {
   if (!d) return <div className="page-loading">Data tidak tersedia.</div>;
 
   const units = d.units ?? [];
-  const upmkOnly = units.filter((u) => u.code !== 'KP');
 
   return (
     <div className="page peta-page">
@@ -75,80 +80,98 @@ export function PetaPage() {
         </p>
       </div>
 
-      <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: 16 }}>
-        <MapContainer
-          center={[d.center.lat, d.center.lng]}
-          zoom={d.zoom}
-          style={{ height: 480, width: '100%' }}
-          scrollWheelZoom={false}
-        >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-          {units.map((u) => (
-            <Marker
-              key={u.code}
-              position={[u.lat, u.lng]}
-              icon={makeIcon(u.label, statusColor(u.status))}
-            >
-              <Popup>
-                <strong>{u.name}</strong>
-                <br />
-                {u.wilayah}
-                <br />
-                Proyek aktif: {u.projects} · Pegawai: {u.headcount}
-                <br />
-                Skor kinerja: {u.score} ({u.status})
-                <br />
-                Tim lapangan — EM {u.fieldTeams.elektromekanik} · Sipil{' '}
-                {u.fieldTeams.sipil} · Jaringan {u.fieldTeams.jaringan} · Adm{' '}
-                {u.fieldTeams.admKontrak}
-              </Popup>
-            </Marker>
-          ))}
-        </MapContainer>
-      </div>
-
-      <div className="card">
-        <div className="card-header">
-          <h3 className="card-title">Detail 5 UPMK</h3>
+      <div className="two-col-grid wide-left">
+        <div className="card p-0">
+          <div className="card-header compact">
+            <div className="card-title">Peta Geografis UPMK</div>
+            <span className="card-meta">{units.length} unit</span>
+          </div>
+          <MapContainer
+            center={[d.center.lat, d.center.lng]}
+            zoom={d.zoom}
+            style={{ height: 440, width: '100%' }}
+            scrollWheelZoom={false}
+          >
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+            {units.map((u) => (
+              <Marker
+                key={u.code}
+                position={[u.lat, u.lng]}
+                icon={makeIcon(u.label, statusColor(u.status))}
+              >
+                <Popup>
+                  <strong>{u.name}</strong>
+                  <br />
+                  {u.wilayah}
+                  <br />
+                  Proyek aktif: {u.projects} · Pegawai: {u.headcount}
+                  <br />
+                  Skor kinerja: {u.score} ({u.status})
+                </Popup>
+              </Marker>
+            ))}
+          </MapContainer>
+          <div className="upmk-legend">
+            <span className="upmk-legend-item">
+              <span className="upmk-legend-dot" style={{ background: '#46BD0D' }} />
+              Baik (≥100)
+            </span>
+            <span className="upmk-legend-item">
+              <span className="upmk-legend-dot" style={{ background: '#FBA806' }} />
+              Hati-hati (95–99)
+            </span>
+            <span className="upmk-legend-item">
+              <span className="upmk-legend-dot" style={{ background: '#EC1C24' }} />
+              Buruk (&lt;95)
+            </span>
+          </div>
         </div>
-        <div className="table-wrap">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Unit</th>
-                <th>Wilayah</th>
-                <th>Proyek</th>
-                <th>Pegawai</th>
-                <th>Tim Lapangan (EM/Sipil/Jar/Adm)</th>
-                <th>Skor</th>
-              </tr>
-            </thead>
-            <tbody>
-              {upmkOnly.map((u) => (
-                <tr key={u.code}>
-                  <td>{u.short}</td>
-                  <td>{u.wilayah}</td>
-                  <td>{u.projects}</td>
-                  <td>{u.headcount}</td>
-                  <td>
-                    {u.fieldTeams.elektromekanik}/{u.fieldTeams.sipil}/
-                    {u.fieldTeams.jaringan}/{u.fieldTeams.admKontrak}
-                  </td>
-                  <td>
-                    <span
-                      className="risk-score"
-                      style={{ backgroundColor: statusColor(u.status) }}
-                    >
-                      {u.score}
-                    </span>
-                  </td>
+
+        <div className="card p-0">
+          <div className="card-header compact">
+            <div className="card-title">Detail Unit &amp; Wilayah</div>
+          </div>
+          <div className="table-wrap">
+            <table className="unit-detail-table">
+              <thead>
+                <tr>
+                  <th>Unit</th>
+                  <th>Wilayah &amp; Tim Lapangan</th>
+                  <th>Proyek</th>
+                  <th>Pegawai</th>
+                  <th>Nilai</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {units.map((u) => (
+                  <tr key={u.code}>
+                    <td>
+                      <span className="unit-detail-code">{u.code}</span>
+                    </td>
+                    <td>
+                      <div>{u.wilayah}</div>
+                      <div className="unit-detail-teams">
+                        <span className="team-chip">EM {u.fieldTeams.elektromekanik}</span>
+                        <span className="team-chip">Sipil {u.fieldTeams.sipil}</span>
+                        <span className="team-chip">Jar {u.fieldTeams.jaringan}</span>
+                        <span className="team-chip">Adm {u.fieldTeams.admKontrak}</span>
+                      </div>
+                    </td>
+                    <td>{u.projects}</td>
+                    <td>{u.headcount}</td>
+                    <td>
+                      <span className={`unit-detail-score ${scoreClass(u.score)}`}>
+                        {u.score}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>

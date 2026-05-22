@@ -1,4 +1,8 @@
 import { useEffect, useState } from 'react';
+import {
+  Eye, Scale, CheckCircle2, Shield, Gavel, Leaf, Users, Building2,
+} from 'lucide-react';
+import type { ComponentType } from 'react';
 import { gcgEsg } from '../lib/api';
 
 interface Principle {
@@ -63,57 +67,56 @@ interface GcgEsgData {
   };
 }
 
-function Bar({ value, max, color }: { value: number; max: number; color: string }) {
-  return (
-    <div
-      style={{
-        background: 'var(--color-surface-sunken, #eee)',
-        borderRadius: 4,
-        height: 8,
-        overflow: 'hidden',
-      }}
-    >
-      <div
-        style={{
-          width: `${Math.min(100, (value / max) * 100)}%`,
-          background: color,
-          height: '100%',
-        }}
-      />
-    </div>
-  );
+const PRINCIPLE_ICON: Record<string, ComponentType<{ size?: number }>> = {
+  tra: Eye,
+  akt: Scale,
+  rsp: CheckCircle2,
+  ind: Shield,
+  wjr: Gavel,
+};
+
+const SEV_BADGE: Record<string, string> = {
+  high: 'badge-danger',
+  medium: 'badge-warning',
+  low: 'badge-success',
+};
+
+function barClass(actual: number, target: number): string {
+  if (actual >= target) return '';
+  if (actual >= target - 5) return 'warn';
+  return 'bad';
 }
 
-function MetricList({ metrics }: { metrics: EsgMetric[] }) {
+function EsgPillar({
+  variant, title, icon: Icon, score, metrics,
+}: {
+  variant: string;
+  title: string;
+  icon: ComponentType<{ size?: number }>;
+  score: number;
+  metrics: EsgMetric[];
+}) {
   return (
-    <div style={{ display: 'grid', gap: 10 }}>
+    <div className={`esg-pillar ${variant}`}>
+      <div className="esg-pillar-head">
+        <span className="esg-pillar-title">
+          <Icon size={18} /> {title}
+        </span>
+        <span className="esg-pillar-score">{score}</span>
+      </div>
       {metrics.map((m) => (
-        <div key={m.id}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-            <span>{m.name}</span>
-            <strong>
-              {m.actual} {m.unit}
-            </strong>
-          </div>
-          <Bar
-            value={m.better === 'lower' ? m.target : m.actual}
-            max={m.better === 'lower' ? m.actual || 1 : Math.max(m.target, m.actual)}
-            color={m.trend === 'up' || m.trend === 'down' ? '#46BD0D' : '#03A2B8'}
-          />
-          <div style={{ fontSize: 11, color: 'var(--color-text-subtle)' }}>
-            Target {m.target} {m.unit} · baseline {m.baseline}
-          </div>
+        <div key={m.id} className="esg-metric">
+          <span className="em-name">{m.name}</span>
+          <span className="em-val">
+            {m.actual}
+            {m.unit && m.unit !== '%' ? ` ${m.unit}` : m.unit}
+          </span>
+          <span className="em-tgt">T: {m.target}</span>
         </div>
       ))}
     </div>
   );
 }
-
-const SEV_COLOR: Record<string, string> = {
-  high: 'danger',
-  medium: 'warning',
-  low: 'success',
-};
 
 export function GcgEsgPage() {
   const [data, setData] = useState<{ data: GcgEsgData | null } | null>(null);
@@ -138,143 +141,118 @@ export function GcgEsgPage() {
         </p>
       </div>
 
-      {/* Hero */}
-      <div className="card" style={{ padding: 20, marginBottom: 16 }}>
-        <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap', alignItems: 'center' }}>
-          <div>
-            <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
-              GCG Composite Score
-            </div>
-            <div style={{ fontSize: 44, fontWeight: 800, color: '#125D72', lineHeight: 1.1 }}>
-              {gcg.overallScore}
-              <span style={{ fontSize: 18, color: 'var(--color-text-subtle)' }}>
-                {' '}
-                / {gcg.maxScore}
-              </span>
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
-              Target {gcg.target} · sebelumnya {gcg.previousScore}
-            </div>
+      <div className="gcg-hero">
+        <div className="gcg-hero-score">
+          <div className="gcg-hero-score-val">{gcg.overallScore}</div>
+          <div className="gcg-hero-score-tgt">
+            Target {gcg.target} · Maks {gcg.maxScore}
           </div>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-              gap: 12,
-              flex: 1,
-            }}
-          >
-            <div className="kpi-strip-item card">
-              <div className="kpi-strip-label">Audit Closure Rate</div>
-              <div className="kpi-strip-value">{gcg.audit.closureRate}%</div>
+        </div>
+        <div className="gcg-hero-info">
+          <h2>GCG Composite Score</h2>
+          <p>
+            Skor tata kelola perusahaan PUSMANPRO — naik dari {gcg.previousScore} pada
+            periode sebelumnya.
+          </p>
+          <div className="gcg-hero-bars">
+            <div className="gcg-mini">
+              <div className="label">Audit Closure Rate</div>
+              <div className="value">{gcg.audit.closureRate}%</div>
             </div>
-            <div className="kpi-strip-item card">
-              <div className="kpi-strip-label">SMAP ISO 37001</div>
-              <div className="kpi-strip-value">{gcg.smap.score}</div>
+            <div className="gcg-mini">
+              <div className="label">SMAP ISO 37001</div>
+              <div className="value">{gcg.smap.score}</div>
             </div>
-            <div className="kpi-strip-item card">
-              <div className="kpi-strip-label">Whistleblower Resolved</div>
-              <div className="kpi-strip-value">
+            <div className="gcg-mini">
+              <div className="label">Whistleblower</div>
+              <div className="value">
                 {gcg.whistleblower.resolved}/{gcg.whistleblower.reports2026}
               </div>
             </div>
-            <div className="kpi-strip-item card">
-              <div className="kpi-strip-label">ESG Composite</div>
-              <div className="kpi-strip-value">{esg.score.composite}</div>
+            <div className="gcg-mini">
+              <div className="label">ESG Composite</div>
+              <div className="value">{esg.score.composite}</div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* 5 GCG principles */}
-      <div className="card" style={{ padding: 16, marginBottom: 16 }}>
-        <div className="card-header">
-          <h3 className="card-title">5 Prinsip GCG</h3>
-        </div>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-            gap: 14,
-          }}
-        >
-          {gcg.principles.map((p) => (
-            <div key={p.id} className="card" style={{ padding: 14 }}>
-              <strong>{p.name}</strong>
-              <div
-                style={{
-                  fontSize: 12,
-                  color: 'var(--color-text-muted)',
-                  margin: '4px 0 8px',
-                }}
-              >
-                {p.desc}
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-                <span>
-                  Aktual <strong>{p.actual}</strong>
+      <div className="section-title-row">
+        <h2 className="section-title">5 Prinsip GCG</h2>
+      </div>
+      <div className="gcg-principle-grid">
+        {gcg.principles.map((p) => {
+          const Icon = PRINCIPLE_ICON[p.id] ?? Shield;
+          return (
+            <div key={p.id} className="gcg-principle">
+              <div className="gcg-principle-head">
+                <span className="gcg-principle-icon">
+                  <Icon size={16} />
                 </span>
-                <span>Target {p.target}</span>
+                <span className="gcg-principle-name">{p.name}</span>
               </div>
-              <Bar value={p.actual} max={100} color="#125D72" />
+              <div className="gcg-principle-desc">{p.desc}</div>
+              <div className="gcg-principle-meta">
+                <span className="gcg-principle-val">{p.actual}</span>
+                <span className="gcg-principle-tgt">Target {p.target}</span>
+              </div>
+              <div className="gcg-bar">
+                <span
+                  className={barClass(p.actual, p.target)}
+                  style={{ width: `${p.actual}%` }}
+                />
+              </div>
             </div>
-          ))}
-        </div>
+          );
+        })}
       </div>
 
-      {/* ESG 3 pillars */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-          gap: 16,
-          marginBottom: 16,
-        }}
-      >
-        <div className="card" style={{ padding: 16 }}>
-          <div className="card-header">
-            <h3 className="card-title">Environment (E = {esg.score.e})</h3>
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--color-text-subtle)', marginBottom: 10 }}>
-            {esg.environment.nzePathway}
-          </div>
-          <MetricList metrics={esg.environment.metrics} />
-        </div>
-        <div className="card" style={{ padding: 16 }}>
-          <div className="card-header">
-            <h3 className="card-title">Social (S = {esg.score.s})</h3>
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--color-text-subtle)', marginBottom: 10 }}>
-            {esg.social.beneficiaries.toLocaleString('id-ID')} penerima manfaat · TJSL Rp{' '}
-            {esg.social.tjslBudgetSpentRpM} M
-          </div>
-          <MetricList metrics={esg.social.metrics} />
-        </div>
-        <div className="card" style={{ padding: 16 }}>
-          <div className="card-header">
-            <h3 className="card-title">Governance (G = {esg.score.g})</h3>
-          </div>
-          <MetricList metrics={esg.governance.metrics} />
-        </div>
+      <div className="section-title-row">
+        <h2 className="section-title">ESG Triple-Pillar Scorecard</h2>
+      </div>
+      <div className="esg-pillars">
+        <EsgPillar
+          variant="env"
+          title="Environment"
+          icon={Leaf}
+          score={esg.score.e}
+          metrics={esg.environment.metrics}
+        />
+        <EsgPillar
+          variant="soc"
+          title="Social"
+          icon={Users}
+          score={esg.score.s}
+          metrics={esg.social.metrics}
+        />
+        <EsgPillar
+          variant="gov"
+          title="Governance"
+          icon={Building2}
+          score={esg.score.g}
+          metrics={esg.governance.metrics}
+        />
       </div>
 
-      {/* Risk linkage */}
-      <div className="card" style={{ padding: 16 }}>
-        <div className="card-header">
-          <h3 className="card-title">
-            Keterkaitan Risiko — {risk.total} risiko · {risk.highRisk} prioritas tinggi ·
-            mitigasi {risk.mitigationRate}%
-          </h3>
+      <div className="card p-0">
+        <div className="card-header compact">
+          <div className="card-title">Keterkaitan Risiko (Proses 11.0)</div>
+          <span className="card-meta">
+            {risk.total} risiko · {risk.highRisk} prioritas tinggi · mitigasi{' '}
+            {risk.mitigationRate}%
+          </span>
         </div>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
-          {risk.byCategory.map((c) => (
-            <span key={c.cat} className="badge" style={{ padding: '4px 10px' }}>
-              {c.cat}: {c.count} ({c.high} tinggi)
-            </span>
-          ))}
+        <div className="card-body">
+          <div className="risk-cat-row">
+            {risk.byCategory.map((c) => (
+              <span key={c.cat} className="meta-pill">
+                {c.cat}: {c.count} ({c.high} tinggi)
+              </span>
+            ))}
+          </div>
         </div>
         <div className="table-wrap">
-          <table className="data-table">
+          <table className="data-table compact">
             <thead>
               <tr>
                 <th>ID</th>
@@ -291,7 +269,7 @@ export function GcgEsgPage() {
                   <td>{r.name}</td>
                   <td>{r.cat}</td>
                   <td>
-                    <span className={`badge badge-${SEV_COLOR[r.severity] ?? 'warning'}`}>
+                    <span className={`badge-pill ${SEV_BADGE[r.severity] ?? 'badge-warning'}`}>
                       {r.severity}
                     </span>
                   </td>

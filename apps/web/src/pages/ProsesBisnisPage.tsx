@@ -19,7 +19,7 @@ interface ProsesData {
 
 const MATURITY_COLOR: Record<number, string> = {
   1: '#EC1C24',
-  2: '#F9AF1C',
+  2: '#FBA806',
   3: '#03A2B8',
   4: '#46BD0D',
 };
@@ -52,92 +52,70 @@ export function ProsesBisnisPage() {
         </p>
       </div>
 
-      <div className="kpi-strip">
-        <div className="kpi-strip-item card">
-          <div className="kpi-strip-label">Total Kelompok Proses</div>
-          <div className="kpi-strip-value">{groups.length}</div>
+      <div className="four-col-grid">
+        <div className="summary-hero-card kpi">
+          <div className="summary-hero-label">Total Kelompok Proses</div>
+          <div className="summary-hero-value">{groups.length}</div>
+          <div className="summary-hero-meta">Klasifikasi proses bisnis L2</div>
         </div>
-        <div className="kpi-strip-item card">
-          <div className="kpi-strip-label">Core Process (5.0)</div>
-          <div className="kpi-strip-value">{core ? core.score : '—'}</div>
+        <div className="summary-hero-card pi">
+          <div className="summary-hero-label">Core Process (5.0)</div>
+          <div className="summary-hero-value">{core ? core.score : '—'}</div>
+          <div className="summary-hero-meta">{core ? core.name : 'Menyediakan Jasa'}</div>
         </div>
-        <div className="kpi-strip-item card">
-          <div className="kpi-strip-label">Rata-rata Skor Maturity</div>
-          <div className="kpi-strip-value">{avg}</div>
+        <div className="summary-hero-card pen">
+          <div className="summary-hero-label">Rata-rata Skor Maturity</div>
+          <div className="summary-hero-value">{avg}</div>
+          <div className="summary-hero-meta">Skala 0–100</div>
         </div>
-        <div className="kpi-strip-item card">
-          <div className="kpi-strip-label">Distribusi F / P / A / M</div>
-          <div className="kpi-strip-value">{dist.join(' / ')}</div>
+        <div className="summary-hero-card total">
+          <div className="summary-hero-label">Distribusi F / P / A / M</div>
+          <div className="summary-hero-value">{dist.join(' / ')}</div>
+          <div className="summary-hero-meta">Foundational → Mastery</div>
         </div>
       </div>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))',
-          gap: 16,
-        }}
-      >
+      <div className="procbiz-grid">
         {groups.map((g) => (
           <div
             key={g.code}
-            className="card"
-            style={{ padding: 16, borderLeft: `4px solid ${MATURITY_COLOR[g.maturity]}` }}
+            className={`procbiz-card maturity-${g.maturity}${g.core ? ' core' : ''}`}
           >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: 8,
-              }}
-            >
-              <strong>
-                {g.code} — {g.name}
-              </strong>
-              {g.core && <span className="badge badge-warning">CORE</span>}
+            {g.core && <span className="badge-core">CORE</span>}
+            <div className="procbiz-head">
+              <span className="procbiz-num">{g.code}</span>
+              <span className="procbiz-name">{g.name}</span>
             </div>
-            <div
-              style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 10 }}
-            >
-              {g.desc}
+            <div className="procbiz-sub">{g.desc}</div>
+            <div className="procbiz-bar">
+              <span style={{ width: `${g.score}%` }} />
             </div>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                fontSize: 12,
-                color: 'var(--color-text-muted)',
-              }}
-            >
+            <div className="procbiz-meta">
               <span>Owner: {g.owner}</span>
-              <span style={{ color: MATURITY_COLOR[g.maturity], fontWeight: 700 }}>
+              <strong>
                 {d.maturityLabels[String(g.maturity)]} · {g.score}
-              </span>
+              </strong>
             </div>
           </div>
         ))}
       </div>
 
-      <div className="card" style={{ padding: 16, marginTop: 16 }}>
-        <div className="card-header">
-          <h3 className="card-title">Legenda Maturity</h3>
+      <div className="card">
+        <div className="card-header compact">
+          <div className="card-title">Legenda Maturity</div>
         </div>
-        <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
-          {[1, 2, 3, 4].map((m) => (
-            <span key={m} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span
-                style={{
-                  width: 12,
-                  height: 12,
-                  borderRadius: 3,
-                  background: MATURITY_COLOR[m],
-                  display: 'inline-block',
-                }}
-              />
-              {m} — {d.maturityLabels[String(m)]}
-            </span>
-          ))}
+        <div className="card-body">
+          <div className="procbiz-legend">
+            {[1, 2, 3, 4].map((m) => (
+              <span key={m} className="procbiz-legend-item">
+                <span
+                  className="procbiz-legend-dot"
+                  style={{ background: MATURITY_COLOR[m] }}
+                />
+                {m} — {d.maturityLabels[String(m)]}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
     </div>
