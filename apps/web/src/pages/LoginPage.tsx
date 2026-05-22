@@ -60,7 +60,7 @@ export function LoginPage() {
             PT PLN (Persero) PUSAT MANAJEMEN PROYEK
           </span>
           <img
-            src="/brand/logo_pln_simpp_data.png"
+            src="/brand/logo_simpp_brand_data.png"
             alt="SIMPP"
             className="login-brand-strip-simpp"
             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
