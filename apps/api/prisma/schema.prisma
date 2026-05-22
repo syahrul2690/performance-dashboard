@@ -314,3 +314,19 @@ model PetaSnapshot {
   @@unique([periodId])
   @@map("peta_snapshots")
 }
+
+model KontrakManajemen {
+  id          String   @id @default(cuid())
+  periodId    String
+  unitCode    String
+  bidang      String
+  holder      String
+  kpiItems    Json
+  status      String   @default("draft")
+  submitter   String
+  submittedAt DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([periodId, unitCode])
+  @@map("kontrak_manajemen")
+}

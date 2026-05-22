@@ -30,6 +30,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false));
   }, []);
 
+  // When a non-auth API call gets a persistent 401 (refresh also failed), clear user
+  useEffect(() => {
+    const handler = () => setUser(null);
+    window.addEventListener('auth:expired', handler);
+    return () => window.removeEventListener('auth:expired', handler);
+  }, []);
+
   const login = useCallback(async (email: string, password: string) => {
     const { user: u } = await authApi.login(email, password);
     setUser(u);

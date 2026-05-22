@@ -31,6 +31,7 @@ export interface Period {
 export interface Kpi {
   id: string;
   label: string;
+  name?: string;
   value: number;
   formatted?: string;
   delta?: number;
@@ -38,6 +39,15 @@ export interface Kpi {
   icon?: string;
   sparkline?: number[];
   target?: number;
+  actual?: number;
+  bobot?: number;
+  nilai?: number;
+  achievement?: number;
+  satuan?: string;
+  unit?: string;
+  bidang?: string;
+  category?: string;
+  polarity?: string;
   status?: string;
 }
 
@@ -52,6 +62,8 @@ export interface HealthScore {
 
 export interface UnitRanking {
   code: string;
+  name?: string;
+  unit?: string;
   score: number;
   status: string;
   projects: number;
@@ -115,7 +127,7 @@ export interface KMDocument {
   tipe: 'WF1' | 'WF1B' | 'WF2' | 'WF3';
   bidangUnit: string;
   holder: string;
-  status: 'IN_REVIEW_C1' | 'IN_REVIEW_C2' | 'IN_REVIEW_SM' | 'APPROVED' | 'RETURNED';
+  status: 'IN_REVIEW_C1' | 'IN_REVIEW_C2' | 'IN_REVIEW_SM' | 'APPROVED' | 'SIGNED_GM' | 'RETURNED' | 'OVERDUE' | 'DRAFT';
   deadline?: string;
   slaRemain?: number;
   reviews: KMReview[];
@@ -154,6 +166,7 @@ export interface RiskItem {
   id: string;
   desc: string;
   cat: string;
+  category?: string;
   unit: string;
   likelihood: number;
   impact: number;
@@ -162,4 +175,17 @@ export interface RiskItem {
   mitigation: string;
   mitigationPct: number;
   dueDate: string;
+}
+
+export interface KontrakManajemen {
+  id: string;
+  periodId: string;
+  unitCode: string;
+  bidang: string;
+  holder: string;
+  kpiItems: Record<string, unknown>[];
+  status: 'draft' | 'submitted';
+  submitter: string;
+  submittedAt: string;
+  updatedAt: string;
 }

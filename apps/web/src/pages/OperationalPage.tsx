@@ -1,60 +1,264 @@
 import { useEffect, useState } from 'react';
 import { operational } from '../lib/api';
+import { Target, BarChart2, ShieldAlert } from 'lucide-react';
+import { SkeletonTable, EmptyState, ErrorState } from '../components/LoadState';
+
+type Kpi = {
+  id: string; no?: string; label?: string; name?: string; indikator?: string; formula?: string;
+  target: number; actual?: number; realisasi?: number; bobot: number;
+  achievement?: number; nilai?: number; status: string; satuan?: string; unit?: string;
+  polarity?: string; polaritas?: string; ytd?: boolean; note?: string; commentary?: string;
+};
+
+type Summary = {
+  kpiNilai: number; kpiBobot: number;
+  piNilai: number; piBobot: number;
+  kepatuhanPenalty: number;
+  totalNilai: number; totalBobot: number;
+  status: string;
+};
+
+type Kepatuhan = { name: string; maxPenalty: number; applied: number; target: string; status: string };
+
+function fmt(v: number, d = 2) {
+  return v?.toLocaleString('id-ID', { minimumFractionDigits: d, maximumFractionDigits: d }) ?? '—';
+}
+
+function pct(v: number, d = 1) {
+  return (v ?? 0).toFixed(d) + '%';
+}
+
+function statusPill(s: string) {
+  const cls = s === 'on-track' || s === 'completed' ? 'completed'
+    : s === 'at-risk' ? 'at-risk'
+    : s === 'delayed' ? 'delayed'
+    : 'needs-revision';
+  return <span className={`status-pill ${cls}`}>{s === 'on-track' ? 'On Track' : s === 'at-risk' ? 'At Risk' : s === 'delayed' ? 'Tertinggal' : s === 'completed' ? 'Tercapai' : s}</span>;
+}
 
 export function OperationalPage() {
   const [data, setData] = useState<{ data: Record<string, unknown> } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    operational.get().then(setData).catch(console.error).finally(() => setLoading(false));
+    operational.get()
+      .then(setData)
+      .catch((e) => setError(e?.message ?? 'Gagal memuat data'))
+      .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div className="page-loading">Memuat…</div>;
-  const d = data?.data as Record<string, unknown> | undefined;
-  const kpis = (d?.kpis ?? []) as Array<Record<string, unknown>>;
+  if (loading) {
+    return (
+      <div className="page">
+        <div className="page-header"><h1 className="page-title">Operational KPIs</h1></div>
+        <div className="four-col-grid">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="summary-hero-card" style={{ minHeight: 120 }}>
+              <div className="skeleton-line skeleton" style={{ width: '70%', height: 12 }} />
+              <div className="skeleton-line skeleton" style={{ width: '50%', height: 32, marginTop: 8 }} />
+              <div className="skeleton-line skeleton" style={{ width: '40%', height: 12, marginTop: 8 }} />
+            </div>
+          ))}
+        </div>
+        <SkeletonTable rows={6} cols={9} />
+      </div>
+    );
+  }
+
+  if (error) return <ErrorState title="Gagal memuat Operational KPIs" message={error} />;
+
+  const d = (data?.data ?? {}) as Record<string, unknown>;
+  const sm = (d.summary ?? {}) as Summary;
+  const kpis = (d.kpis ?? []) as Kpi[];
+  const pis = (d.pis ?? d.pi ?? []) as Kpi[];
+  const kepatuhan = (d.kepatuhan ?? []) as Kepatuhan[];
+
+  if (!data?.data || (kpis.length === 0 && pis.length === 0)) {
+    return <EmptyState title="Data Operational KPI tidak tersedia" />;
+  }
+
+  const kpiRows = kpis.filter(k => !k.id?.startsWith('pi'));
+  const piRows = pis.length > 0 ? pis : kpis.filter(k => k.id?.startsWith('pi'));
+
+  function KpiTable({ rows }: { rows: Kpi[] }) {
+    if (!rows.length) return <EmptyState title="Tidak ada data" />;
+    return (
+      <div className="table-wrap">
+        <table className="data-table compact">
+          <thead>
+            <tr>
+              <th>No</th>
+              <th>Indikator</th>
+              <th>Satuan</th>
+              <th className="num">Target</th>
+              <th className="num">Realisasi</th>
+              <th className="num">Bobot</th>
+              <th className="num">Achv</th>
+              <th className="num">Nilai</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((k, i) => {
+              const actual = k.actual ?? k.realisasi ?? 0;
+              const ach = k.achievement ?? (k.target ? (actual / k.target) * 100 : 0);
+              const nilai = k.nilai ?? 0;
+              return (
+                <tr key={i}>
+                  <td style={{ color: 'var(--color-text-muted)' }}>{k.no ?? k.id}</td>
+                  <td>
+                    <div style={{ fontWeight: 600, color: 'var(--color-text)', fontSize: 'var(--text-xs)' }}>{k.name ?? k.label}</div>
+                    {(k.formula ?? k.commentary) && <div style={{ fontSize: 10, color: 'var(--color-text-subtle)', marginTop: 2 }}>{k.formula ?? k.commentary}</div>}
+                  </td>
+                  <td style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>{k.satuan ?? k.unit ?? '—'}</td>
+                  <td className="num">{fmt(k.target, 1)}</td>
+                  <td className="num" style={{ fontWeight: 700 }}>{fmt(actual, 2)}</td>
+                  <td className="num">{k.bobot}</td>
+                  <td className={`num ${ach >= 100 ? 'delta-positive' : ach >= 90 ? '' : 'delta-negative'}`} style={{ fontWeight: 700 }}>
+                    {fmt(ach, 1)}%
+                  </td>
+                  <td className="num" style={{ fontWeight: 700 }}>{fmt(nilai, 2)}</td>
+                  <td>{statusPill(k.status)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
 
   return (
     <div className="page operational-page">
-      <div className="page-header">
-        <h1 className="page-title">Operasional KPI</h1>
-        <p className="page-subtitle">Key Performance Indicators Operasional</p>
-      </div>
-
-      <div className="kpi-table-card card">
-        <div className="card-header"><h3 className="card-title">Daftar KPI Operasional</h3></div>
-        <div className="table-wrap">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Indikator</th>
-                <th>Target</th>
-                <th>Realisasi</th>
-                <th>Bobot</th>
-                <th>Achievement</th>
-                <th>Nilai</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {kpis.map((kpi, i) => (
-                <tr key={i}>
-                  <td>{kpi.label as string}</td>
-                  <td>{String(kpi.target ?? '')}</td>
-                  <td>{String(kpi.actual ?? kpi.value ?? '')}</td>
-                  <td>{String(kpi.bobot ?? '')}</td>
-                  <td>{typeof kpi.achievement === 'number' ? `${kpi.achievement}%` : String(kpi.achievement ?? '')}</td>
-                  <td>{String(kpi.nilai ?? '')}</td>
-                  <td>
-                    <span className={`badge badge-${kpi.status === 'Baik' ? 'success' : kpi.status === 'Hati-hati' ? 'warning' : 'danger'}`}>
-                      {kpi.status as string}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* 4 Hero Cards */}
+      <div className="four-col-grid">
+        <div className="summary-hero-card kpi">
+          <div className="summary-hero-label">Key Performance Indicator (KPI)</div>
+          <div className="summary-hero-value">{fmt(sm.kpiNilai)}<span className="of">/ {sm.kpiBobot}</span></div>
+          <div className="summary-hero-meta delta-positive">{pct((sm.kpiNilai / (sm.kpiBobot || 1)) * 100)} pencapaian</div>
+        </div>
+        <div className="summary-hero-card pi">
+          <div className="summary-hero-label">Performance Indicator (PI)</div>
+          <div className="summary-hero-value">{fmt(sm.piNilai)}<span className="of">/ {sm.piBobot}</span></div>
+          <div className="summary-hero-meta delta-positive">{pct((sm.piNilai / (sm.piBobot || 1)) * 100)} pencapaian</div>
+        </div>
+        <div className="summary-hero-card pen">
+          <div className="summary-hero-label">Pengurang Kepatuhan</div>
+          <div className="summary-hero-value">{sm.kepatuhanPenalty}<span className="of">(max -30)</span></div>
+          <div className="summary-hero-meta delta-positive">
+            {(sm.kepatuhanPenalty ?? 0) === 0 ? 'Tidak ada pengurang' : `${sm.kepatuhanPenalty} poin`}
+          </div>
+        </div>
+        <div className="summary-hero-card total">
+          <div className="summary-hero-label" style={{ color: 'var(--color-accent)' }}>TOTAL NILAI KINERJA</div>
+          <div className="summary-hero-value">{fmt(sm.totalNilai)}<span className="of">/ {sm.totalBobot}</span></div>
+          <div className="summary-hero-meta">
+            <span className={`status-pill ${(sm.totalNilai ?? 0) >= 100 ? 'completed' : (sm.totalNilai ?? 0) >= 95 ? 'at-risk' : 'delayed'}`}>
+              {sm.status ?? '—'}
+            </span>
+          </div>
         </div>
       </div>
+
+      {/* KPI + PI side by side */}
+      <div className="two-col-grid" style={{ alignItems: 'start', marginBottom: 'var(--space-6)' }}>
+        <div className="card p-0">
+          <div className="card-header compact" style={{ borderBottom: '3px solid var(--color-accent)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flex: 1 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 'var(--radius-md)', background: 'var(--color-accent-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Target size={16} color="var(--color-accent)" />
+              </div>
+              <div>
+                <div className="card-title" style={{ color: 'var(--color-accent)', fontSize: 'var(--text-sm)' }}>KPI</div>
+                <div style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-muted)' }}>{kpiRows.length} indikator · Bobot 40</div>
+              </div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: 'var(--text-lg)', fontWeight: 800, color: 'var(--color-accent)' }}>{fmt(sm.kpiNilai)}<span style={{ fontSize: 'var(--text-xs)', fontWeight: 400, color: 'var(--color-text-muted)' }}> / {sm.kpiBobot}</span></div>
+            </div>
+          </div>
+          <KpiTable rows={kpiRows} />
+        </div>
+
+        <div className="card p-0">
+          <div className="card-header compact" style={{ borderBottom: '3px solid var(--color-info)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flex: 1 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 'var(--radius-md)', background: 'rgba(3,162,184,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <BarChart2 size={16} color="var(--color-info)" />
+              </div>
+              <div>
+                <div className="card-title" style={{ color: 'var(--color-info)', fontSize: 'var(--text-sm)' }}>PI</div>
+                <div style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-muted)' }}>{piRows.length} indikator · Bobot 60</div>
+              </div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: 'var(--text-lg)', fontWeight: 800, color: 'var(--color-info)' }}>{fmt(sm.piNilai)}<span style={{ fontSize: 'var(--text-xs)', fontWeight: 400, color: 'var(--color-text-muted)' }}> / {sm.piBobot}</span></div>
+            </div>
+          </div>
+          <KpiTable rows={piRows} />
+        </div>
+      </div>
+
+      {/* Pengurang Kepatuhan */}
+      {kepatuhan.length > 0 && (
+        <div className="card p-0">
+          <div className="card-header compact" style={{ borderBottom: '3px solid var(--color-danger)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flex: 1 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 'var(--radius-md)', background: 'var(--color-danger-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <ShieldAlert size={16} color="var(--color-danger)" />
+              </div>
+              <div>
+                <div className="card-title" style={{ color: 'var(--color-danger)', fontSize: 'var(--text-sm)' }}>Pengurang Kepatuhan</div>
+                <div style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-muted)' }}>Maks −30 poin</div>
+              </div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: 'var(--text-lg)', fontWeight: 800, color: (sm.kepatuhanPenalty ?? 0) < 0 ? 'var(--color-danger)' : 'var(--color-success)' }}>
+                {(sm.kepatuhanPenalty ?? 0) < 0 ? sm.kepatuhanPenalty : '0 ✓'}
+              </div>
+            </div>
+          </div>
+          <div className="table-wrap">
+            <table className="data-table compact">
+              <thead>
+                <tr>
+                  <th>Sub-Indikator</th>
+                  <th className="num">Maks</th>
+                  <th className="num">Aktual</th>
+                  <th>Target</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {kepatuhan.map((k, i) => (
+                  <tr key={i}>
+                    <td>{k.name}</td>
+                    <td className="num" style={{ color: 'var(--color-danger)', fontWeight: 700 }}>{k.maxPenalty}</td>
+                    <td className="num" style={{ fontWeight: 700, color: k.applied < 0 ? 'var(--color-danger)' : 'var(--color-success)' }}>
+                      {k.applied < 0 ? k.applied : '—'}
+                    </td>
+                    <td style={{ color: 'var(--color-text-muted)' }}>{k.target}</td>
+                    <td>
+                      <span className={`status-pill ${k.status === 'success' ? 'completed' : 'needs-revision'}`}>
+                        {k.status === 'success' ? '✓ Aman' : '⚠ Perhatian'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+                <tr style={{ background: 'var(--color-surface-2)', fontWeight: 700 }}>
+                  <td>TOTAL</td>
+                  <td className="num" style={{ color: 'var(--color-danger)' }}>−30</td>
+                  <td className="num" style={{ fontWeight: 800, color: (sm.kepatuhanPenalty ?? 0) < 0 ? 'var(--color-danger)' : 'var(--color-success)' }}>
+                    {(sm.kepatuhanPenalty ?? 0) < 0 ? sm.kepatuhanPenalty : '0 ✓'}
+                  </td>
+                  <td colSpan={2} />
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

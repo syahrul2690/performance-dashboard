@@ -40,13 +40,13 @@
       --space-5:  20px; --space-6:  24px; --space-8:  32px; --space-10: 40px;
       --space-12: 48px; --space-16: 64px;
 
-      --text-2xs:  clamp(11px, 0.72rem, 12px);
-      --text-xs:   clamp(12px, 0.80rem, 13px);
-      --text-sm:   clamp(13px, 0.88rem, 14px);
-      --text-base: clamp(15px, 1.00rem, 16px);
-      --text-md:   clamp(16px, 1.06rem, 17px);
-      --text-lg:   clamp(18px, 1.18rem, 20px);
-      --text-xl:   clamp(22px, 1.50rem, 26px);
+      --text-2xs:  clamp(12px, 0.80rem, 13px);
+      --text-xs:   clamp(13px, 0.88rem, 14px);
+      --text-sm:   clamp(14px, 0.94rem, 15px);
+      --text-base: clamp(16px, 1.06rem, 17px);
+      --text-md:   clamp(17px, 1.13rem, 18px);
+      --text-lg:   clamp(19px, 1.25rem, 21px);
+      --text-xl:   clamp(23px, 1.56rem, 27px);
 
       --display-sm: clamp(24px, 2.0rem, 30px);
       --display-md: clamp(32px, 2.6rem, 40px);
@@ -912,7 +912,7 @@
       line-height: 1.1; letter-spacing: -0.005em;
     }
     .preview-card-value sub {
-      font-family: 'Inter', sans-serif; font-size: 50%;
+      font-family: system-ui, sans-serif; font-size: 50%;
       color: var(--color-text-muted); vertical-align: baseline;
       margin-left: 2px;
     }
@@ -1035,103 +1035,7 @@
       gap: var(--space-1);
     }
     .summary-hero-value .of {
-      font-family: 'Inter', sans-serif;
-      font-size: 40%;
-      color: var(--color-text-muted);
-      font-weight: 500;
-    }
-    .summary-hero-card.total .summary-hero-value { color: var(--color-accent); }
-    .summary-hero-meta {
-      font-size: var(--text-xs);
-      color: var(--color-text-muted);
-    }
-
-    .kepatuhan-summary {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-3);
-    }
-    .kepatuhan-big {
-      text-align: center;
-      padding: var(--space-4) 0;
-      background: var(--color-success-tint);
-      border-radius: var(--radius-md);
-      border: 1px solid rgba(16, 185, 129, 0.3);
-    }
-    .kepatuhan-big-value {
-      font-family: 'Manrope', system-ui, sans-serif;
-      font-size: var(--display-lg);
-      color: var(--color-success);
-      line-height: 1;
-    }
-    .kepatuhan-big-label {
-      font-size: var(--text-xs);
-      color: var(--color-text-muted);
-      margin-top: var(--space-1);
-    }
-    .kepatuhan-rows {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-1);
-    }
-    .kepatuhan-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: var(--space-2) var(--space-3);
-      background: var(--color-surface-2);
-      border-radius: var(--radius-sm);
-      font-size: var(--text-xs);
-    }
-    .kepatuhan-row-label {
-      color: var(--color-text-muted);
-      flex: 1;
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .kepatuhan-row-max {
-      color: var(--color-text-subtle);
-      font-size: var(--text-2xs);
-      margin: 0 var(--space-2);
-    }
-
-    /* =========================================================
-       COST & CAPEX PERFORMANCE PAGE (Fase 6)
-       ========================================================= */
-    .ratio-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: var(--space-3);
-      margin-bottom: var(--space-6);
-    }
-    .ratio-card {
-      background: var(--color-surface);
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-md);
-      padding: var(--space-4);
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-2);
-      transition: border-color var(--tr-fast), transform var(--tr-fast);
-    }
-    .ratio-card:hover { border-color: var(--color-accent-tint); transform: translateY(-1px); }
-    .ratio-card-label {
-      font-size: var(--text-xs);
-      color: var(--color-text-muted);
-      font-weight: 500;
-      letter-spacing: 0.02em;
-    }
-    .ratio-card-value {
-      font-family: 'Manrope', system-ui, sans-serif;
-      font-size: var(--display-sm);
-      color: var(--color-text);
-      line-height: 1;
-      letter-spacing: -0.005em;
-    }
-    .ratio-card-value .ratio-card-unit {
-      font-family: 'Inter', sans-serif;
+      font-family: system-ui, sans-serif;
       font-size: 50%;
       color: var(--color-text-muted);
       font-weight: 500;
@@ -1390,7 +1294,7 @@
       gap: var(--space-2);
     }
     .metric-card-unit {
-      font-family: 'Inter', sans-serif;
+      font-family: system-ui, sans-serif;
       font-size: 40%;
       color: var(--color-text-muted);
       font-weight: 500;
@@ -1769,7 +1673,7 @@
       font-size: var(--text-lg); color: var(--color-text);
       line-height: 1.1;
     }
-    .kpi-detail-stat .stat-value .status-pill { font-family: 'Inter', sans-serif; }
+    .kpi-detail-stat .stat-value .status-pill { font-family: system-ui, sans-serif; }
 
     /* Skeleton */
     .skeleton {
