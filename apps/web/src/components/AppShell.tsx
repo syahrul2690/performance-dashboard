@@ -111,7 +111,7 @@ export function AppShell() {
             className="logo sidebar-brand-img"
             src="/brand/Logo_PLN.png"
             alt="PLN"
-            style={{width:52,height:52,objectFit:'contain',flexShrink:0,borderRadius:10,background:'#FFFFFF',padding:4}}
+            style={{width:52,height:52,objectFit:'contain',flexShrink:0,borderRadius:10,background:'var(--color-surface)',padding:4,border:'1px solid var(--color-border)'}}
             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
           />
           <div className="sidebar-brand-text">

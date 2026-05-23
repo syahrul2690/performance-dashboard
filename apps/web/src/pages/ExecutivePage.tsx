@@ -108,9 +108,9 @@ export function ExecutivePage() {
       </div>
 
       {/* Hero Health Score — compact, single row */}
-      <div className="hero-health" style={{ gridTemplateColumns: '260px 1fr', gap: 'var(--space-6)', padding: 'var(--space-5)' }}>
-        <div className="hero-health-gauge" style={{ height: 280 }}>
-          <svg viewBox="0 0 320 200" style={{ width: '100%', height: 200, display: 'block' }}>
+      <div className="hero-health" style={{ gridTemplateColumns: '320px 1fr', gap: 'var(--space-6)', padding: 'var(--space-5)' }}>
+        <div className="hero-health-gauge" style={{ width: '100%', maxWidth: 320, height: 280 }}>
+          <svg viewBox="0 0 320 200" preserveAspectRatio="xMidYMin meet" style={{ width: '100%', height: 200, display: 'block' }}>
             <defs>
               <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
                 <stop offset="0%" stopColor="var(--color-danger)" />
