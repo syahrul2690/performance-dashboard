@@ -51,7 +51,7 @@ export function LoginPage() {
       <div className="login-body">
         <div className="login-brand-strip">
           <img
-            src="/brand/logo_pln_data.png"
+            src="/brand/Logo_PLN.png"
             alt="PLN"
             className="login-brand-strip-pln"
             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}

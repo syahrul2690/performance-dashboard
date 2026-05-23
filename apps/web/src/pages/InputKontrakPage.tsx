@@ -7,10 +7,13 @@ import type { KontrakManajemen } from '../lib/types';
 
 type KpiItem = {
   indikator: string;
-  target: string;
+  target: string;   // Target Semester I
+  target2: string;  // Target tahunan (tahun saat ini)
   satuan: string;
   bobot: string;
 };
+
+const CURRENT_YEAR = new Date().getFullYear();
 
 export function InputKontrakPage() {
   const { user } = useAuth();
@@ -24,7 +27,7 @@ export function InputKontrakPage() {
 
   const [bidang, setBidang] = useState('');
   const [holder, setHolder] = useState('');
-  const [kpiItems, setKpiItems] = useState<KpiItem[]>([{ indikator: '', target: '', satuan: '', bobot: '' }]);
+  const [kpiItems, setKpiItems] = useState<KpiItem[]>([{ indikator: '', target: '', target2: '', satuan: '', bobot: '' }]);
 
   useEffect(() => {
     loadData();
@@ -44,7 +47,7 @@ export function InputKontrakPage() {
   const resetForm = () => {
     setBidang('');
     setHolder('');
-    setKpiItems([{ indikator: '', target: '', satuan: '', bobot: '' }]);
+    setKpiItems([{ indikator: '', target: '', target2: '', satuan: '', bobot: '' }]);
     setShowForm(false);
     setEditingId(null);
   };
@@ -52,7 +55,15 @@ export function InputKontrakPage() {
   const handleEdit = (kontrak: KontrakManajemen) => {
     setBidang(kontrak.bidang);
     setHolder(kontrak.holder);
-    setKpiItems(kontrak.kpiItems as KpiItem[]);
+    setKpiItems(
+      (kontrak.kpiItems as Partial<KpiItem>[]).map((it) => ({
+        indikator: it.indikator ?? '',
+        target: it.target ?? '',
+        target2: it.target2 ?? '',
+        satuan: it.satuan ?? '',
+        bobot: it.bobot ?? '',
+      })),
+    );
     setEditingId(kontrak.id);
     setShowForm(true);
   };
@@ -97,7 +108,7 @@ export function InputKontrakPage() {
     }
   };
 
-  const addKpiRow = () => setKpiItems(prev => [...prev, { indikator: '', target: '', satuan: '', bobot: '' }]);
+  const addKpiRow = () => setKpiItems(prev => [...prev, { indikator: '', target: '', target2: '', satuan: '', bobot: '' }]);
   const removeKpiRow = (i: number) => setKpiItems(prev => prev.filter((_, idx) => idx !== i));
   const updateKpiRow = (i: number, field: keyof KpiItem, value: string) =>
     setKpiItems(prev => prev.map((item, idx) => idx === i ? { ...item, [field]: value } : item));
@@ -172,8 +183,9 @@ export function InputKontrakPage() {
                   <thead>
                     <tr>
                       <th>No</th>
-                      <th>Indikator</th>
-                      <th>Target</th>
+                      <th>Indikator Kinerja</th>
+                      <th>Target Semester I</th>
+                      <th>Target {CURRENT_YEAR}</th>
                       <th>Satuan</th>
                       <th className="num">Bobot (%)</th>
                       <th style={{ width: 50 }}></th>
@@ -184,7 +196,8 @@ export function InputKontrakPage() {
                       <tr key={i}>
                         <td style={{ color: 'var(--color-text-muted)' }}>{i + 1}</td>
                         <td><input className="form-input form-input-sm" value={item.indikator} onChange={e => updateKpiRow(i, 'indikator', e.target.value)} placeholder="Nama indikator" /></td>
-                        <td><input className="form-input form-input-sm" value={item.target} onChange={e => updateKpiRow(i, 'target', e.target.value)} placeholder="Target" style={{ width: 100 }} /></td>
+                        <td><input className="form-input form-input-sm" value={item.target} onChange={e => updateKpiRow(i, 'target', e.target.value)} placeholder="Sem I" style={{ width: 100 }} /></td>
+                        <td><input className="form-input form-input-sm" value={item.target2 ?? ''} onChange={e => updateKpiRow(i, 'target2', e.target.value)} placeholder={`Target ${CURRENT_YEAR}`} style={{ width: 100 }} /></td>
                         <td><input className="form-input form-input-sm" value={item.satuan} onChange={e => updateKpiRow(i, 'satuan', e.target.value)} placeholder="Satuan" style={{ width: 80 }} /></td>
                         <td className="num"><input className="form-input form-input-sm" type="number" value={item.bobot} onChange={e => updateKpiRow(i, 'bobot', e.target.value)} placeholder="0" style={{ width: 70 }} /></td>
                         <td>

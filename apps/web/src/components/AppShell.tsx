@@ -75,6 +75,7 @@ export function AppShell() {
   const [exportOpen, setExportOpen] = useState(false);
   const [roleMenuOpen, setRoleMenuOpen] = useState(false);
   const [warRoomActive, setWarRoomActive] = useState(false);
+  const [periodMode, setPeriodMode] = useState<'Bulan' | 'Semester' | 'Tahun'>('Semester');
   const notifRef = useRef<HTMLDivElement>(null);
   const userRef = useRef<HTMLDivElement>(null);
   const exportRef = useRef<HTMLDivElement>(null);
@@ -176,9 +177,16 @@ export function AppShell() {
 
         <div className="topbar-center">
           <div className="segmented" role="group" aria-label="Periode pelaporan">
-            <button aria-pressed="false">Bulan</button>
-            <button aria-pressed="true">Semester</button>
-            <button aria-pressed="false">Tahun</button>
+            {(['Bulan', 'Semester', 'Tahun'] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                aria-pressed={periodMode === mode}
+                onClick={() => setPeriodMode(mode)}
+              >
+                {mode}
+              </button>
+            ))}
           </div>
         </div>
 
