@@ -1,10 +1,43 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties, type ComponentType } from 'react';
 import { executive } from '../lib/api';
-import { BarChart3, LineChart, Trophy, Layers, TrendingUp, TrendingDown, Minus, ShieldCheck } from 'lucide-react';
+import {
+  BarChart3, LineChart, Trophy, Layers, TrendingUp, TrendingDown, Minus, ShieldCheck,
+  Compass, Cpu, Leaf, Users, GitBranch, ClipboardList, HardHat, CheckCircle2,
+} from 'lucide-react';
 import { CapacityChart } from '../components/CapacityChart';
 import { UnitTrendChart } from '../components/UnitTrendChart';
 import { SkeletonKpiCards, SkeletonChart, SkeletonTable, EmptyState, ErrorState } from '../components/LoadState';
 import type { ExecutiveData } from '../lib/types';
+
+const PILLARS: Array<{
+  id: 'growth' | 'digital' | 'nze' | 'enabler';
+  name: string;
+  tag: string;
+  icon: ComponentType<{ size?: number }>;
+  value: number;
+  target: string;
+}> = [
+  { id: 'growth',  name: 'Growth',            tag: 'Pertumbuhan Layanan', icon: TrendingUp, value: 78, target: 'Target 2026 · 100%' },
+  { id: 'digital', name: 'Digital',           tag: 'BIM & Digitalisasi',  icon: Cpu,        value: 92, target: 'Target 2026 · 100%' },
+  { id: 'nze',     name: 'Net Zero Emission', tag: 'Proyek Hijau & ESG',  icon: Leaf,       value: 64, target: 'Roadmap NZE 2060' },
+  { id: 'enabler', name: 'Enabler',           tag: 'SDM, GCG & K3L',      icon: Users,      value: 85, target: 'Target 2026 · 100%' },
+];
+
+const LIFECYCLE_ICON: Record<string, ComponentType<{ size?: number }>> = {
+  'clipboard-list': ClipboardList,
+  'hard-hat': HardHat,
+  'check-circle-2': CheckCircle2,
+  'trophy': Trophy,
+};
+
+interface LifecycleStage {
+  stage: string;
+  code: string;
+  count: number;
+  icon: string;
+  color: string;
+  desc: string;
+}
 
 function fmt(v: unknown, d = 2) {
   if (typeof v !== 'number') return String(v ?? '—');
@@ -76,8 +109,8 @@ export function ExecutivePage() {
 
       {/* Hero Health Score — compact, single row */}
       <div className="hero-health" style={{ gridTemplateColumns: '260px 1fr', gap: 'var(--space-6)', padding: 'var(--space-5)' }}>
-        <div className="hero-health-gauge">
-          <svg viewBox="0 0 320 200" style={{width:'100%',height:'100%'}}>
+        <div className="hero-health-gauge" style={{ height: 280 }}>
+          <svg viewBox="0 0 320 200" style={{ width: '100%', height: 200, display: 'block' }}>
             <defs>
               <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
                 <stop offset="0%" stopColor="var(--color-danger)" />
@@ -140,6 +173,76 @@ export function ExecutivePage() {
           <strong>Tidak ada pengurang aktif</strong> — Semua Pengurang (Keterlambatan COD, Temuan BPK, Fatality) dalam kondisi aman.
         </div>
       </div>
+
+      {/* 4 Pilar Strategis */}
+      <div className="section-title-row" style={{ marginTop: 'var(--space-5)' }}>
+        <h2 className="section-title"><Compass size={16} />4 Pilar Strategis — Next Chapter of Transformation</h2>
+        <span className="section-meta">Sumber: Profil Organisasi PUSMANPRO</span>
+      </div>
+      <div className="pillars-strip">
+        {PILLARS.map((p) => {
+          const Icon = p.icon;
+          return (
+            <div key={p.id} className={`pillar-card ${p.id}`}>
+              <div className="pillar-head">
+                <span className="pillar-icon"><Icon size={16} /></span>
+                <div>
+                  <div className="pillar-name">{p.name}</div>
+                  <div className="pillar-tag">{p.tag}</div>
+                </div>
+              </div>
+              <div className="pillar-progress-row">
+                <span className="pillar-progress-val">{p.value}%</span>
+                <span className="pillar-progress-target">{p.target}</span>
+              </div>
+              <div className="pillar-bar"><span style={{ width: `${p.value}%` }} /></div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Project Lifecycle Funnel */}
+      {(() => {
+        const lifecycle = (d as unknown as { projectLifecycle?: LifecycleStage[] }).projectLifecycle ?? [];
+        const total = lifecycle.reduce((s, x) => s + (x.count ?? 0), 0);
+        if (!lifecycle.length) return null;
+        return (
+          <>
+            <div className="section-title-row">
+              <h2 className="section-title">
+                <GitBranch size={16} />
+                Project Lifecycle — {total} Proyek Aktif PUSMANPRO
+              </h2>
+              <span className="section-meta">Pra-Pelaksanaan → Pelaksanaan → TOC → FAC</span>
+            </div>
+            <div className="lifecycle-funnel">
+              {lifecycle.map((s) => {
+                const pct = total > 0 ? Math.round((s.count / total) * 100) : 0;
+                const Icon = LIFECYCLE_ICON[s.icon] ?? ClipboardList;
+                return (
+                  <div
+                    key={s.code}
+                    className="lifecycle-stage"
+                    style={{ ['--stage-color' as string]: s.color } as CSSProperties}
+                  >
+                    <div className="lifecycle-pct">{pct}%</div>
+                    <div className="lifecycle-head">
+                      <Icon size={14} />
+                      {s.code.toUpperCase()}
+                    </div>
+                    <div>
+                      <span className="lifecycle-count">{s.count}</span>
+                      <span className="lifecycle-count-unit">proyek</span>
+                    </div>
+                    <div className="lifecycle-stage-name">{s.stage}</div>
+                    <div className="lifecycle-stage-desc">{s.desc}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        );
+      })()}
 
       {/* KPI Master-Detail — use 1:1 ratio so detail panel is filled */}
       <div className="section-title-row">
