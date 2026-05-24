@@ -30,10 +30,13 @@ const NAV_ITEMS = [
     { to: '/risk', label: 'Manajemen Risiko', icon: AlertTriangle },
     { to: '/peta', label: 'Peta Geografis UPMK', icon: MapPin },
   ]},
-  { section: 'Workflow Kontrak Manajemen', items: [
-    { to: '/workflow-km/usulan', label: 'Proses Usulan KM', icon: FilePlus },
-    { to: '/workflow-km/realisasi', label: 'Proses Realisasi KM', icon: LineChart },
-  ]},
+  // Section "Workflow Kontrak Manajemen" disembunyikan sementara dari sidebar.
+  // Halaman & route masih aktif (/workflow-km/usulan, /workflow-km/realisasi);
+  // tinggal aktifkan kembali blok di bawah ini bila ingin ditampilkan.
+  // { section: 'Workflow Kontrak Manajemen', items: [
+  //   { to: '/workflow-km/usulan', label: 'Proses Usulan KM', icon: FilePlus },
+  //   { to: '/workflow-km/realisasi', label: 'Proses Realisasi KM', icon: LineChart },
+  // ]},
   { section: 'Pengaturan', items: [
     { to: '/settings', label: 'Settings', icon: Settings },
   ]},
