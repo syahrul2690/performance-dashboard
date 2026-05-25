@@ -8,7 +8,7 @@ const DEMO_ACCOUNTS = [
   { role: 'Sr. Manajer', email: 'srmanajer@pusmanpro.pln.co.id' },
   { role: 'Manajer', email: 'manajer@pusmanpro.pln.co.id' },
   { role: 'Asman', email: 'asman@pusmanpro.pln.co.id' },
-  { role: 'Staff', email: 'staff@pusmanpro.pln.co.id' },
+  { role: 'Staff', email: 'staff.officer@pusmanpro.pln.co.id' },
 ];
 
 export function LoginPage() {
