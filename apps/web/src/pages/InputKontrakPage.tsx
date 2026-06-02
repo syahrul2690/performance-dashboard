@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { inputKontrak } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
-import { FileText, Plus, Trash2, Send, CheckCircle, Edit2, X, Upload, AlertCircle } from 'lucide-react';
+import { FileText, Plus, Trash2, Send, CheckCircle, Edit2, X, Upload, AlertCircle, Download } from 'lucide-react';
 import { SkeletonTable, EmptyState, ErrorState } from '../components/LoadState';
 import type { KontrakManajemen } from '../lib/types';
 
@@ -155,6 +155,22 @@ export function InputKontrakPage() {
     }
   };
 
+  const handleDownloadTemplate = async () => {
+    try {
+      const blob = await inputKontrak.downloadTemplate();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'template-kontrak-manajemen.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      setError('Gagal mengunduh template');
+    }
+  };
+
   const addKpiRow = () => setKpiItems((prev) => [...prev, emptyRow()]);
   const removeKpiRow = (i: number) =>
     setKpiItems((prev) => (prev.length <= 1 ? prev : prev.filter((_, idx) => idx !== i)));
@@ -196,7 +212,10 @@ export function InputKontrakPage() {
             style={{ display: 'none' }}
             onChange={handleUpload}
           />
-          <button className="btn btn-ghost" onClick={() => fileRef.current?.click()} disabled={submitting}>
+          <button className="btn btn-ghost" onClick={handleDownloadTemplate} title="Unduh template Excel">
+            <Download size={16} /> Template
+          </button>
+          <button className="btn btn-ghost" onClick={() => fileRef.current?.click()} disabled={submitting} title="Format: .xlsx/.xls/.csv dengan kolom Indikator Kinerja, Formula, Satuan, Bobot, Target Semester I, Target tahun">
             <Upload size={16} /> Upload Excel
           </button>
           <button className="btn btn-primary" onClick={() => { resetForm(); setShowForm(true); }} disabled={showForm}>

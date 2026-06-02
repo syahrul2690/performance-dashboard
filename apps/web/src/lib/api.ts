@@ -154,6 +154,8 @@ export const inputKontrak = {
     form.append('file', file);
     return api.post('/input-kontrak/upload', form).then((r) => r.data);
   },
+  downloadTemplate: () =>
+    api.get('/input-kontrak/template/download', { responseType: 'blob' }).then((r) => r.data as Blob),
 };
 
 export const notifications = {
