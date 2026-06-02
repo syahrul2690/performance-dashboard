@@ -20,6 +20,9 @@ const emptyRow = (): KpiItem => ({ indikator: '', formula: '', satuan: '', bobot
 const STATUS_LABEL: Record<string, string> = {
   draft: 'Draft', submitted: 'Menunggu Review', approved: 'Disetujui', rejected: 'Dikembalikan',
 };
+const KM_STAGE_LABEL: Record<number, string> = {
+  2: 'Asisten Manajer', 3: 'Manajer Bidang', 4: 'Senior Manajer',
+};
 const STATUS_PILL: Record<string, string> = {
   draft: 'in-review', submitted: 'needs-revision', approved: 'completed', rejected: 'delayed',
 };
@@ -327,6 +330,11 @@ export function InputKontrakPage() {
                       <span className={`status-pill ${STATUS_PILL[k.status] ?? 'in-review'}`}>
                         {STATUS_LABEL[k.status] ?? k.status}
                       </span>
+                      {k.status === 'submitted' && (
+                        <div style={{ fontSize: 10, color: 'var(--color-text-muted)', marginTop: 2 }}>
+                          di {KM_STAGE_LABEL[k.currentStage] ?? 'tahap review'}
+                        </div>
+                      )}
                       {k.status === 'rejected' && k.reviewNote && (
                         <div style={{ fontSize: 10, color: 'var(--color-danger)', marginTop: 2, maxWidth: 220 }}>
                           {k.reviewNote}

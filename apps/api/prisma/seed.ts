@@ -242,6 +242,7 @@ async function main() {
     },
   ];
 
+  const staffUser = await prisma.user.findFirst({ where: { role: Role.STAFF } });
   let kmCount = 0;
   for (const k of sampleKontrak) {
     // Idempotent: lewati bila kontrak dengan unit+bidang+periode yang sama sudah ada.
@@ -257,7 +258,9 @@ async function main() {
         holder: k.holder,
         kpiItems: k.kpiItems as object,
         status: k.status,
+        currentStage: k.status === 'submitted' ? 2 : 1, // submitted → menunggu Asman
         submitter: k.submitter,
+        submitterId: staffUser?.id ?? null,
       },
     });
     kmCount++;

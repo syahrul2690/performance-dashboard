@@ -7,6 +7,9 @@ import { CheckCircle, XCircle, Clock, CalendarClock, ClipboardList, FileText, Us
 import { SkeletonTable, EmptyState, ErrorState } from '../components/LoadState';
 
 const STAGES = ['', 'Staff', 'Asman', 'Manajer', 'Sr. Manajer', 'GM'];
+// Jenjang persetujuan usulan Kontrak Manajemen: Staff → Asman → Manajer → Sr. Manajer (final)
+const KM_STAGES = ['Staff', 'Asman', 'Manajer', 'Sr. Manajer'];
+const KM_FINAL_STAGE = 4;
 const UNIT_NAMES: Record<string, string> = {
   KP: 'Kantor Induk', UPMK1: 'UPMK I', UPMK2: 'UPMK II',
   UPMK3: 'UPMK III', UPMK4: 'UPMK IV', UPMK5: 'UPMK V',
@@ -138,6 +141,7 @@ export function ApprovalsPage() {
                     <th>Bidang</th>
                     <th>Pengirim</th>
                     <th>KPI</th>
+                    <th>Jenjang Persetujuan</th>
                     <th>Tanggal</th>
                     <th style={{ width: 260 }}>Tindakan</th>
                   </tr>
@@ -157,6 +161,26 @@ export function ApprovalsPage() {
                             {k.kpiItems.length} indikator <ChevronDown size={12} style={{ transform: kmExpanded === k.id ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />
                           </button>
                         </td>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            {KM_STAGES.map((label, idx) => {
+                              const stage = idx + 1;
+                              const done = stage < k.currentStage;
+                              const current = stage === k.currentStage;
+                              return (
+                                <div key={stage} title={label} style={{
+                                  width: 22, height: 22, borderRadius: '50%', fontSize: 9, fontWeight: 700,
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  background: done ? 'var(--color-success)' : current ? 'var(--color-accent)' : 'var(--color-surface-2)',
+                                  color: done || current ? '#fff' : 'var(--color-text-muted)',
+                                }}>
+                                  {done ? '✓' : stage}
+                                </div>
+                              );
+                            })}
+                            <span style={{ fontSize: 10, color: 'var(--color-text-muted)', marginLeft: 2 }}>{KM_STAGES[k.currentStage - 1]}</span>
+                          </div>
+                        </td>
                         <td style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
                           {new Date(k.submittedAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })}
                         </td>
@@ -172,7 +196,7 @@ export function ApprovalsPage() {
                               />
                               <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
                                 <button className="btn btn-sm" style={{ background: 'var(--color-success)', color: '#fff' }} disabled={kmBusy} onClick={() => handleKmReview(k.id, 'approve')}>
-                                  <CheckCircle size={12} /> Setujui
+                                  <CheckCircle size={12} /> {k.currentStage >= KM_FINAL_STAGE ? 'Setujui (Final)' : 'Setujui & Teruskan'}
                                 </button>
                                 <button className="btn btn-sm" style={{ background: 'var(--color-danger)', color: '#fff' }} disabled={kmBusy} onClick={() => handleKmReview(k.id, 'reject')}>
                                   <XCircle size={12} /> Kembalikan
@@ -189,7 +213,7 @@ export function ApprovalsPage() {
                       </tr>
                       {kmExpanded === k.id && (
                         <tr>
-                          <td colSpan={6} style={{ background: 'var(--color-surface-2)', padding: 0 }}>
+                          <td colSpan={7} style={{ background: 'var(--color-surface-2)', padding: 0 }}>
                             <table className="data-table compact" style={{ margin: 0 }}>
                               <thead>
                                 <tr>

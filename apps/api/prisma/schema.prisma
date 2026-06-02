@@ -323,6 +323,8 @@ model KontrakManajemen {
   holder      String
   kpiItems    Json
   status      String    @default("draft") // draft | submitted | approved | rejected
+  currentStage Int      @default(1) // 1=Staff 2=Asman 3=Manajer 4=Sr.Manajer (final)
+  history     Json      @default("[]")
   submitter   String
   submitterId String?
   reviewer    String?

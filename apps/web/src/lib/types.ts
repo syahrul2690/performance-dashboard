@@ -185,6 +185,8 @@ export interface KontrakManajemen {
   holder: string;
   kpiItems: Record<string, unknown>[];
   status: 'draft' | 'submitted' | 'approved' | 'rejected';
+  currentStage: number;
+  history?: Array<Record<string, unknown>>;
   submitter: string;
   submitterId?: string | null;
   reviewer?: string | null;
