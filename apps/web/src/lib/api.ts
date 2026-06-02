@@ -133,12 +133,27 @@ export const inputKontrak = {
     api.get('/input-kontrak', { params: { unitCode, periodId } }).then((r) => r.data),
   getById: (id: string) =>
     api.get(`/input-kontrak/${id}`).then((r) => r.data),
-  save: (unitCode: string, bidang: string, holder: string, kpiItems: Record<string, unknown>[]) =>
-    api.post('/input-kontrak/save', { unitCode, bidang, holder, kpiItems }).then((r) => r.data),
+  save: (
+    unitCode: string,
+    bidang: string,
+    holder: string,
+    kpiItems: Record<string, unknown>[],
+    id?: string,
+  ) =>
+    api.post('/input-kontrak/save', { id, unitCode, bidang, holder, kpiItems }).then((r) => r.data),
   submit: (id: string) =>
     api.post(`/input-kontrak/${id}/submit`).then((r) => r.data),
   delete: (id: string) =>
     api.delete(`/input-kontrak/${id}`).then((r) => r.data),
+  reviewList: () =>
+    api.get('/input-kontrak/review/list').then((r) => r.data),
+  review: (id: string, action: 'approve' | 'reject', note?: string) =>
+    api.post(`/input-kontrak/${id}/review`, { action, note }).then((r) => r.data),
+  uploadExcel: (file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return api.post('/input-kontrak/upload', form).then((r) => r.data);
+  },
 };
 
 export const notifications = {

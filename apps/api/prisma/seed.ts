@@ -244,12 +244,15 @@ async function main() {
 
   let kmCount = 0;
   for (const k of sampleKontrak) {
-    await prisma.kontrakManajemen.upsert({
-      where: { periodId_unitCode: { periodId: period.id, unitCode: k.unitCode + '_' + k.bidang } },
-      update: {},
-      create: {
+    // Idempotent: lewati bila kontrak dengan unit+bidang+periode yang sama sudah ada.
+    const existing = await prisma.kontrakManajemen.findFirst({
+      where: { periodId: period.id, unitCode: k.unitCode, bidang: k.bidang },
+    });
+    if (existing) continue;
+    await prisma.kontrakManajemen.create({
+      data: {
         periodId: period.id,
-        unitCode: k.unitCode + '_' + k.bidang,
+        unitCode: k.unitCode,
         bidang: k.bidang,
         holder: k.holder,
         kpiItems: k.kpiItems as object,

@@ -184,8 +184,12 @@ export interface KontrakManajemen {
   bidang: string;
   holder: string;
   kpiItems: Record<string, unknown>[];
-  status: 'draft' | 'submitted';
+  status: 'draft' | 'submitted' | 'approved' | 'rejected';
   submitter: string;
+  submitterId?: string | null;
+  reviewer?: string | null;
+  reviewNote?: string | null;
+  reviewedAt?: string | null;
   submittedAt: string;
   updatedAt: string;
 }

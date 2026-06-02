@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
-import { approvals as approvalsApi } from '../lib/api';
+import { useEffect, useState, Fragment } from 'react';
+import { approvals as approvalsApi, inputKontrak } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
-import type { Report } from '../lib/types';
-import { CheckCircle, XCircle, Clock, CalendarClock, ClipboardList, FileText, UsersRound } from 'lucide-react';
+import { useNotif } from '../context/NotifContext';
+import type { Report, KontrakManajemen } from '../lib/types';
+import { CheckCircle, XCircle, Clock, CalendarClock, ClipboardList, FileText, UsersRound, FileSignature, ChevronDown } from 'lucide-react';
 import { SkeletonTable, EmptyState, ErrorState } from '../components/LoadState';
 
 const STAGES = ['', 'Staff', 'Asman', 'Manajer', 'Sr. Manajer', 'GM'];
@@ -22,11 +23,20 @@ const WORKFLOW_STATIC = [
 
 export function ApprovalsPage() {
   const { user } = useAuth();
+  const { refresh: refreshNotif } = useNotif();
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionNote, setActionNote] = useState('');
   const [actionTarget, setActionTarget] = useState<string | null>(null);
+
+  // Review usulan Kontrak Manajemen (untuk Asman ke atas)
+  const canReview = !!user && user.role !== 'STAFF';
+  const [kmList, setKmList] = useState<KontrakManajemen[]>([]);
+  const [kmNote, setKmNote] = useState('');
+  const [kmTarget, setKmTarget] = useState<string | null>(null);
+  const [kmExpanded, setKmExpanded] = useState<string | null>(null);
+  const [kmBusy, setKmBusy] = useState(false);
 
   const load = () => {
     approvalsApi.reports()
@@ -35,7 +45,27 @@ export function ApprovalsPage() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, []);
+  const loadKm = () => {
+    if (!canReview) return;
+    inputKontrak.reviewList().then((d) => setKmList(d as KontrakManajemen[])).catch(() => {});
+  };
+
+  useEffect(() => { load(); loadKm(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleKmReview = async (id: string, action: 'approve' | 'reject') => {
+    if (action === 'reject' && !kmNote) { alert('Isi catatan saat mengembalikan usulan'); return; }
+    setKmBusy(true);
+    try {
+      await inputKontrak.review(id, action, kmNote || undefined);
+      setKmTarget(null); setKmNote('');
+      loadKm();
+      refreshNotif();
+    } catch (e) {
+      alert((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Gagal memproses review');
+    } finally {
+      setKmBusy(false);
+    }
+  };
 
   const handleAdvance = async (id: string) => {
     await approvalsApi.advance(id, actionNote);
@@ -87,6 +117,111 @@ export function ApprovalsPage() {
           </div>
         ))}
       </div>
+
+      {/* Review Usulan Kontrak Manajemen — hanya untuk Asman ke atas */}
+      {canReview && (
+        <div className="card p-0" style={{ marginBottom: 'var(--space-6)', borderTop: '3px solid var(--color-accent)' }}>
+          <div className="card-header compact">
+            <div className="card-title"><FileSignature size={14} />Usulan Kontrak Manajemen Menunggu Review</div>
+            <span className="status-pill" style={{ background: 'var(--color-accent-tint)', color: 'var(--color-accent)', fontWeight: 'bold' }}>
+              {kmList.length} Usulan
+            </span>
+          </div>
+          {kmList.length === 0 ? (
+            <div className="card-body"><EmptyState title="Tidak ada usulan" message="Belum ada usulan kontrak manajemen yang menunggu review." /></div>
+          ) : (
+            <div className="table-wrap">
+              <table className="data-table compact">
+                <thead>
+                  <tr>
+                    <th>Unit</th>
+                    <th>Bidang</th>
+                    <th>Pengirim</th>
+                    <th>KPI</th>
+                    <th>Tanggal</th>
+                    <th style={{ width: 260 }}>Tindakan</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {kmList.map((k) => (
+                    <Fragment key={k.id}>
+                      <tr>
+                        <td style={{ fontWeight: 600 }}>{UNIT_NAMES[k.unitCode] ?? k.unitCode}</td>
+                        <td>{k.bidang}</td>
+                        <td style={{ color: 'var(--color-text-muted)' }}>{k.submitter}</td>
+                        <td>
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => setKmExpanded(kmExpanded === k.id ? null : k.id)}
+                          >
+                            {k.kpiItems.length} indikator <ChevronDown size={12} style={{ transform: kmExpanded === k.id ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />
+                          </button>
+                        </td>
+                        <td style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
+                          {new Date(k.submittedAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })}
+                        </td>
+                        <td>
+                          {kmTarget === k.id ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                              <textarea
+                                className="form-textarea"
+                                style={{ fontSize: 'var(--text-xs)', minHeight: 48 }}
+                                placeholder="Catatan (wajib untuk menolak)"
+                                value={kmNote}
+                                onChange={(e) => setKmNote(e.target.value)}
+                              />
+                              <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                                <button className="btn btn-sm" style={{ background: 'var(--color-success)', color: '#fff' }} disabled={kmBusy} onClick={() => handleKmReview(k.id, 'approve')}>
+                                  <CheckCircle size={12} /> Setujui
+                                </button>
+                                <button className="btn btn-sm" style={{ background: 'var(--color-danger)', color: '#fff' }} disabled={kmBusy} onClick={() => handleKmReview(k.id, 'reject')}>
+                                  <XCircle size={12} /> Kembalikan
+                                </button>
+                                <button className="btn btn-ghost btn-sm" onClick={() => { setKmTarget(null); setKmNote(''); }}>Batal</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <button className="btn btn-secondary btn-sm" onClick={() => { setKmTarget(k.id); setKmNote(''); }}>
+                              <Clock size={12} /> Tinjau
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                      {kmExpanded === k.id && (
+                        <tr>
+                          <td colSpan={6} style={{ background: 'var(--color-surface-2)', padding: 0 }}>
+                            <table className="data-table compact" style={{ margin: 0 }}>
+                              <thead>
+                                <tr>
+                                  <th>No</th><th>Indikator Kinerja</th><th>Formula</th><th>Satuan</th>
+                                  <th className="num">Bobot</th><th>Target Sem I</th><th>Target Tahun</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {(k.kpiItems as Record<string, string>[]).map((it, idx) => (
+                                  <tr key={idx}>
+                                    <td>{idx + 1}</td>
+                                    <td>{it.indikator}</td>
+                                    <td>{it.formula}</td>
+                                    <td>{it.satuan}</td>
+                                    <td className="num">{it.bobot}</td>
+                                    <td>{it.target}</td>
+                                    <td>{it.target2}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Workflow Timeline Card */}
       <div className="card p-0" style={{ marginBottom: 'var(--space-6)' }}>

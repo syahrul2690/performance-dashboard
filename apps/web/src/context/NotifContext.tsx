@@ -25,7 +25,16 @@ export function NotifProvider({ children }: { children: ReactNode }) {
     notifApi.list().then(setItems).catch(() => {});
   }, [user]);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  // Muat awal + polling otomatis tiap 15 detik supaya notifikasi
+  // (mis. usulan KM baru ke Asman) muncul tanpa perlu refresh manual.
+  useEffect(() => {
+    if (!user) { setItems([]); return; }
+    refresh();
+    const id = window.setInterval(refresh, 15000);
+    const onFocus = () => refresh();
+    window.addEventListener('focus', onFocus);
+    return () => { window.clearInterval(id); window.removeEventListener('focus', onFocus); };
+  }, [user, refresh]);
 
   const markRead = (id: string) => {
     notifApi.markRead(id).then(refresh).catch(() => {});

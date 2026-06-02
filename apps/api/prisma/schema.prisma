@@ -316,17 +316,21 @@ model PetaSnapshot {
 }
 
 model KontrakManajemen {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   periodId    String
   unitCode    String
   bidang      String
   holder      String
   kpiItems    Json
-  status      String   @default("draft")
+  status      String    @default("draft") // draft | submitted | approved | rejected
   submitter   String
-  submittedAt DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  submitterId String?
+  reviewer    String?
+  reviewNote  String?
+  reviewedAt  DateTime?
+  submittedAt DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  @@unique([periodId, unitCode])
+  @@index([periodId, unitCode])
   @@map("kontrak_manajemen")
 }
