@@ -375,6 +375,18 @@ code {
 .card-title { font-size: var(--text-sm); font-weight: 700; color: var(--color-text); display: flex; align-items: center; gap: var(--space-2); }
 .card-meta { font-size: var(--text-xs); color: var(--color-text-muted); }
 
+/* ----- Fold-up card header (clickable button) ----- */
+.fold-card-header {
+  width: 100%;
+  background: none;
+  border: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.fold-card-header:hover { background: var(--color-surface-hover); }
+
 /* ----- Sidebar nav label: allow long labels to wrap to 2 lines ----- */
 .nav-item { align-items: flex-start; }
 .nav-icon { margin-top: 2px; }

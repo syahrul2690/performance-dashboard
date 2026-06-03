@@ -1,10 +1,41 @@
-import { useEffect, useState, Fragment } from 'react';
+import { useEffect, useState, Fragment, type ReactNode } from 'react';
 import { approvals as approvalsApi, inputKontrak } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useNotif } from '../context/NotifContext';
 import type { Report, KontrakManajemen } from '../lib/types';
 import { CheckCircle, XCircle, Clock, CalendarClock, ClipboardList, FileText, UsersRound, FileSignature, ChevronDown } from 'lucide-react';
 import { SkeletonTable, EmptyState, ErrorState } from '../components/LoadState';
+
+// Kartu yang bisa dilipat (fold-up): klik header untuk buka/tutup isi.
+function FoldCard({
+  title, icon, right, accent, defaultOpen = true, children,
+}: {
+  title: string;
+  icon?: ReactNode;
+  right?: ReactNode;
+  accent?: string;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="card p-0" style={{ marginBottom: 'var(--space-6)', ...(accent ? { borderTop: `3px solid ${accent}` } : {}) }}>
+      <button
+        type="button"
+        className="card-header compact fold-card-header"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+      >
+        <div className="card-title">{icon}{title}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+          {right}
+          <ChevronDown size={16} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .2s', color: 'var(--color-text-muted)' }} />
+        </div>
+      </button>
+      {open && children}
+    </div>
+  );
+}
 
 const STAGES = ['', 'Staff', 'Asman', 'Manajer', 'Sr. Manajer', 'GM'];
 // Jenjang persetujuan usulan Kontrak Manajemen: Staff → Asman → Manajer → Sr. Manajer → GM (final)
@@ -123,13 +154,12 @@ export function ApprovalsPage() {
 
       {/* Review Usulan Kontrak Manajemen — hanya untuk Asman ke atas */}
       {canReview && (
-        <div className="card p-0" style={{ marginBottom: 'var(--space-6)', borderTop: '3px solid var(--color-accent)' }}>
-          <div className="card-header compact">
-            <div className="card-title"><FileSignature size={14} />Usulan Kontrak Manajemen Menunggu Review</div>
-            <span className="status-pill" style={{ background: 'var(--color-accent-tint)', color: 'var(--color-accent)', fontWeight: 'bold' }}>
-              {kmList.length} Usulan
-            </span>
-          </div>
+        <FoldCard
+          accent="var(--color-accent)"
+          icon={<FileSignature size={14} />}
+          title="Usulan Kontrak Manajemen Menunggu Review"
+          right={<span className="status-pill" style={{ background: 'var(--color-accent-tint)', color: 'var(--color-accent)', fontWeight: 'bold' }}>{kmList.length} Usulan</span>}
+        >
           {kmList.length === 0 ? (
             <div className="card-body"><EmptyState title="Tidak ada usulan" message="Belum ada usulan kontrak manajemen yang menunggu review." /></div>
           ) : (
@@ -249,15 +279,16 @@ export function ApprovalsPage() {
               </table>
             </div>
           )}
-        </div>
+        </FoldCard>
       )}
 
       {/* Workflow Timeline Card */}
-      <div className="card p-0" style={{ marginBottom: 'var(--space-6)' }}>
-        <div className="card-header compact">
-          <div className="card-title"><CalendarClock size={14} />Timeline Pelaporan Bulanan</div>
-          <span className="card-meta">5 Fase siklus bulanan</span>
-        </div>
+      <FoldCard
+        icon={<CalendarClock size={14} />}
+        title="Timeline Pelaporan Bulanan"
+        right={<span className="card-meta">5 Fase siklus bulanan</span>}
+        defaultOpen={false}
+      >
         <div className="card-body" style={{ padding: 'var(--space-4)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: 'var(--space-5)', overflowX: 'auto', paddingBottom: 4 }}>
             {WORKFLOW_STATIC.map((w, i) => (
@@ -290,15 +321,15 @@ export function ApprovalsPage() {
             ))}
           </div>
         </div>
-      </div>
+      </FoldCard>
 
       {/* Pending Tasks */}
       {myTasks > 0 && (
-        <div className="card p-0" style={{ marginBottom: 'var(--space-6)' }}>
-          <div className="card-header compact">
-            <div className="card-title"><ClipboardList size={14} />Tugas Approval Saya</div>
-            <span className="status-pill" style={{ background: 'var(--color-accent-tint)', color: 'var(--color-accent)', fontWeight: 'bold' }}>{myTasks} Tugas</span>
-          </div>
+        <FoldCard
+          icon={<ClipboardList size={14} />}
+          title="Tugas Approval Saya"
+          right={<span className="status-pill" style={{ background: 'var(--color-accent-tint)', color: 'var(--color-accent)', fontWeight: 'bold' }}>{myTasks} Tugas</span>}
+        >
           <div className="table-wrap">
             <table className="data-table compact">
               <thead>
@@ -365,15 +396,15 @@ export function ApprovalsPage() {
               </tbody>
             </table>
           </div>
-        </div>
+        </FoldCard>
       )}
 
       {/* All Reports */}
-      <div className="card p-0" style={{ marginBottom: 'var(--space-6)' }}>
-        <div className="card-header compact">
-          <div className="card-title"><FileText size={14} />Semua Laporan Kinerja Manajemen</div>
-          <span className="card-meta">Riwayat dan status terkini</span>
-        </div>
+      <FoldCard
+        icon={<FileText size={14} />}
+        title="Semua Laporan Kinerja Manajemen"
+        right={<span className="card-meta">Riwayat dan status terkini</span>}
+      >
         <div className="table-wrap">
           <table className="data-table compact">
             <thead>
@@ -418,14 +449,15 @@ export function ApprovalsPage() {
             </tbody>
           </table>
         </div>
-      </div>
+      </FoldCard>
 
       {/* RACI Matrix */}
-      <div className="card p-0">
-        <div className="card-header compact">
-          <div className="card-title"><UsersRound size={14} />Matriks RACI</div>
-          <span className="card-meta">R=Responsible · A=Accountable · C=Consulted · I=Informed</span>
-        </div>
+      <FoldCard
+        icon={<UsersRound size={14} />}
+        title="Matriks RACI"
+        right={<span className="card-meta">R=Responsible · A=Accountable · C=Consulted · I=Informed</span>}
+        defaultOpen={false}
+      >
         <div className="table-wrap">
           <table className="data-table compact">
             <thead>
@@ -465,7 +497,7 @@ export function ApprovalsPage() {
             </tbody>
           </table>
         </div>
-      </div>
+      </FoldCard>
     </div>
   );
 }

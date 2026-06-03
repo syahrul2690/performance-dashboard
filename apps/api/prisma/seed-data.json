@@ -4102,17 +4102,17 @@
           "title": "Keterlambatan finalisasi PMS proyek baru UPMK III & UPMK IV",
           "impact": 2.4,
           "impactPct": 40,
-          "owner": "Bidang OMP &middot; UPMK III/IV",
+          "owner": "Bidang OMP · UPMK III/IV",
           "evidence": "Rapat eskalasi belum dijadwalkan dengan Pemberi Kerja; 4 dari 9 PMS belum disepakati",
-          "source": "Motion PMO &mdash; 22 Feb 2026"
+          "source": "Motion PMO — 22 Feb 2026"
         },
         {
           "rank": 2,
           "title": "Revisi S-Curve karena permasalahan ROW/lahan",
           "impact": 1.5,
           "impactPct": 25,
-          "owner": "UPMK III &middot; Pertanahan",
-          "evidence": "GI Marisa &amp; Trans Kolaka — pembebasan lahan tertunda 18 hari kerja",
+          "owner": "UPMK III · Pertanahan",
+          "evidence": "GI Marisa & Trans Kolaka — pembebasan lahan tertunda 18 hari kerja",
           "source": "Status ROW Pekanbaru 18 Feb 2026"
         },
         {
@@ -4122,23 +4122,23 @@
           "impactPct": 18,
           "owner": "Procurement Korporat",
           "evidence": "Vendor X delay 21 hari kerja untuk 2 unit trafo 60 MVA",
-          "source": "PO-2025-1142 &middot; status Carrier"
+          "source": "PO-2025-1142 · status Carrier"
         },
         {
           "rank": 4,
           "title": "Cuaca ekstrem & banjir lokasi proyek (Q1 2026)",
           "impact": 0.6,
           "impactPct": 10,
-          "owner": "UPMK IV &middot; Site Manager",
+          "owner": "UPMK IV · Site Manager",
           "evidence": "7 hari kerja terhenti, 3 site terdampak banjir Februari",
-          "source": "Daily Site Report &middot; 03&ndash;09 Feb"
+          "source": "Daily Site Report · 03–09 Feb"
         },
         {
           "rank": 5,
           "title": "Perubahan scope dari Pemberi Kerja (change order)",
           "impact": 0.46,
           "impactPct": 7,
-          "owner": "Bidang OMP &middot; Engineering",
+          "owner": "Bidang OMP · Engineering",
           "evidence": "2 dari 12 proyek menerima change order non-budget; re-baselining belum approved",
           "source": "CO-Log Q1 2026"
         }
@@ -4233,7 +4233,7 @@
         "baseline": 91.5,
         "mitigated": 99.2,
         "baselineNote": "Jika tidak ada intervensi tambahan, trend bulanan -0,3 pp mengarah ke 91,5% End-of-Year 2026.",
-        "mitigatedNote": "Dengan eksekusi 5 aksi mitigasi tepat waktu, capaian Desember 2026 diproyeksikan 99,2% &mdash; gap residual 0,8 pp."
+        "mitigatedNote": "Dengan eksekusi 5 aksi mitigasi tepat waktu, capaian Desember 2026 diproyeksikan 99,2% — gap residual 0,8 pp."
       }
     }
   }
