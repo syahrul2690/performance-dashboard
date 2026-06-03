@@ -1,9 +1,9 @@
 import { useEffect, useState, Fragment, type ReactNode } from 'react';
-import { approvals as approvalsApi, inputKontrak, inputRealisasi } from '../lib/api';
+import { approvals as approvalsApi, inputKontrak, inputRealisasi, meta as metaApi } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useNotif } from '../context/NotifContext';
 import type { Report, KontrakManajemen, RealisasiKinerja } from '../lib/types';
-import { CheckCircle, XCircle, Clock, CalendarClock, ClipboardList, FileText, UsersRound, FileSignature, ChevronDown, ClipboardCheck } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, CalendarClock, FileText, UsersRound, FileSignature, ChevronDown, ClipboardCheck } from 'lucide-react';
 import { SkeletonTable, EmptyState, ErrorState } from '../components/LoadState';
 
 // Kartu yang bisa dilipat (fold-up): klik header untuk buka/tutup isi.
@@ -41,24 +41,19 @@ const STAGES = ['', 'Staff', 'Asman', 'Manajer', 'Sr. Manajer', 'GM'];
 // Jenjang persetujuan usulan Kontrak Manajemen: Staff → Asman → Manajer → Sr. Manajer → GM (final)
 const KM_STAGES = ['Staff', 'Asman', 'Manajer', 'Sr. Manajer', 'GM'];
 const KM_FINAL_STAGE = 5;
+
+const DOC_STATUS_LABEL: Record<string, string> = {
+  draft: 'Draft', submitted: 'Menunggu Review', approved: 'Disetujui', rejected: 'Dikembalikan',
+};
+const DOC_STATUS_PILL: Record<string, string> = {
+  draft: 'in-review', submitted: 'needs-revision', approved: 'completed', rejected: 'delayed',
+};
 const UNIT_NAMES: Record<string, string> = {
   KP: 'Kantor Induk', UPMK1: 'UPMK I', UPMK2: 'UPMK II',
   UPMK3: 'UPMK III', UPMK4: 'UPMK IV', UPMK5: 'UPMK V',
 };
 
-// nextApprover bisa tersimpan sebagai JSON string {"role","name"} → tampilkan nama saja.
-function formatApprover(raw?: string | null): string {
-  if (!raw) return '';
-  const s = String(raw).trim();
-  if (s.startsWith('{') || s.startsWith('[')) {
-    try {
-      const o = JSON.parse(s);
-      if (o && typeof o === 'object' && !Array.isArray(o)) return String(o.name ?? o.role ?? s);
-    } catch { /* abaikan, tampilkan apa adanya */ }
-  }
-  return s;
-}
-const FASE_ACCENT = ['var(--color-accent)', 'var(--color-info)', 'var(--color-warning)', 'var(--color-success)', 'var(--color-text-muted)'];
+const FASE_ACCENT =['var(--color-accent)', 'var(--color-info)', 'var(--color-warning)', 'var(--color-success)', 'var(--color-text-muted)'];
 
 const WORKFLOW_STATIC = [
   { stage: 1, fase: 'Input Data', deadline: 'Tgl 1-3', slaHours: 48, action: 'Staff input realisasi KPI/PI bulanan ke sistem', role: 'STAFF', checklist: ['Isi semua field realisasi', 'Lampirkan dokumen pendukung', 'Submit sebelum deadline'] },
@@ -74,8 +69,6 @@ export function ApprovalsPage() {
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [actionNote, setActionNote] = useState('');
-  const [actionTarget, setActionTarget] = useState<string | null>(null);
 
   // Review usulan Kontrak Manajemen (untuk Asman ke atas)
   const canReview = !!user && user.role !== 'STAFF';
@@ -92,9 +85,10 @@ export function ApprovalsPage() {
   const [realExpanded, setRealExpanded] = useState<string | null>(null);
   const [realBusy, setRealBusy] = useState(false);
 
-  // Semua dokumen yang diinput manual (KM + Realisasi) — untuk kartu ringkasan
+  // Semua dokumen yang diinput manual (KM + Realisasi) — untuk kartu ringkasan & registri
   const [allKm, setAllKm] = useState<KontrakManajemen[]>([]);
   const [allReal, setAllReal] = useState<RealisasiKinerja[]>([]);
+  const [periodMap, setPeriodMap] = useState<Record<string, string>>({});
 
   const load = () => {
     approvalsApi.reports()
@@ -113,10 +107,17 @@ export function ApprovalsPage() {
     inputRealisasi.reviewList().then((d) => setRealList(d as RealisasiKinerja[])).catch(() => {});
   };
 
-  // Semua dokumen KM + Realisasi (lintas unit) untuk kartu ringkasan
+  // Semua dokumen KM + Realisasi (lintas unit) untuk kartu ringkasan & registri
   const loadDocs = () => {
     inputKontrak.list().then((d) => setAllKm(d as KontrakManajemen[])).catch(() => {});
     inputRealisasi.history().then((d) => setAllReal(d as RealisasiKinerja[])).catch(() => {});
+    metaApi.periods()
+      .then((ps) => {
+        const map: Record<string, string> = {};
+        (ps as Array<{ id: string; label: string }>).forEach((p) => { map[p.id] = p.label; });
+        setPeriodMap(map);
+      })
+      .catch(() => {});
   };
 
   useEffect(() => { load(); loadKm(); loadReal(); loadDocs(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -151,17 +152,6 @@ export function ApprovalsPage() {
     }
   };
 
-  const handleAdvance = async (id: string) => {
-    await approvalsApi.advance(id, actionNote);
-    setActionTarget(null); setActionNote(''); load();
-  };
-
-  const handleReturn = async (id: string) => {
-    if (!actionNote) { alert('Isi catatan revisi'); return; }
-    await approvalsApi.return(id, actionNote);
-    setActionTarget(null); setActionNote(''); load();
-  };
-
   if (loading) {
     return (
       <div className="page">
@@ -187,6 +177,18 @@ export function ApprovalsPage() {
   const approvedDoc = docs.filter((d) => d.status === 'approved').length;
   const pendingDoc = docs.filter((d) => d.status === 'submitted').length;
   const myTasks = kmList.length + realList.length;
+
+  // Registri semua dokumen persetujuan nyata (KM + Realisasi) lintas unit
+  const docRows = [
+    ...allKm.map((k) => ({ id: k.id, jenis: 'Kontrak Manajemen', detail: k.bidang, unitCode: k.unitCode, periodId: k.periodId, status: k.status, currentStage: k.currentStage, reviewer: k.reviewer })),
+    ...allReal.map((r) => ({ id: r.id, jenis: 'Realisasi Kinerja', detail: '', unitCode: r.unitCode, periodId: r.periodId, status: r.status, currentStage: r.currentStage, reviewer: r.reviewer })),
+  ];
+  const nextApproverLabel = (status: string, stage: number): string => {
+    if (status === 'approved') return '✓ Selesai';
+    if (status === 'rejected') return 'Dikembalikan ke konseptor';
+    if (status === 'submitted') return KM_STAGES[stage - 1] ?? '—';
+    return '—';
+  };
 
   return (
     <div className="page approvals-page">
@@ -497,128 +499,62 @@ export function ApprovalsPage() {
         </div>
       </FoldCard>
 
-      {/* Pending Tasks */}
-      {myTasks > 0 && (
-        <FoldCard
-          icon={<ClipboardList size={14} />}
-          title="Tugas Approval Saya"
-          right={<span className="status-pill" style={{ background: 'var(--color-accent-tint)', color: 'var(--color-accent)', fontWeight: 'bold' }}>{myTasks} Tugas</span>}
-        >
-          <div className="table-wrap">
-            <table className="data-table compact">
-              <thead>
-                <tr>
-                  <th>Unit</th>
-                  <th>Periode</th>
-                  <th>Fase</th>
-                  <th>Status</th>
-                  <th>Tindakan</th>
-                </tr>
-              </thead>
-              <tbody>
-                {reports.filter(r => r.canApprove).map(r => (
-                  <tr key={r.id}>
-                    <td style={{ fontWeight: 600 }}>{UNIT_NAMES[r.unit] ?? r.unit}</td>
-                    <td style={{ color: 'var(--color-text-muted)' }}>{r.periodId}</td>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        {[1, 2, 3, 4, 5].map(s => (
-                          <div key={s} style={{
-                            width: 22, height: 22, borderRadius: '50%',
-                            background: s < r.currentStage ? 'var(--color-success)' : s === r.currentStage ? FASE_ACCENT[s - 1] : 'var(--color-surface-2)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            color: s <= r.currentStage ? '#fff' : 'var(--color-text-muted)',
-                            fontSize: 9, fontWeight: 700,
-                          }}>
-                            {s < r.currentStage ? '✓' : s}
-                          </div>
-                        ))}
-                        <span style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>{STAGES[r.currentStage]}</span>
-                      </div>
-                    </td>
-                    <td>
-                      <span className={`status-pill ${r.status === 'APPROVED' ? 'completed' : r.status === 'NEEDS_REVISION' ? 'needs-revision' : 'in-review'}`} style={{ fontSize: 10 }}>{r.status}</span>
-                    </td>
-                    <td>
-                      {actionTarget === r.id ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                          <textarea
-                            className="form-textarea"
-                            style={{ fontSize: 'var(--text-xs)', minHeight: 52 }}
-                            placeholder="Catatan (opsional untuk approve, wajib untuk revisi)"
-                            value={actionNote}
-                            onChange={e => setActionNote(e.target.value)}
-                          />
-                          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                            <button className="btn btn-sm" style={{ background: 'var(--color-success)', color: '#fff' }} onClick={() => handleAdvance(r.id)}>
-                              <CheckCircle size={12} /> Setujui
-                            </button>
-                            <button className="btn btn-sm" style={{ background: 'var(--color-danger)', color: '#fff' }} onClick={() => handleReturn(r.id)}>
-                              <XCircle size={12} /> Kembalikan
-                            </button>
-                            <button className="btn btn-ghost btn-sm" onClick={() => setActionTarget(null)}>Batal</button>
-                          </div>
-                        </div>
-                      ) : (
-                        <button className="btn btn-secondary btn-sm" onClick={() => setActionTarget(r.id)}>
-                          <Clock size={12} /> Tinjau
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </FoldCard>
-      )}
-
-      {/* All Reports */}
+      {/* Semua Dokumen Persetujuan — data nyata dari dokumen yang diinput */}
       <FoldCard
         icon={<FileText size={14} />}
-        title="Semua Laporan Kinerja Manajemen"
-        right={<span className="card-meta">Riwayat dan status terkini</span>}
+        title="Semua Dokumen Persetujuan"
+        right={<span className="card-meta">{docRows.length} dokumen · KM + Realisasi</span>}
       >
         <div className="table-wrap">
           <table className="data-table compact">
             <thead>
               <tr>
                 <th>Unit</th>
+                <th>Jenis Dokumen</th>
                 <th>Periode</th>
-                <th>Progress</th>
+                <th>Jenjang</th>
                 <th>Status</th>
-                <th>Next Approver</th>
+                <th>Menunggu Review</th>
               </tr>
             </thead>
             <tbody>
-              {reports.map(r => (
-                <tr key={r.id}>
-                  <td style={{ fontWeight: 600 }}>{UNIT_NAMES[r.unit] ?? r.unit}</td>
-                  <td style={{ color: 'var(--color-text-muted)' }}>{r.periodId}</td>
+              {docRows.map((d) => (
+                <tr key={d.id}>
+                  <td style={{ fontWeight: 600 }}>{UNIT_NAMES[d.unitCode] ?? d.unitCode}</td>
+                  <td>
+                    {d.jenis}
+                    {d.detail ? <span style={{ color: 'var(--color-text-muted)' }}> · {d.detail}</span> : null}
+                  </td>
+                  <td style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>{periodMap[d.periodId] ?? '—'}</td>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                      {[1, 2, 3, 4, 5].map(s => (
-                        <div key={s} style={{
-                          width: 20, height: 20, borderRadius: '50%', fontSize: 9, fontWeight: 700,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          background: s < r.currentStage ? 'var(--color-success)' : s === r.currentStage ? 'var(--color-accent)' : 'var(--color-surface-2)',
-                          color: s <= r.currentStage ? '#fff' : 'var(--color-text-muted)',
-                        }}>
-                          {s < r.currentStage ? '✓' : s}
-                        </div>
-                      ))}
+                      {KM_STAGES.map((label, idx) => {
+                        const s = idx + 1;
+                        const done = d.status === 'approved' || s < d.currentStage;
+                        const current = d.status === 'submitted' && s === d.currentStage;
+                        return (
+                          <div key={s} title={label} style={{
+                            width: 20, height: 20, borderRadius: '50%', fontSize: 9, fontWeight: 700,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            background: done ? 'var(--color-success)' : current ? 'var(--color-accent)' : 'var(--color-surface-2)',
+                            color: done || current ? '#fff' : 'var(--color-text-muted)',
+                          }}>{done ? '✓' : s}</div>
+                        );
+                      })}
                     </div>
                   </td>
                   <td>
-                    <span className={`status-pill ${r.status === 'APPROVED' ? 'completed' : r.status === 'NEEDS_REVISION' ? 'needs-revision' : 'in-review'}`} style={{ fontSize: 10 }}>{r.status}</span>
+                    <span className={`status-pill ${DOC_STATUS_PILL[d.status] ?? 'in-review'}`} style={{ fontSize: 10 }}>
+                      {DOC_STATUS_LABEL[d.status] ?? d.status}
+                    </span>
                   </td>
-                  <td style={{ color: 'var(--color-text-muted)' }}>
-                    {r.nextApprover ? formatApprover(r.nextApprover) : <span style={{ color: 'var(--color-success)' }}>✓ Selesai</span>}
+                  <td style={{ color: d.status === 'approved' ? 'var(--color-success)' : 'var(--color-text-muted)' }}>
+                    {nextApproverLabel(d.status, d.currentStage)}
                   </td>
                 </tr>
               ))}
-              {reports.length === 0 && (
-                <tr><td colSpan={5}><EmptyState title="Tidak ada laporan" /></td></tr>
+              {docRows.length === 0 && (
+                <tr><td colSpan={6}><EmptyState title="Belum ada dokumen" message="Belum ada Kontrak Manajemen atau Realisasi yang diinput." /></td></tr>
               )}
             </tbody>
           </table>
