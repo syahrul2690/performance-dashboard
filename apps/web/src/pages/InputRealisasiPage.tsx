@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
-import { inputRealisasi, workflowKm } from '../lib/api';
+import { inputRealisasi, inputKontrak } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { ClipboardEdit, CheckCircle, Clock } from 'lucide-react';
 import { SkeletonTable, EmptyState, ErrorState } from '../components/LoadState';
+import type { KontrakManajemen } from '../lib/types';
 
 type KpiItem = {
   no?: number; indikator?: string; formula?: string; satuan?: string;
-  bobot?: number | string; target?: number | string; realisasi?: number | string;
+  bobot?: number | string; target?: number | string; target2?: number | string;
+  bidang?: string; realisasi?: number | string;
 };
 
 export function InputRealisasiPage() {
@@ -22,15 +24,18 @@ export function InputRealisasiPage() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [histRes, usulanRes] = await Promise.allSettled([
+        const [histRes, approvedRes] = await Promise.allSettled([
           inputRealisasi.history(user?.unit),
-          workflowKm.usulan(),
+          inputKontrak.approved(user?.unit),
         ]);
         if (histRes.status === 'fulfilled') setHistory(histRes.value as unknown[]);
-        if (usulanRes.status === 'fulfilled') {
-          const docs = usulanRes.value as Array<{ tipe?: string; kpiList?: KpiItem[]; kpiKantorInduk?: KpiItem[]; kpiUPMK?: KpiItem[] }>;
-          const merged = docs.flatMap(d => d.kpiList ?? d.kpiKantorInduk ?? d.kpiUPMK ?? []);
-          if (merged.length > 0) setKpiList(merged);
+        if (approvedRes.status === 'fulfilled') {
+          // Acuan realisasi = KPI dari Kontrak Manajemen yang sudah DISETUJUI (final GM).
+          const kontrak = approvedRes.value as KontrakManajemen[];
+          const merged: KpiItem[] = kontrak.flatMap((k) =>
+            (k.kpiItems as KpiItem[]).map((it) => ({ ...it, bidang: k.bidang })),
+          );
+          setKpiList(merged);
         }
       } catch (e) {
         setError((e as Error)?.message ?? 'Gagal memuat data');
@@ -116,17 +121,22 @@ export function InputRealisasiPage() {
         </div>
         <div className="table-wrap">
           {kpiList.length === 0 ? (
-            <EmptyState title="Tidak ada data KPI" message="Pastikan Kontrak Manajemen (WF-1/WF-2) sudah disetujui." />
+            <EmptyState
+              title="Belum ada KPI acuan"
+              message="Belum ada Kontrak Manajemen yang disetujui (final GM) untuk unit Anda. Selesaikan persetujuan KM terlebih dahulu di menu Input Kontrak Manajemen → Persetujuan."
+            />
           ) : (
             <table className="data-table compact">
               <thead>
                 <tr>
                   <th>No</th>
+                  <th>Bidang</th>
                   <th>Indikator</th>
                   <th>Formula</th>
                   <th>Satuan</th>
                   <th className="num">Bobot</th>
-                  <th className="num">Target</th>
+                  <th className="num">Target Sem I</th>
+                  <th className="num">Target Tahun</th>
                   <th>Realisasi</th>
                 </tr>
               </thead>
@@ -137,11 +147,13 @@ export function InputRealisasiPage() {
                   return (
                     <tr key={i} style={{ background: hasVal ? 'rgba(34,197,94,0.03)' : 'transparent' }}>
                       <td style={{ color: 'var(--color-text-muted)' }}>{kpi.no ?? i + 1}</td>
+                      <td style={{ fontSize: 11, color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>{kpi.bidang ?? '—'}</td>
                       <td style={{ maxWidth: 220, fontWeight: 500 }}>{kpi.indikator ?? '—'}</td>
                       <td style={{ fontSize: 10, color: 'var(--color-text-muted)', maxWidth: 200 }}>{kpi.formula ?? '—'}</td>
                       <td style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>{kpi.satuan ?? '—'}</td>
                       <td className="num" style={{ fontWeight: 700, color: 'var(--color-accent)' }}>{kpi.bobot ?? '—'}</td>
                       <td className="num">{kpi.target ?? '—'}</td>
+                      <td className="num">{kpi.target2 ?? '—'}</td>
                       <td style={{ minWidth: 140 }}>
                         <input
                           type="text"

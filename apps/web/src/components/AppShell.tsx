@@ -9,13 +9,14 @@ import {
   Bell, Moon, Sun, LogOut, ChevronDown, Menu, ChevronsLeft,
   Tv2, Search, Download, User, HelpCircle, FilePlus, LineChart,
   FileSpreadsheet, Image, Printer, ExternalLink,
-  Workflow, Network, Leaf, MapPin,
+  Workflow, Network, Leaf, MapPin, FileCheck2,
 } from 'lucide-react';
 
 const NAV_ITEMS = [
   { section: 'Aksi Saya', items: [
     { to: '/approvals', label: 'Persetujuan', icon: CheckSquare },
     { to: '/input-kontrak', label: 'Input Kontrak Manajemen', icon: FileText },
+    { to: '/kontrak-disetujui', label: 'Kontrak Manajemen Disetujui', icon: FileCheck2 },
     { to: '/input-realisasi', label: 'Input Realisasi Bulanan', icon: ClipboardEdit },
   ]},
   { section: 'Dashboard', items: [
@@ -61,6 +62,7 @@ const ROUTE_NAMES: Record<string, string> = {
   '/approvals': 'Persetujuan',
   '/input-realisasi': 'Input Realisasi',
   '/input-kontrak': 'Input Kontrak Manajemen',
+  '/kontrak-disetujui': 'Kontrak Manajemen Disetujui',
   '/workflow-km/usulan': 'Proses Usulan KM',
   '/workflow-km/realisasi': 'Proses Realisasi KM',
   '/settings': 'Settings',

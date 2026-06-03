@@ -43,6 +43,19 @@ export class InputKontrakService {
     return this.prisma.kontrakManajemen.findUnique({ where: { id } });
   }
 
+  // Registri KM yang sudah DISETUJUI penuh (final oleh GM). Untuk arsip (Opsi A)
+  // dan acuan Input Realisasi per unit (Opsi B).
+  async getApproved(unitCode?: string, periodId?: string) {
+    return this.prisma.kontrakManajemen.findMany({
+      where: {
+        status: 'approved',
+        ...(unitCode ? { unitCode } : {}),
+        ...(periodId ? { periodId } : {}),
+      },
+      orderBy: [{ unitCode: 'asc' }, { reviewedAt: 'desc' }],
+    });
+  }
+
   // Save: create a NEW kontrak, or update an existing one when `id` is given.
   // Tidak lagi menimpa kontrak lain pada unit/periode yang sama.
   async save(

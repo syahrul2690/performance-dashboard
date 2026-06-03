@@ -38,6 +38,11 @@ export class InputKontrakController {
     return this.svc.getReviewList(user);
   }
 
+  @Get('approved')
+  approved(@Query('unitCode') unitCode?: string, @Query('periodId') periodId?: string) {
+    return this.svc.getApproved(unitCode, periodId);
+  }
+
   @Get(':id')
   getById(@Param('id') id: string) {
     return this.svc.getById(id);
