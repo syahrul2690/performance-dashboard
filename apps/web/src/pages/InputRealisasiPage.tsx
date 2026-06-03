@@ -23,8 +23,19 @@ const STAGE_LABEL: Record<number, string> = {
   2: 'Asisten Manajer', 3: 'Manajer Bidang', 4: 'Senior Manajer', 5: 'General Manager',
 };
 
+// Unit yang bisa mengisi realisasi: Kantor Induk + 5 UPMK
+const UNIT_OPTIONS = [
+  { code: 'KP', name: 'Kantor Induk' },
+  { code: 'UPMK1', name: 'UPMK I' },
+  { code: 'UPMK2', name: 'UPMK II' },
+  { code: 'UPMK3', name: 'UPMK III' },
+  { code: 'UPMK4', name: 'UPMK IV' },
+  { code: 'UPMK5', name: 'UPMK V' },
+];
+
 export function InputRealisasiPage() {
   const { user } = useAuth();
+  const [selectedUnit, setSelectedUnit] = useState<string>('KP');
   const [history, setHistory] = useState<unknown[]>([]);
   const [kpiList, setKpiList] = useState<KpiItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,21 +44,25 @@ export function InputRealisasiPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
+  // Default unit mengikuti unit user (bila ada)
+  useEffect(() => { if (user?.unit) setSelectedUnit(user.unit); }, [user?.unit]);
+
   useEffect(() => {
     const loadData = async () => {
       try {
         const [histRes, approvedRes] = await Promise.allSettled([
-          inputRealisasi.history(user?.unit),
-          inputKontrak.approved(user?.unit),
+          inputRealisasi.history(selectedUnit),
+          inputKontrak.approved(selectedUnit),
         ]);
         if (histRes.status === 'fulfilled') setHistory(histRes.value as unknown[]);
         if (approvedRes.status === 'fulfilled') {
-          // Acuan realisasi = KPI dari Kontrak Manajemen yang sudah DISETUJUI (final GM).
+          // Acuan realisasi = KPI dari Kontrak Manajemen yang sudah DISETUJUI (final GM) untuk unit terpilih.
           const kontrak = approvedRes.value as KontrakManajemen[];
           const merged: KpiItem[] = kontrak.flatMap((k) =>
             (k.kpiItems as KpiItem[]).map((it) => ({ ...it, bidang: k.bidang })),
           );
           setKpiList(merged);
+          setValues({});
         }
       } catch (e) {
         setError((e as Error)?.message ?? 'Gagal memuat data');
@@ -56,7 +71,7 @@ export function InputRealisasiPage() {
       }
     };
     loadData();
-  }, [user]);
+  }, [selectedUnit]);
 
   const handleSubmit = async () => {
     if (!user) return;
@@ -66,10 +81,10 @@ export function InputRealisasiPage() {
       kpiList.forEach((kpi, i) => {
         payload[`kpi_${i}`] = { ...kpi, realisasi: values[String(i)] ?? '' };
       });
-      await inputRealisasi.submit(user.unit, payload);
+      await inputRealisasi.submit(selectedUnit, payload);
       setSubmitted(true);
       setValues({});
-      const hist = await inputRealisasi.history(user.unit);
+      const hist = await inputRealisasi.history(selectedUnit);
       setHistory(hist as unknown[]);
       setTimeout(() => setSubmitted(false), 3000);
     } catch (e) {
@@ -83,7 +98,7 @@ export function InputRealisasiPage() {
     if (!confirm('Hapus realisasi ini? Tindakan ini tidak dapat dibatalkan.')) return;
     try {
       await inputRealisasi.delete(id);
-      const hist = await inputRealisasi.history(user?.unit);
+      const hist = await inputRealisasi.history(selectedUnit);
       setHistory(hist as unknown[]);
     } catch (e) {
       const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? (e as Error)?.message ?? 'Gagal menghapus';
@@ -115,8 +130,19 @@ export function InputRealisasiPage() {
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 'var(--text-lg)', fontWeight: 700 }}>Input Realisasi Bulanan — Februari 2026</div>
-            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginTop: 4 }}>
-              Unit: <strong>{user?.unit ?? '—'}</strong> · {kpiList.length} indikator KM · Deadline: Tanggal 3 setiap bulan
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+              <span>Unit:</span>
+              <select
+                className="form-input form-input-sm"
+                value={selectedUnit}
+                onChange={(e) => setSelectedUnit(e.target.value)}
+                style={{ width: 'auto', minWidth: 140, fontWeight: 700 }}
+              >
+                {UNIT_OPTIONS.map((u) => (
+                  <option key={u.code} value={u.code}>{u.name} ({u.code})</option>
+                ))}
+              </select>
+              <span>· {kpiList.length} indikator KM · Deadline: Tanggal 3 setiap bulan</span>
             </div>
           </div>
           <div style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -140,7 +166,7 @@ export function InputRealisasiPage() {
       {/* KPI Input Table */}
       <div className="card p-0" style={{ marginBottom: 'var(--space-6)' }}>
         <div className="card-header compact">
-          <div className="card-title"><ClipboardEdit size={14} />KPI Realisasi — {user?.unit === 'KP' ? 'Kantor Induk' : `UPMK (${user?.unit})`}</div>
+          <div className="card-title"><ClipboardEdit size={14} />KPI Realisasi — {UNIT_OPTIONS.find((u) => u.code === selectedUnit)?.name ?? selectedUnit}</div>
           <span className="card-meta">Isi nilai realisasi Februari 2026</span>
         </div>
         <div className="table-wrap">

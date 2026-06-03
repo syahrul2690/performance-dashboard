@@ -17,6 +17,14 @@ type KpiItem = {
 const CURRENT_YEAR = new Date().getFullYear();
 const emptyRow = (): KpiItem => ({ indikator: '', formula: '', satuan: '', bobot: '', target: '', target2: '' });
 
+// 4 Bidang Utama PUSMANPRO (sesuai struktur organisasi)
+const BIDANG_OPTIONS = [
+  'Operasi Manajemen Proyek',
+  'QA/QC',
+  'Perencanaan & Project Control',
+  'Keuangan, Komunikasi & Umum',
+];
+
 const STATUS_LABEL: Record<string, string> = {
   draft: 'Draft', submitted: 'Menunggu Review', approved: 'Disetujui', rejected: 'Dikembalikan',
 };
@@ -269,14 +277,22 @@ export function InputKontrakPage() {
             )}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
               <div>
-                <label className="form-label">Bidang / Unit <span style={{ color: 'var(--color-danger)' }}>*</span></label>
-                <input
+                <label className="form-label">Bidang <span style={{ color: 'var(--color-danger)' }}>*</span></label>
+                <select
                   className="form-input"
                   value={bidang}
                   onChange={(e) => { setBidang(e.target.value); if (formError) setFormError(null); }}
-                  placeholder="Contoh: Bidang Teknik"
                   style={formError && !bidang.trim() ? { borderColor: 'var(--color-danger)' } : undefined}
-                />
+                >
+                  <option value="">— Pilih Bidang —</option>
+                  {BIDANG_OPTIONS.map((b) => (
+                    <option key={b} value={b}>{b}</option>
+                  ))}
+                  {/* Pertahankan nilai lama (mis. dari data lama) bila di luar 4 bidang */}
+                  {bidang && !BIDANG_OPTIONS.includes(bidang) && (
+                    <option value={bidang}>{bidang}</option>
+                  )}
+                </select>
               </div>
               <div>
                 <label className="form-label">Penanggung Jawab <span style={{ color: 'var(--color-danger)' }}>*</span></label>

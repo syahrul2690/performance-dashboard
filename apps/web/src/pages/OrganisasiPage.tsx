@@ -25,6 +25,7 @@ interface OrgData {
   gm: OrgNodeData;
   sm: OrgNodeData[];
   manager: OrgNodeData[];
+  asman?: OrgNodeData[];
   asmanKhusus: OrgNodeData[];
   upmk: OrgNodeData[];
   upmkSub: { standard: SubNode[] };
@@ -135,9 +136,21 @@ export function OrganisasiPage() {
                 <div className="org-sm-children">
                   {d.manager
                     .filter((m) => m.parent === sm.id)
-                    .map((m) => (
-                      <OrgNodeCard key={m.id} node={m} variant="man-node" />
-                    ))}
+                    .map((m) => {
+                      const asmanChildren = (d.asman ?? []).filter((a) => a.parent === m.id);
+                      return (
+                        <div key={m.id}>
+                          <OrgNodeCard node={m} variant="man-node" />
+                          {asmanChildren.length > 0 && (
+                            <div style={{ marginTop: 6, paddingLeft: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              {asmanChildren.map((a) => (
+                                <OrgNodeCard key={a.id} node={a} variant="asman-node" />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                 </div>
               </div>
             ))}

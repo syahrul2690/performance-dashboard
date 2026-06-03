@@ -46,6 +46,12 @@
       { "id": "man_aset_properti",      "code": "MAN APR", "name": "MAN Aset & Properti",             "parent": "sm_kku",  "icon": "building-2",     "formasi": 1 },
       { "id": "man_pengadaan",          "code": "MAN PGD", "name": "MAN Perencana/Pelaksana Pengadaan", "parent": "gm",    "icon": "shopping-cart",  "formasi": 2, "tugasPokok": ["Garis koordinasi langsung di bawah GM (di luar 4 SM utama).", "Bertanggung jawab atas perencanaan & pelaksanaan pengadaan strategis korporat."] }
     ],
+    "asman": [
+      { "id": "asman_elektromekanik", "code": "ASMAN EM",    "name": "ASMAN Elektromekanik",                "parent": "man_operasi_pembangkit", "icon": "zap",        "formasi": 1 },
+      { "id": "asman_sipil_pbjr",     "code": "ASMAN SIPIL", "name": "ASMAN Sipil Pembangkit & Jaringan",   "parent": "man_operasi_pembangkit", "icon": "building-2", "formasi": 1 },
+      { "id": "asman_adm_kontrak",    "code": "ASMAN ADM",   "name": "ASMAN Administrasi Kontrak",          "parent": "man_operasi_jaringan",   "icon": "file-text", "formasi": 1 },
+      { "id": "asman_jaringan",       "code": "ASMAN JR",    "name": "ASMAN Jaringan",                      "parent": "man_operasi_jaringan",   "icon": "cable",      "formasi": 1 }
+    ],
     "asmanKhusus": [
       { "id": "asman_k3l",    "code": "ASMAN K3L",  "name": "ASMAN K3L",                       "parent": "gm", "icon": "hard-hat",     "formasi": 1, "tugasPokok": ["Mengelola fungsi K3L korporat termasuk koordinasi K3L UPMK.", "Akuntabel atas Pengelolaan HSSE (Kepatuhan max -8)."] },
       { "id": "asman_risiko", "code": "ASMAN MR&K", "name": "ASMAN Manajemen Risiko & Kepatuhan", "parent": "gm", "icon": "shield-alert", "formasi": 1, "tugasPokok": ["Mengelola risk register, kepatuhan SMAP ISO 37001, dan tindak lanjut audit.", "Akuntabel atas Maturity Level Kepatuhan & Tindak Lanjut Auditor."] }
