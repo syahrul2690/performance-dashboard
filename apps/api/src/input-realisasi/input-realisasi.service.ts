@@ -21,6 +21,14 @@ const STAGE_LABEL: Record<number, string> = {
 };
 const FINAL_STAGE = 5;
 
+// SLA approval per tahap (hari kerja kalender). Task 6.
+const SLA_DAYS: Record<number, number> = { 2: 2, 3: 2, 4: 2, 5: 3 };
+function slaRemainingDays(r: { currentStage: number; submittedAt: Date }): number {
+  const days = SLA_DAYS[r.currentStage] ?? 2;
+  const deadline = new Date(r.submittedAt).getTime() + days * 86400000;
+  return Math.ceil((deadline - Date.now()) / 86400000);
+}
+
 @Injectable()
 export class InputRealisasiService {
   constructor(
@@ -38,26 +46,34 @@ export class InputRealisasiService {
     });
   }
 
-  // Staff submit realisasi → masuk tahap 2 (Asman), notifikasi ke Asman.
-  async submit(user: User, unitCode: string, values: Record<string, unknown>) {
-    const period = await this.prisma.period.findFirst({ where: { isActive: true } });
-    if (!period) throw new BadRequestException('Tidak ada periode aktif');
+  // Staff submit realisasi (per bidang) → masuk tahap 2 (Asman), notifikasi ke Asman bidang tsb.
+  async submit(user: User, unitCode: string, bidang: string, values: Record<string, unknown>, periodId?: string) {
+    if (!bidang) throw new BadRequestException('Bidang wajib diisi');
+    // Task 7: Staff hanya dapat mengisi realisasi pada bidangnya sendiri.
+    if (user.role === Role.STAFF && user.bidang && bidang !== user.bidang) {
+      throw new ForbiddenException('Anda hanya dapat mengisi realisasi pada bidang Anda');
+    }
+
+    const period = periodId
+      ? await this.prisma.period.findUnique({ where: { id: periodId } })
+      : await this.prisma.period.findFirst({ where: { isActive: true } });
+    if (!period) throw new BadRequestException(periodId ? 'Periode tidak ditemukan' : 'Tidak ada periode aktif');
 
     const existing = await this.prisma.inputRealisasi.findUnique({
-      where: { periodId_unitCode: { periodId: period.id, unitCode } },
+      where: { periodId_unitCode_bidang: { periodId: period.id, unitCode, bidang } },
     });
     const baseHistory = existing && Array.isArray(existing.history) ? (existing.history as object[]) : [];
     const history = [...baseHistory, { stage: 1, actor: user.name, role: user.role, action: 'submitted', ts: new Date().toISOString() }];
 
     const result = await this.prisma.inputRealisasi.upsert({
-      where: { periodId_unitCode: { periodId: period.id, unitCode } },
+      where: { periodId_unitCode_bidang: { periodId: period.id, unitCode, bidang } },
       update: {
         values: values as object, submitter: user.name, submitterId: user.id,
         status: 'submitted', currentStage: 2, history,
         reviewer: null, reviewNote: null, reviewedAt: null, submittedAt: new Date(),
       },
       create: {
-        periodId: period.id, unitCode, submitter: user.name, submitterId: user.id,
+        periodId: period.id, unitCode, bidang, submitter: user.name, submitterId: user.id,
         values: values as object, status: 'submitted', currentStage: 2, history,
       },
     });
@@ -70,10 +86,16 @@ export class InputRealisasiService {
     return result;
   }
 
-  private async notifyStage(stage: number, realisasi: { id: string; unitCode: string }, actorName: string) {
+  private async notifyStage(stage: number, realisasi: { id: string; unitCode: string; bidang: string }, actorName: string) {
     const role = STAGE_TO_ROLE[stage];
     if (!role) return;
-    const recipients = await this.prisma.user.findMany({ where: { role, isActive: true } });
+    // Task 9: reviewer non-GM hanya yang sebidang. GM (final) tidak difilter bidang.
+    const recipients = await this.prisma.user.findMany({
+      where: {
+        role, isActive: true,
+        ...(role !== Role.GM ? { bidang: realisasi.bidang } : {}),
+      },
+    });
     if (recipients.length === 0) return;
     const unitLabel = UNIT_NAMES[realisasi.unitCode] ?? realisasi.unitCode;
     await this.prisma.notification.createMany({
@@ -81,8 +103,8 @@ export class InputRealisasiService {
         userId: u.id,
         type: 'approval',
         title: 'Realisasi Kinerja Menunggu Review',
-        msg: `${actorName} mengirim Realisasi Kinerja ${unitLabel} untuk review ${STAGE_LABEL[stage]}.`,
-        route: '/approvals',
+        msg: `${actorName} mengirim Realisasi Kinerja ${unitLabel} — ${realisasi.bidang} untuk review ${STAGE_LABEL[stage]}.`,
+        route: '/approvals?type=realisasi',
         targetId: realisasi.id,
         unread: true,
       })),
@@ -112,10 +134,15 @@ export class InputRealisasiService {
   async getReviewList(user: User) {
     if (user.role === Role.STAFF) throw new ForbiddenException('Tidak berwenang me-review');
     const stage = ROLE_TO_STAGE[user.role];
-    return this.prisma.inputRealisasi.findMany({
-      where: { status: 'submitted', currentStage: stage },
+    // Task 9: non-GM hanya melihat realisasi sebidang; GM lintas-bidang.
+    const items = await this.prisma.inputRealisasi.findMany({
+      where: {
+        status: 'submitted', currentStage: stage,
+        ...(user.role !== Role.GM && user.bidang ? { bidang: user.bidang } : {}),
+      },
       orderBy: { submittedAt: 'desc' },
     });
+    return items.map((r) => ({ ...r, slaRemainingDays: slaRemainingDays(r) }));
   }
 
   // Review berjenjang (hybrid): approve naik tahap hingga GM; reject ke konseptor / mundur 1 tahap.
@@ -132,7 +159,12 @@ export class InputRealisasiService {
     const r = await this.prisma.inputRealisasi.findUnique({ where: { id } });
     if (!r) throw new NotFoundException('Realisasi tidak ditemukan');
     if (r.status !== 'submitted') throw new ForbiddenException('Realisasi tidak dalam status menunggu review');
-    if (action === 'reject' && !note) throw new BadRequestException('Catatan wajib diisi saat menolak');
+    // Task 3: komentar wajib untuk setiap keputusan (approve maupun reject).
+    if (!note?.trim()) throw new BadRequestException('Catatan/komentar wajib diisi saat menyetujui atau menolak');
+    // Task 9: non-GM hanya boleh me-review realisasi sebidang.
+    if (user.role !== Role.GM && user.bidang && r.bidang !== user.bidang) {
+      throw new ForbiddenException('Anda hanya dapat menyetujui realisasi pada bidang Anda');
+    }
 
     const userStage = ROLE_TO_STAGE[user.role];
     if (r.currentStage !== userStage) {

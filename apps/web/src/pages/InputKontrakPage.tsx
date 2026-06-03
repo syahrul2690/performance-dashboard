@@ -25,6 +25,16 @@ const BIDANG_OPTIONS = [
   'Keuangan, Komunikasi & Umum',
 ];
 
+// Unit yang dapat mengajukan Kontrak Manajemen: Kantor Induk + 5 UPMK
+const UNIT_OPTIONS = [
+  { code: 'KP', name: 'Kantor Induk' },
+  { code: 'UPMK1', name: 'UPMK I' },
+  { code: 'UPMK2', name: 'UPMK II' },
+  { code: 'UPMK3', name: 'UPMK III' },
+  { code: 'UPMK4', name: 'UPMK IV' },
+  { code: 'UPMK5', name: 'UPMK V' },
+];
+
 const STATUS_LABEL: Record<string, string> = {
   draft: 'Draft', submitted: 'Menunggu Review', approved: 'Disetujui', rejected: 'Dikembalikan',
 };
@@ -48,17 +58,22 @@ export function InputKontrakPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const [selectedUnit, setSelectedUnit] = useState('KP');
   const [bidang, setBidang] = useState('');
   const [holder, setHolder] = useState('');
   const [kpiItems, setKpiItems] = useState<KpiItem[]>([emptyRow()]);
 
+  // Default unit mengikuti unit user (bila ada)
+  useEffect(() => { if (user?.unit) setSelectedUnit(user.unit); }, [user?.unit]);
+
   useEffect(() => {
     loadData();
-  }, [user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedUnit]);
 
   const loadData = async () => {
     try {
-      const data = await inputKontrak.list(user?.unit);
+      const data = await inputKontrak.list(selectedUnit);
       setKontrakList(data as KontrakManajemen[]);
     } catch (e) {
       setError((e as Error)?.message ?? 'Gagal memuat data');
@@ -110,7 +125,7 @@ export function InputKontrakPage() {
     setSubmitting(true);
     try {
       await inputKontrak.save(
-        user.unit, bidang.trim(), holder.trim(),
+        selectedUnit, bidang.trim(), holder.trim(),
         kpiItems as unknown as Record<string, unknown>[],
         editingId ?? undefined,
       );
@@ -220,9 +235,20 @@ export function InputKontrakPage() {
             <FileText size={24} color="var(--color-accent)" />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 700 }}>Input Kontrak Manajemen — Februari 2026</div>
-            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginTop: 4 }}>
-              Unit: <strong>{user?.unit ?? '—'}</strong> · {kontrakList.length} kontrak · Draft: {draftCount} · Terkirim: {submittedCount}
+            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 700 }}>Input Kontrak Manajemen (Tahun Berjalan {CURRENT_YEAR})</div>
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+              <span>Unit:</span>
+              <select
+                className="form-input form-input-sm"
+                value={selectedUnit}
+                onChange={(e) => setSelectedUnit(e.target.value)}
+                style={{ width: 'auto', minWidth: 140, fontWeight: 700 }}
+              >
+                {UNIT_OPTIONS.map((u) => (
+                  <option key={u.code} value={u.code}>{u.name} ({u.code})</option>
+                ))}
+              </select>
+              <span>· {kontrakList.length} kontrak · Draft: {draftCount} · Terkirim: {submittedCount}</span>
             </div>
           </div>
           <input

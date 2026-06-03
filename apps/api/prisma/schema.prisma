@@ -43,6 +43,7 @@ model User {
   name         String
   role         Role
   unit         String
+  bidang       String?  // Bidang asal user (null = lintas-bidang, mis. GM)
   passwordHash String
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
@@ -228,6 +229,7 @@ model InputRealisasi {
   id           String    @id @default(cuid())
   periodId     String
   unitCode     String
+  bidang       String    @default("") // Realisasi dipecah per bidang
   submitter    String
   submitterId  String?
   values       Json
@@ -240,7 +242,7 @@ model InputRealisasi {
   submittedAt  DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  @@unique([periodId, unitCode])
+  @@unique([periodId, unitCode, bidang])
   @@map("input_realisasi")
 }
 

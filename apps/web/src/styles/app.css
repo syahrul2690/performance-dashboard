@@ -395,3 +395,16 @@ code {
   line-height: 1.25;
   word-break: break-word;
 }
+
+/* Highlight kartu yang dibuka dari notifikasi (Task 10) */
+@keyframes notifPulse {
+  0% { box-shadow: 0 0 0 0 rgba(3, 162, 184, 0.55); }
+  70% { box-shadow: 0 0 0 8px rgba(3, 162, 184, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(3, 162, 184, 0); }
+}
+.notif-highlight {
+  outline: 2px solid var(--color-info, #03a2b8);
+  outline-offset: 2px;
+  animation: notifPulse 1.2s ease-out 2;
+  scroll-margin-top: 80px;
+}

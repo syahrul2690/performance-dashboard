@@ -195,7 +195,7 @@ export function OperationalPage() {
           <div className="summary-hero-meta delta-positive">{pct((sm.kpiNilai / (sm.kpiBobot || 1)) * 100)} pencapaian</div>
         </div>
         <div className="summary-hero-card pi">
-          <div className="summary-hero-label">Performance Indicator (PI)</div>
+          <div className="summary-hero-label">Key Performance Indicator (KPI)</div>
           <div className="summary-hero-value">{fmt(sm.piNilai)}<span className="of">/ {sm.piBobot}</span></div>
           <div className="summary-hero-meta delta-positive">{pct((sm.piNilai / (sm.piBobot || 1)) * 100)} pencapaian</div>
         </div>
@@ -217,7 +217,7 @@ export function OperationalPage() {
         </div>
       </div>
 
-      {/* KPI + PI side by side */}
+      {/* KPI (bobot 40) + KPI (bobot 60) side by side */}
       <div className="two-col-grid" style={{ alignItems: 'start', marginBottom: 'var(--space-6)' }}>
         <div className="card p-0">
           <div className="card-header compact" style={{ borderBottom: '3px solid var(--color-accent)' }}>
@@ -244,7 +244,7 @@ export function OperationalPage() {
                 <BarChart2 size={16} color="var(--color-info)" />
               </div>
               <div>
-                <div className="card-title" style={{ color: 'var(--color-info)', fontSize: 'var(--text-sm)' }}>PI</div>
+                <div className="card-title" style={{ color: 'var(--color-info)', fontSize: 'var(--text-sm)' }}>KPI</div>
                 <div style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-muted)' }}>{piRows.length} indikator · Bobot 60</div>
               </div>
             </div>

@@ -56,36 +56,98 @@ async function main() {
   }
   console.log('  role_variants:', extra.roleVariants.length);
 
-  // Users — one per role from ROLES constant
+  // 4 Bidang baku PUSMANPRO (Kantor Induk)
+  const BIDANG_LIST = [
+    'Operasi Manajemen Proyek',
+    'QA/QC',
+    'Perencanaan & Project Control',
+    'Keuangan, Komunikasi & Umum',
+  ];
+  const BIDANG_SLUG: Record<string, string> = {
+    'Operasi Manajemen Proyek': 'omp',
+    'QA/QC': 'qaqc',
+    'Perencanaan & Project Control': 'rpc',
+    'Keuangan, Komunikasi & Umum': 'kku',
+  };
+
+  // Users — one per role from ROLES constant (generik). Non-GM diberi bidang OMP
+  // agar fungsional; GM lintas-bidang (bidang = null).
   for (const [roleKey, info] of Object.entries(ROLES)) {
     const email = info.email || `${roleKey}@pusmanpro.pln.co.id`;
     const variant = await prisma.roleVariant.findUnique({
       where: { code: REP_VARIANT[roleKey] },
     });
+    const bidang = roleKey === 'gm' ? null : BIDANG_LIST[0];
     await prisma.user.upsert({
       where: { email },
-      update: { roleVariantId: variant?.id ?? null },
+      update: { roleVariantId: variant?.id ?? null, bidang },
       create: {
         email,
         name: info.name,
         role: ROLE_MAP[roleKey],
         unit: info.unit || 'KP',
+        bidang,
         passwordHash: hash,
         isActive: true,
         roleVariantId: variant?.id ?? null,
         prefs: { create: {} },
       },
     });
-    console.log('  user:', email, ROLE_MAP[roleKey]);
+    console.log('  user:', email, ROLE_MAP[roleKey], bidang ?? 'lintas-bidang');
   }
 
-  // Period — Februari 2026 (active)
-  const period = await prisma.period.upsert({
-    where: { yearMonth: '2026-02' },
-    update: { isActive: true },
-    create: { yearMonth: '2026-02', label: 'Februari 2026', isActive: true },
-  });
-  console.log('  period:', period.label);
+  // User demo per bidang (staff/asman/manajer/srmanajer) untuk demo gating
+  // lintas-bidang. Bidang OMP sudah diwakili user generik di atas.
+  const PER_BIDANG_ROLES: Array<{ key: string; role: Role; label: string }> = [
+    { key: 'staff', role: Role.STAFF, label: 'Staff' },
+    { key: 'asman', role: Role.ASMAN, label: 'Asisten Manajer' },
+    { key: 'manajer', role: Role.MANAJER, label: 'Manajer' },
+    { key: 'srmanajer', role: Role.SRMANAJER, label: 'Senior Manajer' },
+  ];
+  for (const bidang of BIDANG_LIST.slice(1)) {
+    const slug = BIDANG_SLUG[bidang];
+    for (const r of PER_BIDANG_ROLES) {
+      const email = `${r.key}.${slug}@pusmanpro.pln.co.id`;
+      const variant = await prisma.roleVariant.findUnique({
+        where: { code: REP_VARIANT[r.key] },
+      });
+      await prisma.user.upsert({
+        where: { email },
+        update: { bidang, roleVariantId: variant?.id ?? null },
+        create: {
+          email,
+          name: `${r.label} ${bidang}`,
+          role: r.role,
+          unit: 'KP',
+          bidang,
+          passwordHash: hash,
+          isActive: true,
+          roleVariantId: variant?.id ?? null,
+          prefs: { create: {} },
+        },
+      });
+    }
+    console.log('  users bidang:', bidang);
+  }
+
+  // Periode — 12 bulan tahun berjalan 2026. Aktif = Februari 2026 (selaras snapshot domain).
+  const BULAN_ID = [
+    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
+  ];
+  const ACTIVE_YM = '2026-02';
+  let period!: Awaited<ReturnType<typeof prisma.period.upsert>>;
+  for (let m = 0; m < 12; m++) {
+    const ym = `2026-${String(m + 1).padStart(2, '0')}`;
+    const isActive = ym === ACTIVE_YM;
+    const p = await prisma.period.upsert({
+      where: { yearMonth: ym },
+      update: { isActive, label: `${BULAN_ID[m]} 2026` },
+      create: { yearMonth: ym, label: `${BULAN_ID[m]} 2026`, isActive },
+    });
+    if (isActive) period = p;
+  }
+  console.log('  periods: 12 bulan 2026, aktif:', period.label);
 
   // Domain snapshots — store the exact prototype DATA sections as JSON blobs
   const meta = { periodId: period.id };
@@ -219,25 +281,29 @@ async function main() {
   const sampleKontrak = [
     {
       unitCode: 'KP',
-      bidang: 'Bidang Teknik',
-      holder: 'Ahmad Teknik',
+      bidang: 'Operasi Manajemen Proyek',
+      holder: 'Suryo P.',
       kpiItems: [
         { indikator: 'Progress Konstruksi Jaringan', target: '95', satuan: '%', bobot: '30' },
         { indikator: 'Availability Sistem', target: '99.5', satuan: '%', bobot: '25' },
         { indikator: 'Rasio Pemeliharaan', target: '1.2', satuan: '%', bobot: '20' },
       ],
-      status: 'submitted',
+      // Sudah disetujui final → jadi acuan Input Realisasi untuk bidang OMP.
+      status: 'approved',
+      currentStage: 5,
       submitter: 'Staff Officer',
     },
     {
       unitCode: 'KP',
-      bidang: 'Bidang Keuangan',
-      holder: 'Siti Keuangan',
+      bidang: 'Keuangan, Komunikasi & Umum',
+      holder: 'Rahmi A.',
       kpiItems: [
         { indikator: 'Efisiensi Biaya Operasional', target: '85', satuan: '%', bobot: '35' },
         { indikator: 'Realisasi Anggaran', target: '90', satuan: '%', bobot: '30' },
       ],
-      status: 'draft',
+      // Menunggu review Asman → demo gating approval per-bidang.
+      status: 'submitted',
+      currentStage: 2,
       submitter: 'Staff Officer',
     },
   ];
@@ -258,7 +324,7 @@ async function main() {
         holder: k.holder,
         kpiItems: k.kpiItems as object,
         status: k.status,
-        currentStage: k.status === 'submitted' ? 2 : 1, // submitted → menunggu Asman
+        currentStage: k.currentStage,
         submitter: k.submitter,
         submitterId: staffUser?.id ?? null,
       },

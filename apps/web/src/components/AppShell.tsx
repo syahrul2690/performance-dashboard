@@ -261,7 +261,17 @@ export function AppShell() {
                   <div
                     key={n.id}
                     className={`notif-item${n.unread ? ' unread' : ''}`}
-                    onClick={() => { if (n.route) navigate(n.route); setNotifOpen(false); }}
+                    onClick={() => {
+                      if (n.route) {
+                        // Sisipkan targetId sebagai `focus` agar kartu terkait di-highlight (Task 10).
+                        const tid = (n as { targetId?: string }).targetId;
+                        const route = tid
+                          ? `${n.route}${n.route.includes('?') ? '&' : '?'}focus=${encodeURIComponent(tid)}`
+                          : n.route;
+                        navigate(route);
+                      }
+                      setNotifOpen(false);
+                    }}
                   >
                     <div className={`notif-icon ${n.type === 'alert' ? 'warning' : 'info'}`}>
                       <Bell size={14} />

@@ -1,14 +1,57 @@
 import { useEffect, useState, Fragment, type ReactNode } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { approvals as approvalsApi, inputKontrak, inputRealisasi, meta as metaApi } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useNotif } from '../context/NotifContext';
 import type { Report, KontrakManajemen, RealisasiKinerja } from '../lib/types';
-import { CheckCircle, XCircle, Clock, CalendarClock, FileText, UsersRound, FileSignature, ChevronDown, ClipboardCheck } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, CalendarClock, FileText, UsersRound, FileSignature, ChevronDown, ClipboardCheck, Timer, MessageSquare } from 'lucide-react';
 import { SkeletonTable, EmptyState, ErrorState } from '../components/LoadState';
+
+// Badge SLA approval (Task 6): hari tersisa hingga deadline tahap berjalan.
+function SlaBadge({ days }: { days?: number | null }) {
+  if (days === undefined || days === null) return <span style={{ color: 'var(--color-text-subtle)' }}>—</span>;
+  const overdue = days < 0;
+  const urgent = days <= 1;
+  const color = overdue ? 'var(--color-danger)' : urgent ? 'var(--color-warning)' : 'var(--color-success)';
+  const bg = overdue ? 'var(--color-danger-tint)' : urgent ? 'var(--color-warning-tint)' : 'var(--color-success-tint)';
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 700, color, background: bg, padding: '2px 8px', borderRadius: 8, whiteSpace: 'nowrap' }}>
+      <Timer size={11} />
+      {overdue ? `Telat ${Math.abs(days)} hari` : days === 0 ? 'Jatuh tempo hari ini' : `${days} hari lagi`}
+    </span>
+  );
+}
+
+// Timeline komentar/persetujuan dari history JSON (Task 4 — traceability).
+type HistEntry = { stage?: number; actor?: string; role?: string; action?: string; note?: string; ts?: string; toStage?: number };
+const ACTION_LABEL: Record<string, string> = {
+  submitted: 'Diajukan', approved: 'Disetujui', returned: 'Dikembalikan ke konseptor', returned_step: 'Dikembalikan 1 tahap',
+};
+function ApprovalTimeline({ history }: { history: unknown }) {
+  const entries = Array.isArray(history) ? (history as HistEntry[]) : [];
+  if (entries.length === 0) return <div style={{ fontSize: 11, color: 'var(--color-text-muted)', padding: 'var(--space-3)' }}>Belum ada riwayat persetujuan.</div>;
+  return (
+    <div style={{ padding: 'var(--space-3) var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+      {entries.map((e, i) => (
+        <div key={i} style={{ display: 'flex', gap: 'var(--space-3)', fontSize: 11, alignItems: 'flex-start' }}>
+          <MessageSquare size={12} style={{ marginTop: 2, color: 'var(--color-text-muted)', flexShrink: 0 }} />
+          <div>
+            <div style={{ fontWeight: 600 }}>
+              {ACTION_LABEL[e.action ?? ''] ?? e.action ?? '—'} · {e.actor ?? '—'}
+              {e.role ? <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}> ({e.role})</span> : null}
+              {e.ts ? <span style={{ color: 'var(--color-text-subtle)', fontWeight: 400 }}> · {new Date(e.ts).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span> : null}
+            </div>
+            {e.note ? <div style={{ color: 'var(--color-text-muted)', marginTop: 1 }}>“{e.note}”</div> : <div style={{ color: 'var(--color-text-subtle)', fontStyle: 'italic', marginTop: 1 }}>(tanpa komentar)</div>}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 // Kartu yang bisa dilipat (fold-up): klik header untuk buka/tutup isi.
 function FoldCard({
-  title, icon, right, accent, defaultOpen = true, children,
+  title, icon, right, accent, defaultOpen = true, children, id, highlight = false,
 }: {
   title: string;
   icon?: ReactNode;
@@ -16,10 +59,12 @@ function FoldCard({
   accent?: string;
   defaultOpen?: boolean;
   children: ReactNode;
+  id?: string;
+  highlight?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="card p-0" style={{ marginBottom: 'var(--space-6)', ...(accent ? { borderTop: `3px solid ${accent}` } : {}) }}>
+    <div id={id} className={`card p-0${highlight ? ' notif-highlight' : ''}`} style={{ marginBottom: 'var(--space-6)', ...(accent ? { borderTop: `3px solid ${accent}` } : {}) }}>
       <button
         type="button"
         className="card-header compact fold-card-header"
@@ -90,6 +135,14 @@ export function ApprovalsPage() {
   const [allReal, setAllReal] = useState<RealisasiKinerja[]>([]);
   const [periodMap, setPeriodMap] = useState<Record<string, string>>({});
 
+  // Task 10: highlight kartu sesuai notifikasi yang diklik (realisasi = prioritas utama).
+  const [searchParams] = useSearchParams();
+  const focusType = searchParams.get('type');
+  const focusId = searchParams.get('focus');
+  const [highlight, setHighlight] = useState<'real' | 'km' | null>(null);
+  // Task 4: ekspansi riwayat komentar pada kartu "Semua Dokumen Persetujuan".
+  const [docExpanded, setDocExpanded] = useState<string | null>(null);
+
   const load = () => {
     approvalsApi.reports()
       .then(setReports)
@@ -122,11 +175,31 @@ export function ApprovalsPage() {
 
   useEffect(() => { load(); loadKm(); loadReal(); loadDocs(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Saat tiba dari notifikasi: tentukan kartu yang di-highlight & scroll ke sana.
+  // Prioritas: Realisasi Kinerja Bulanan; fallback ke Usulan KM yang menunggu.
+  useEffect(() => {
+    if (loading || (!focusType && !focusId)) return;
+    const inReal = focusType === 'realisasi' || realList.some((r) => r.id === focusId);
+    const inKm = focusType === 'km' || kmList.some((k) => k.id === focusId);
+    const target: 'real' | 'km' | null = inReal
+      ? 'real'
+      : inKm
+        ? 'km'
+        : realList.length > 0 ? 'real' : kmList.length > 0 ? 'km' : null;
+    if (!target) return;
+    setHighlight(target);
+    const el = document.getElementById(target === 'real' ? 'card-realisasi' : 'card-km');
+    el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const t = setTimeout(() => setHighlight(null), 4000);
+    return () => clearTimeout(t);
+  }, [loading, focusType, focusId, realList, kmList]);
+
   const handleRealReview = async (id: string, action: 'approve' | 'reject', returnTo?: 'konseptor' | 'previous') => {
-    if (action === 'reject' && !realNote) { alert('Isi catatan saat mengembalikan realisasi'); return; }
+    // Task 3: komentar wajib untuk setiap keputusan (setujui maupun kembalikan).
+    if (!realNote.trim()) { alert('Catatan/komentar wajib diisi saat menyetujui atau mengembalikan realisasi'); return; }
     setRealBusy(true);
     try {
-      await inputRealisasi.review(id, action, realNote || undefined, returnTo);
+      await inputRealisasi.review(id, action, realNote, returnTo);
       setRealTarget(null); setRealNote('');
       loadReal();
       refreshNotif();
@@ -138,10 +211,11 @@ export function ApprovalsPage() {
   };
 
   const handleKmReview = async (id: string, action: 'approve' | 'reject', returnTo?: 'konseptor' | 'previous') => {
-    if (action === 'reject' && !kmNote) { alert('Isi catatan saat mengembalikan usulan'); return; }
+    // Task 3: komentar wajib untuk setiap keputusan (setujui maupun kembalikan).
+    if (!kmNote.trim()) { alert('Catatan/komentar wajib diisi saat menyetujui atau mengembalikan usulan'); return; }
     setKmBusy(true);
     try {
-      await inputKontrak.review(id, action, kmNote || undefined, returnTo);
+      await inputKontrak.review(id, action, kmNote, returnTo);
       setKmTarget(null); setKmNote('');
       loadKm();
       refreshNotif();
@@ -180,8 +254,8 @@ export function ApprovalsPage() {
 
   // Registri semua dokumen persetujuan nyata (KM + Realisasi) lintas unit
   const docRows = [
-    ...allKm.map((k) => ({ id: k.id, jenis: 'Kontrak Manajemen', detail: k.bidang, unitCode: k.unitCode, periodId: k.periodId, status: k.status, currentStage: k.currentStage, reviewer: k.reviewer })),
-    ...allReal.map((r) => ({ id: r.id, jenis: 'Realisasi Kinerja', detail: '', unitCode: r.unitCode, periodId: r.periodId, status: r.status, currentStage: r.currentStage, reviewer: r.reviewer })),
+    ...allKm.map((k) => ({ id: k.id, jenis: 'Kontrak Manajemen', detail: k.bidang, unitCode: k.unitCode, periodId: k.periodId, status: k.status, currentStage: k.currentStage, reviewer: k.reviewer, history: (k as KontrakManajemen & { history?: unknown }).history })),
+    ...allReal.map((r) => ({ id: r.id, jenis: 'Realisasi Kinerja', detail: (r as RealisasiKinerja & { bidang?: string }).bidang ?? '', unitCode: r.unitCode, periodId: r.periodId, status: r.status, currentStage: r.currentStage, reviewer: r.reviewer, history: (r as RealisasiKinerja & { history?: unknown }).history })),
   ];
   const nextApproverLabel = (status: string, stage: number): string => {
     if (status === 'approved') return '✓ Selesai';
@@ -209,6 +283,8 @@ export function ApprovalsPage() {
       {/* Review Usulan Kontrak Manajemen — hanya untuk Asman ke atas */}
       {canReview && (
         <FoldCard
+          id="card-km"
+          highlight={highlight === 'km'}
           accent="var(--color-accent)"
           icon={<FileSignature size={14} />}
           title="Usulan Kontrak Manajemen Menunggu Review"
@@ -226,6 +302,7 @@ export function ApprovalsPage() {
                     <th>Pengirim</th>
                     <th>KPI</th>
                     <th>Jenjang Persetujuan</th>
+                    <th>SLA</th>
                     <th>Tanggal</th>
                     <th style={{ width: 260 }}>Tindakan</th>
                   </tr>
@@ -265,6 +342,7 @@ export function ApprovalsPage() {
                             <span style={{ fontSize: 10, color: 'var(--color-text-muted)', marginLeft: 2 }}>{KM_STAGES[k.currentStage - 1]}</span>
                           </div>
                         </td>
+                        <td><SlaBadge days={(k as KontrakManajemen & { slaRemainingDays?: number }).slaRemainingDays} /></td>
                         <td style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
                           {new Date(k.submittedAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })}
                         </td>
@@ -274,7 +352,7 @@ export function ApprovalsPage() {
                               <textarea
                                 className="form-textarea"
                                 style={{ fontSize: 'var(--text-xs)', minHeight: 48 }}
-                                placeholder="Catatan (wajib untuk menolak)"
+                                placeholder="Catatan/komentar (wajib untuk setiap keputusan)"
                                 value={kmNote}
                                 onChange={(e) => setKmNote(e.target.value)}
                               />
@@ -302,7 +380,7 @@ export function ApprovalsPage() {
                       </tr>
                       {kmExpanded === k.id && (
                         <tr>
-                          <td colSpan={7} style={{ background: 'var(--color-surface-2)', padding: 0 }}>
+                          <td colSpan={8} style={{ background: 'var(--color-surface-2)', padding: 0 }}>
                             <table className="data-table compact" style={{ margin: 0 }}>
                               <thead>
                                 <tr>
@@ -339,6 +417,8 @@ export function ApprovalsPage() {
       {/* Review Realisasi Kinerja Bulanan — hanya untuk Asman ke atas */}
       {canReview && (
         <FoldCard
+          id="card-realisasi"
+          highlight={highlight === 'real'}
           accent="var(--color-info)"
           icon={<ClipboardCheck size={14} />}
           title="Realisasi Kinerja Bulanan Menunggu Review"
@@ -352,9 +432,11 @@ export function ApprovalsPage() {
                 <thead>
                   <tr>
                     <th>Unit</th>
+                    <th>Bidang</th>
                     <th>Pengirim</th>
                     <th>Indikator</th>
                     <th>Jenjang Persetujuan</th>
+                    <th>SLA</th>
                     <th>Tanggal</th>
                     <th style={{ width: 260 }}>Tindakan</th>
                   </tr>
@@ -366,6 +448,7 @@ export function ApprovalsPage() {
                       <Fragment key={rl.id}>
                         <tr>
                           <td style={{ fontWeight: 600 }}>{UNIT_NAMES[rl.unitCode] ?? rl.unitCode}</td>
+                          <td style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{(rl as RealisasiKinerja & { bidang?: string }).bidang ?? '—'}</td>
                           <td style={{ color: 'var(--color-text-muted)' }}>{rl.submitter}</td>
                           <td>
                             <button className="btn btn-ghost btn-sm" onClick={() => setRealExpanded(realExpanded === rl.id ? null : rl.id)}>
@@ -390,6 +473,7 @@ export function ApprovalsPage() {
                               <span style={{ fontSize: 10, color: 'var(--color-text-muted)', marginLeft: 2 }}>{KM_STAGES[rl.currentStage - 1]}</span>
                             </div>
                           </td>
+                          <td><SlaBadge days={(rl as RealisasiKinerja & { slaRemainingDays?: number }).slaRemainingDays} /></td>
                           <td style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
                             {new Date(rl.submittedAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })}
                           </td>
@@ -399,7 +483,7 @@ export function ApprovalsPage() {
                                 <textarea
                                   className="form-textarea"
                                   style={{ fontSize: 'var(--text-xs)', minHeight: 48 }}
-                                  placeholder="Catatan (wajib untuk menolak)"
+                                  placeholder="Catatan/komentar (wajib untuk setiap keputusan)"
                                   value={realNote}
                                   onChange={(e) => setRealNote(e.target.value)}
                                 />
@@ -427,7 +511,7 @@ export function ApprovalsPage() {
                         </tr>
                         {realExpanded === rl.id && (
                           <tr>
-                            <td colSpan={6} style={{ background: 'var(--color-surface-2)', padding: 0 }}>
+                            <td colSpan={8} style={{ background: 'var(--color-surface-2)', padding: 0 }}>
                               <table className="data-table compact" style={{ margin: 0 }}>
                                 <thead>
                                   <tr><th>No</th><th>Indikator</th><th>Satuan</th><th className="num">Bobot</th><th className="num">Target</th><th className="num">Realisasi</th></tr>
@@ -515,11 +599,13 @@ export function ApprovalsPage() {
                 <th>Jenjang</th>
                 <th>Status</th>
                 <th>Menunggu Review</th>
+                <th>Komentar</th>
               </tr>
             </thead>
             <tbody>
               {docRows.map((d) => (
-                <tr key={d.id}>
+                <Fragment key={d.id}>
+                <tr>
                   <td style={{ fontWeight: 600 }}>{UNIT_NAMES[d.unitCode] ?? d.unitCode}</td>
                   <td>
                     {d.jenis}
@@ -551,10 +637,24 @@ export function ApprovalsPage() {
                   <td style={{ color: d.status === 'approved' ? 'var(--color-success)' : 'var(--color-text-muted)' }}>
                     {nextApproverLabel(d.status, d.currentStage)}
                   </td>
+                  <td>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setDocExpanded(docExpanded === d.id ? null : d.id)} title="Lihat riwayat persetujuan & komentar">
+                      <MessageSquare size={12} /> {Array.isArray(d.history) ? (d.history as unknown[]).length : 0}
+                      <ChevronDown size={12} style={{ transform: docExpanded === d.id ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />
+                    </button>
+                  </td>
                 </tr>
+                {docExpanded === d.id && (
+                  <tr>
+                    <td colSpan={7} style={{ background: 'var(--color-surface-2)', padding: 0 }}>
+                      <ApprovalTimeline history={d.history} />
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               ))}
               {docRows.length === 0 && (
-                <tr><td colSpan={6}><EmptyState title="Belum ada dokumen" message="Belum ada Kontrak Manajemen atau Realisasi yang diinput." /></td></tr>
+                <tr><td colSpan={7}><EmptyState title="Belum ada dokumen" message="Belum ada Kontrak Manajemen atau Realisasi yang diinput." /></td></tr>
               )}
             </tbody>
           </table>

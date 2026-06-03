@@ -14,6 +14,7 @@ export interface User {
   name: string;
   role: Role;
   unit: string;
+  bidang?: string | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

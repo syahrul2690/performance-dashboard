@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { inputRealisasi, inputKontrak } from '../lib/api';
+import { inputRealisasi, inputKontrak, meta } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { ClipboardEdit, CheckCircle, Clock, Trash2 } from 'lucide-react';
 import { SkeletonTable, EmptyState, ErrorState } from '../components/LoadState';
-import type { KontrakManajemen } from '../lib/types';
+import type { KontrakManajemen, Period } from '../lib/types';
 
 const CURRENT_YEAR = new Date().getFullYear();
 
@@ -35,7 +35,10 @@ const UNIT_OPTIONS = [
 
 export function InputRealisasiPage() {
   const { user } = useAuth();
+  const isStaff = user?.role === 'STAFF';
   const [selectedUnit, setSelectedUnit] = useState<string>('KP');
+  const [periods, setPeriods] = useState<Period[]>([]);
+  const [selectedPeriodId, setSelectedPeriodId] = useState<string>('');
   const [history, setHistory] = useState<unknown[]>([]);
   const [kpiList, setKpiList] = useState<KpiItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,20 +50,36 @@ export function InputRealisasiPage() {
   // Default unit mengikuti unit user (bila ada)
   useEffect(() => { if (user?.unit) setSelectedUnit(user.unit); }, [user?.unit]);
 
+  // Muat daftar periode (Jan–Des) sekali; default ke periode aktif.
   useEffect(() => {
+    meta.periods().then((res) => {
+      const list = (res as Period[]) ?? [];
+      setPeriods(list);
+      const active = list.find((p) => p.isActive) ?? list[0];
+      if (active) setSelectedPeriodId(active.id);
+      else setLoading(false); // tak ada periode → jangan nyangkut di skeleton
+    }).catch(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (!selectedPeriodId) return;
     const loadData = async () => {
       try {
         const [histRes, approvedRes] = await Promise.allSettled([
-          inputRealisasi.history(selectedUnit),
-          inputKontrak.approved(selectedUnit),
+          inputRealisasi.history(selectedUnit, selectedPeriodId),
+          inputKontrak.approved(selectedUnit, selectedPeriodId),
         ]);
         if (histRes.status === 'fulfilled') setHistory(histRes.value as unknown[]);
         if (approvedRes.status === 'fulfilled') {
           // Acuan realisasi = KPI dari Kontrak Manajemen yang sudah DISETUJUI (final GM) untuk unit terpilih.
           const kontrak = approvedRes.value as KontrakManajemen[];
-          const merged: KpiItem[] = kontrak.flatMap((k) =>
+          let merged: KpiItem[] = kontrak.flatMap((k) =>
             (k.kpiItems as KpiItem[]).map((it) => ({ ...it, bidang: k.bidang })),
           );
+          // Task 7: staff hanya boleh mengisi KPI bidangnya sendiri.
+          if (isStaff && user?.bidang) {
+            merged = merged.filter((it) => it.bidang === user.bidang);
+          }
           setKpiList(merged);
           setValues({});
         }
@@ -71,24 +90,31 @@ export function InputRealisasiPage() {
       }
     };
     loadData();
-  }, [selectedUnit]);
+  }, [selectedUnit, selectedPeriodId, isStaff, user?.bidang]);
 
   const handleSubmit = async () => {
     if (!user) return;
     setSubmitting(true);
     try {
-      const payload: Record<string, unknown> = {};
+      // Realisasi dipecah per bidang: kelompokkan baris KPI per bidang, kirim satu submit per bidang.
+      const byBidang = new Map<string, Record<string, unknown>>();
       kpiList.forEach((kpi, i) => {
-        payload[`kpi_${i}`] = { ...kpi, realisasi: values[String(i)] ?? '' };
+        const b = kpi.bidang ?? '';
+        if (!byBidang.has(b)) byBidang.set(b, {});
+        const bucket = byBidang.get(b)!;
+        bucket[`kpi_${i}`] = { ...kpi, realisasi: values[String(i)] ?? '' };
       });
-      await inputRealisasi.submit(selectedUnit, payload);
+      for (const [bidang, payload] of byBidang) {
+        await inputRealisasi.submit(selectedUnit, bidang, payload, selectedPeriodId);
+      }
       setSubmitted(true);
       setValues({});
-      const hist = await inputRealisasi.history(selectedUnit);
+      const hist = await inputRealisasi.history(selectedUnit, selectedPeriodId);
       setHistory(hist as unknown[]);
       setTimeout(() => setSubmitted(false), 3000);
     } catch (e) {
-      setError((e as Error)?.message ?? 'Gagal mengirim');
+      const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? (e as Error)?.message ?? 'Gagal mengirim';
+      setError(msg);
     } finally {
       setSubmitting(false);
     }
@@ -98,7 +124,7 @@ export function InputRealisasiPage() {
     if (!confirm('Hapus realisasi ini? Tindakan ini tidak dapat dibatalkan.')) return;
     try {
       await inputRealisasi.delete(id);
-      const hist = await inputRealisasi.history(selectedUnit);
+      const hist = await inputRealisasi.history(selectedUnit, selectedPeriodId);
       setHistory(hist as unknown[]);
     } catch (e) {
       const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? (e as Error)?.message ?? 'Gagal menghapus';
@@ -119,6 +145,7 @@ export function InputRealisasiPage() {
 
   const filledCount = Object.values(values).filter(v => v.trim() !== '').length;
   const completionPct = kpiList.length > 0 ? Math.round((filledCount / kpiList.length) * 100) : 0;
+  const selectedPeriodLabel = periods.find((p) => p.id === selectedPeriodId)?.label ?? 'Tahun Berjalan';
 
   return (
     <div className="page input-realisasi-page">
@@ -129,8 +156,20 @@ export function InputRealisasiPage() {
             <ClipboardEdit size={24} color="var(--color-accent)" />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 700 }}>Input Realisasi Bulanan — Februari 2026</div>
+            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 700 }}>Input Realisasi Bulanan — {selectedPeriodLabel}</div>
             <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+              <span>Periode:</span>
+              <select
+                className="form-input form-input-sm"
+                value={selectedPeriodId}
+                onChange={(e) => setSelectedPeriodId(e.target.value)}
+                style={{ width: 'auto', minWidth: 130, fontWeight: 700 }}
+              >
+                {periods.map((p) => (
+                  <option key={p.id} value={p.id}>{p.label}</option>
+                ))}
+              </select>
+              <span>·</span>
               <span>Unit:</span>
               <select
                 className="form-input form-input-sm"
@@ -142,7 +181,7 @@ export function InputRealisasiPage() {
                   <option key={u.code} value={u.code}>{u.name} ({u.code})</option>
                 ))}
               </select>
-              <span>· {kpiList.length} indikator KM · Deadline: Tanggal 3 setiap bulan</span>
+              <span>· {kpiList.length} indikator KM{isStaff && user?.bidang ? ` · Bidang: ${user.bidang}` : ''} · Deadline: Tanggal 3 setiap bulan</span>
             </div>
           </div>
           <div style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -167,7 +206,7 @@ export function InputRealisasiPage() {
       <div className="card p-0" style={{ marginBottom: 'var(--space-6)' }}>
         <div className="card-header compact">
           <div className="card-title"><ClipboardEdit size={14} />KPI Realisasi — {UNIT_OPTIONS.find((u) => u.code === selectedUnit)?.name ?? selectedUnit}</div>
-          <span className="card-meta">Isi nilai realisasi Februari 2026</span>
+          <span className="card-meta">Isi nilai realisasi {selectedPeriodLabel}</span>
         </div>
         <div className="table-wrap">
           {kpiList.length === 0 ? (
@@ -243,6 +282,7 @@ export function InputRealisasiPage() {
               <thead>
                 <tr>
                   <th>Unit</th>
+                  <th>Bidang</th>
                   <th>Submitter</th>
                   <th>Status</th>
                   <th>Tanggal Submit</th>
@@ -259,6 +299,7 @@ export function InputRealisasiPage() {
                   return (
                     <tr key={i}>
                       <td style={{ fontWeight: 600 }}>{item.unitCode as string ?? '—'}</td>
+                      <td style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{item.bidang as string ?? '—'}</td>
                       <td>{item.submitter as string ?? '—'}</td>
                       <td>
                         <span className={`status-pill ${STATUS_PILL[status] ?? 'in-review'}`} style={{ fontSize: 10 }}>

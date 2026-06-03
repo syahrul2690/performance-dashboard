@@ -7,7 +7,9 @@ import { IsObject, IsString, IsOptional, IsIn } from 'class-validator';
 
 class SubmitDto {
   @IsString() unitCode: string;
+  @IsString() bidang: string;
   @IsObject() values: Record<string, unknown>;
+  @IsOptional() @IsString() periodId?: string;
 }
 
 class ReviewDto {
@@ -33,7 +35,7 @@ export class InputRealisasiController {
 
   @Put('submit')
   submit(@CurrentUser() user: User, @Body() dto: SubmitDto) {
-    return this.svc.submit(user, dto.unitCode, dto.values);
+    return this.svc.submit(user, dto.unitCode, dto.bidang, dto.values, dto.periodId);
   }
 
   @Post(':id/review')
