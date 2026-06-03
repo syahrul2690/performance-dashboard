@@ -21,6 +21,7 @@ import { ProsesBisnisModule } from './proses-bisnis/proses-bisnis.module';
 import { OrganisasiModule } from './organisasi/organisasi.module';
 import { GcgEsgModule } from './gcg-esg/gcg-esg.module';
 import { PetaModule } from './peta/peta.module';
+import { KinerjaModule } from './kinerja/kinerja.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { PetaModule } from './peta/peta.module';
     OrganisasiModule,
     GcgEsgModule,
     PetaModule,
+    KinerjaModule,
   ],
 })
 export class AppModule {}

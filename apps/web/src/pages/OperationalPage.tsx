@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react';
-import { operational } from '../lib/api';
-import { Target, BarChart2, ShieldAlert } from 'lucide-react';
+import { operational, kinerja } from '../lib/api';
+import { Target, BarChart2, ShieldAlert, ClipboardCheck } from 'lucide-react';
 import { SkeletonTable, EmptyState, ErrorState } from '../components/LoadState';
+
+interface RekapKpi { indikator: string; satuan: string; bobot: number; target: number; realisasi: number; capaian: number; nilai: number; }
+interface RekapUnit { code: string; name: string; score: number; status: string; kpis: RekapKpi[]; }
+interface Rekap { hasData: boolean; overall: number | null; units: RekapUnit[]; }
 
 type Kpi = {
   id: string; no?: string; label?: string; name?: string; indikator?: string; formula?: string;
@@ -38,13 +42,17 @@ function statusPill(s: string) {
 
 export function OperationalPage() {
   const [data, setData] = useState<{ data: Record<string, unknown> } | null>(null);
+  const [rekap, setRekap] = useState<Rekap | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    operational.get()
-      .then(setData)
-      .catch((e) => setError(e?.message ?? 'Gagal memuat data'))
+    Promise.allSettled([operational.get(), kinerja.rekap()])
+      .then(([op, rk]) => {
+        if (op.status === 'fulfilled') setData(op.value);
+        else setError((op.reason as Error)?.message ?? 'Gagal memuat data');
+        if (rk.status === 'fulfilled') setRekap(rk.value as Rekap);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -131,6 +139,54 @@ export function OperationalPage() {
 
   return (
     <div className="page operational-page">
+      {/* Capaian LIVE dari Realisasi Kinerja yang sudah disetujui final (Integrasi C) */}
+      {rekap?.hasData && (
+        <div className="card p-0" style={{ marginBottom: 'var(--space-6)', borderTop: '3px solid var(--color-success)' }}>
+          <div className="card-header compact">
+            <div className="card-title"><ClipboardCheck size={14} />Capaian Kinerja dari Realisasi Disetujui</div>
+            <span className="status-pill completed" style={{ fontWeight: 700 }}>
+              Total Nilai {fmt(rekap.overall ?? 0)} · {rekap.units.length} unit
+            </span>
+          </div>
+          {rekap.units.map((u) => (
+            <div key={u.code}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--space-2) var(--space-4)', background: 'var(--color-surface-2)', fontWeight: 700, fontSize: 'var(--text-sm)' }}>
+                <span>{u.name}</span>
+                <span style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
+                  <span style={{ color: 'var(--color-brand)' }}>Nilai {fmt(u.score)}</span>
+                  <span className={`status-pill ${u.score >= 100 ? 'completed' : u.score >= 90 ? 'at-risk' : 'delayed'}`}>{u.status}</span>
+                </span>
+              </div>
+              <div className="table-wrap">
+                <table className="data-table compact">
+                  <thead>
+                    <tr>
+                      <th>No</th><th>Indikator</th><th>Satuan</th>
+                      <th className="num">Target</th><th className="num">Realisasi</th>
+                      <th className="num">Bobot</th><th className="num">Capaian</th><th className="num">Nilai</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {u.kpis.map((k, i) => (
+                      <tr key={i}>
+                        <td style={{ color: 'var(--color-text-muted)' }}>{i + 1}</td>
+                        <td style={{ fontWeight: 500 }}>{k.indikator}</td>
+                        <td style={{ color: 'var(--color-text-muted)' }}>{k.satuan || '—'}</td>
+                        <td className="num">{fmt(k.target)}</td>
+                        <td className="num" style={{ fontWeight: 700 }}>{fmt(k.realisasi)}</td>
+                        <td className="num">{fmt(k.bobot)}</td>
+                        <td className={`num ${k.capaian >= 100 ? 'delta-positive' : k.capaian >= 90 ? '' : 'delta-negative'}`} style={{ fontWeight: 700 }}>{pct(k.capaian)}</td>
+                        <td className="num" style={{ fontWeight: 700 }}>{fmt(k.nilai)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* 4 Hero Cards */}
       <div className="four-col-grid">
         <div className="summary-hero-card kpi">

@@ -103,6 +103,8 @@ export class InputRealisasiService {
       data: { actor: user.name, userId: user.id, action: 'realisasi.delete', entity: 'InputRealisasi', targetId: id },
     });
     await this.cache.del(`realisasi:${r.unitCode}`);
+    await this.cache.del('kinerja:active');
+    await this.cache.del(`kinerja:${r.periodId}`);
     return { success: true };
   }
 
@@ -152,6 +154,8 @@ export class InputRealisasiService {
         await this.notifyStage(prevStage, result, user.name);
         await this.prisma.auditLog.create({ data: { actor: user.name, userId: user.id, action: 'realisasi.return_step', entity: 'InputRealisasi', targetId: id, note } });
         await this.cache.del(`realisasi:${r.unitCode}`);
+    await this.cache.del('kinerja:active');
+    await this.cache.del(`kinerja:${r.periodId}`);
         return result;
       }
 
@@ -171,6 +175,8 @@ export class InputRealisasiService {
       }
       await this.prisma.auditLog.create({ data: { actor: user.name, userId: user.id, action: 'realisasi.reject', entity: 'InputRealisasi', targetId: id, note } });
       await this.cache.del(`realisasi:${r.unitCode}`);
+    await this.cache.del('kinerja:active');
+    await this.cache.del(`kinerja:${r.periodId}`);
       return result;
     }
 
@@ -205,6 +211,8 @@ export class InputRealisasiService {
 
     await this.prisma.auditLog.create({ data: { actor: user.name, userId: user.id, action: 'realisasi.approve', entity: 'InputRealisasi', targetId: id, note } });
     await this.cache.del(`realisasi:${r.unitCode}`);
+    await this.cache.del('kinerja:active');
+    await this.cache.del(`kinerja:${r.periodId}`);
     return result;
   }
 }

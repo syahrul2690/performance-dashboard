@@ -181,4 +181,9 @@ export const kpi = {
   deepDive: (id: string) => api.get(`/kpi/deepdive/${id}`).then((r) => r.data),
 };
 
+export const kinerja = {
+  rekap: (periodId?: string) =>
+    api.get('/kinerja/rekap', { params: { periodId } }).then((r) => r.data),
+};
+
 export default api;

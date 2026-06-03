@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties, type ComponentType } from 'react';
-import { executive } from '../lib/api';
+import { executive, kinerja } from '../lib/api';
 import {
   BarChart3, LineChart, Trophy, Layers, TrendingUp, TrendingDown, Minus, ShieldCheck,
   Compass, Cpu, Leaf, Users, GitBranch, ClipboardList, HardHat, CheckCircle2,
@@ -52,16 +52,23 @@ function StatusPill({ status }: { status?: string }) {
   return <span className={`status-pill ${cls}`}>{status}</span>;
 }
 
+interface RekapUnit { code: string; name: string; score: number; status: string; }
+interface Rekap { hasData: boolean; overall: number | null; units: RekapUnit[]; }
+
 export function ExecutivePage() {
   const [data, setData] = useState<{ period: unknown; data: ExecutiveData } | null>(null);
+  const [rekap, setRekap] = useState<Rekap | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeKpi, setActiveKpi] = useState(0);
 
   useEffect(() => {
-    executive.summary()
-      .then(setData)
-      .catch((e) => setError(e?.message ?? 'Gagal memuat data'))
+    Promise.allSettled([executive.summary(), kinerja.rekap()])
+      .then(([sum, rk]) => {
+        if (sum.status === 'fulfilled') setData(sum.value);
+        else setError((sum.reason as Error)?.message ?? 'Gagal memuat data');
+        if (rk.status === 'fulfilled') setRekap(rk.value as Rekap);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -92,7 +99,15 @@ export function ExecutivePage() {
   const kpis = d.kpis ?? [];
   const selectedKpi = kpis[activeKpi];
 
-  const scoreColor = (hs.value as number) >= 100 ? 'var(--color-success)' : (hs.value as number) >= 90 ? 'var(--color-warning)' : 'var(--color-danger)';
+  // Integrasi C: bila ada realisasi DISETUJUI, pakai data nyata (live); jika belum, fallback ke seed.
+  const isLive = !!rekap?.hasData;
+  const gaugeValue = isLive && rekap?.overall != null ? rekap.overall : (hs.value as number);
+  const ranking: Array<{ code?: string; name?: string; unit?: string; score: number; status: string; projects?: number; criticalKpi?: string }> =
+    isLive && rekap
+      ? rekap.units.map((u) => ({ code: u.code, name: u.name, score: u.score, status: u.status }))
+      : (d.unitRanking ?? []);
+
+  const scoreColor = gaugeValue >= 100 ? 'var(--color-success)' : gaugeValue >= 90 ? 'var(--color-warning)' : 'var(--color-danger)';
 
   return (
     <div className="page">
@@ -102,7 +117,12 @@ export function ExecutivePage() {
           <h1 className="page-title">Executive Summary</h1>
           <p className="page-subtitle">Dashboard Kinerja PUSMANPRO — Februari 2026</p>
         </div>
-        <div className="page-meta">
+        <div className="page-meta" style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+          {isLive && (
+            <span className="meta-pill" style={{ background: 'var(--color-success-tint)', color: 'var(--color-success)', fontWeight: 700 }} title="Sumber: Realisasi Kinerja yang sudah disetujui final GM">
+              ● Data Realisasi Disetujui
+            </span>
+          )}
           <span className="meta-pill">Februari 2026</span>
         </div>
       </div>
@@ -120,7 +140,7 @@ export function ExecutivePage() {
             </defs>
             <path d="M 40 170 A 120 120 0 0 1 280 170" fill="none" stroke="var(--color-surface-hover)" strokeWidth="24" strokeLinecap="round" />
             <path d="M 40 170 A 120 120 0 0 1 280 170" fill="none" stroke="url(#gaugeGrad)" strokeWidth="24" strokeLinecap="round"
-              strokeDasharray="377" strokeDashoffset={377 - 377 * Math.min((hs.value as number) / 120, 1)} />
+              strokeDasharray="377" strokeDashoffset={377 - 377 * Math.min(gaugeValue / 120, 1)} />
             {[75,90,100].map((tick, i) => {
               const pct = tick / 120;
               const angle = -180 + pct * 180;
@@ -129,9 +149,9 @@ export function ExecutivePage() {
             })}
           </svg>
           <div className="hero-health-overlay">
-            <div className="hero-health-value display-font" style={{color: scoreColor, fontSize: 'var(--display-md)'}}>{fmt(hs.value)}</div>
+            <div className="hero-health-value display-font" style={{color: scoreColor, fontSize: 'var(--display-md)'}}>{fmt(gaugeValue)}</div>
             <div className="hero-health-meta">/ {String(hs.target ?? 100)}</div>
-            <StatusPill status={String(hs.status ?? 'Baik')} />
+            <StatusPill status={isLive ? (gaugeValue >= 100 ? 'Baik' : gaugeValue >= 90 ? 'Hati-hati' : 'Tertinggal') : String(hs.status ?? 'Baik')} />
           </div>
         </div>
 
@@ -386,14 +406,14 @@ export function ExecutivePage() {
           </div>
         )}
 
-        {d.unitRanking && d.unitRanking.length > 0 && (
+        {ranking && ranking.length > 0 && (
           <div className="card p-0">
             <div className="card-header compact">
               <div className="card-title"><TrendingUp size={14} />Ranking Unit Kinerja</div>
-              <span className="card-meta">Semester I 2026</span>
+              <span className="card-meta">{isLive ? 'Dari realisasi disetujui' : 'Semester I 2026'}</span>
             </div>
             <div style={{padding:'var(--space-2) 0'}}>
-              {d.unitRanking.map((r, i) => {
+              {ranking.map((r, i) => {
                 const score = r.score as number ?? 0;
                 const stCls = score >= 100 ? 'on-track' : score >= 90 ? 'at-risk' : 'delayed';
                 return (
