@@ -45,6 +45,19 @@ const UNIT_NAMES: Record<string, string> = {
   KP: 'Kantor Induk', UPMK1: 'UPMK I', UPMK2: 'UPMK II',
   UPMK3: 'UPMK III', UPMK4: 'UPMK IV', UPMK5: 'UPMK V',
 };
+
+// nextApprover bisa tersimpan sebagai JSON string {"role","name"} → tampilkan nama saja.
+function formatApprover(raw?: string | null): string {
+  if (!raw) return '';
+  const s = String(raw).trim();
+  if (s.startsWith('{') || s.startsWith('[')) {
+    try {
+      const o = JSON.parse(s);
+      if (o && typeof o === 'object' && !Array.isArray(o)) return String(o.name ?? o.role ?? s);
+    } catch { /* abaikan, tampilkan apa adanya */ }
+  }
+  return s;
+}
 const FASE_ACCENT = ['var(--color-accent)', 'var(--color-info)', 'var(--color-warning)', 'var(--color-success)', 'var(--color-text-muted)'];
 
 const WORKFLOW_STATIC = [
@@ -79,6 +92,10 @@ export function ApprovalsPage() {
   const [realExpanded, setRealExpanded] = useState<string | null>(null);
   const [realBusy, setRealBusy] = useState(false);
 
+  // Semua dokumen yang diinput manual (KM + Realisasi) — untuk kartu ringkasan
+  const [allKm, setAllKm] = useState<KontrakManajemen[]>([]);
+  const [allReal, setAllReal] = useState<RealisasiKinerja[]>([]);
+
   const load = () => {
     approvalsApi.reports()
       .then(setReports)
@@ -96,7 +113,13 @@ export function ApprovalsPage() {
     inputRealisasi.reviewList().then((d) => setRealList(d as RealisasiKinerja[])).catch(() => {});
   };
 
-  useEffect(() => { load(); loadKm(); loadReal(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Semua dokumen KM + Realisasi (lintas unit) untuk kartu ringkasan
+  const loadDocs = () => {
+    inputKontrak.list().then((d) => setAllKm(d as KontrakManajemen[])).catch(() => {});
+    inputRealisasi.history().then((d) => setAllReal(d as RealisasiKinerja[])).catch(() => {});
+  };
+
+  useEffect(() => { load(); loadKm(); loadReal(); loadDocs(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleRealReview = async (id: string, action: 'approve' | 'reject', returnTo?: 'konseptor' | 'previous') => {
     if (action === 'reject' && !realNote) { alert('Isi catatan saat mengembalikan realisasi'); return; }
@@ -158,18 +181,20 @@ export function ApprovalsPage() {
 
   if (error) return <ErrorState title="Gagal memuat laporan" message={error} />;
 
-  const total = reports.length;
-  const approved = reports.filter(r => r.status === 'APPROVED').length;
-  const pending = reports.filter(r => r.status !== 'APPROVED').length;
-  const myTasks = reports.filter(r => r.canApprove).length;
+  // Ringkasan dari dokumen yang DIINPUT manual ke sistem (Kontrak Manajemen + Realisasi Kinerja)
+  const docs: Array<{ status: string }> = [...allKm, ...allReal];
+  const totalDoc = docs.length;
+  const approvedDoc = docs.filter((d) => d.status === 'approved').length;
+  const pendingDoc = docs.filter((d) => d.status === 'submitted').length;
+  const myTasks = kmList.length + realList.length;
 
   return (
     <div className="page approvals-page">
       <div className="kpi-strip-grid">
         {[
-          { label: 'Total Laporan', value: total, color: 'var(--color-accent)' },
-          { label: 'Sudah Disetujui', value: approved, color: 'var(--color-success)' },
-          { label: 'Menunggu Review', value: pending, color: 'var(--color-warning)' },
+          { label: 'Total Dokumen', value: totalDoc, color: 'var(--color-accent)' },
+          { label: 'Sudah Disetujui', value: approvedDoc, color: 'var(--color-success)' },
+          { label: 'Menunggu Review', value: pendingDoc, color: 'var(--color-warning)' },
           { label: 'Tugas Saya', value: myTasks, color: 'var(--color-info)' },
         ].map((k, i) => (
           <div key={i} className="metric-card" style={{ borderTop: `3px solid ${k.color}` }}>
@@ -588,7 +613,7 @@ export function ApprovalsPage() {
                     <span className={`status-pill ${r.status === 'APPROVED' ? 'completed' : r.status === 'NEEDS_REVISION' ? 'needs-revision' : 'in-review'}`} style={{ fontSize: 10 }}>{r.status}</span>
                   </td>
                   <td style={{ color: 'var(--color-text-muted)' }}>
-                    {r.nextApprover ?? <span style={{ color: 'var(--color-success)' }}>✓ Selesai</span>}
+                    {r.nextApprover ? formatApprover(r.nextApprover) : <span style={{ color: 'var(--color-success)' }}>✓ Selesai</span>}
                   </td>
                 </tr>
               ))}

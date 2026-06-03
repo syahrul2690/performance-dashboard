@@ -174,7 +174,7 @@ async function main() {
       ? null
       : typeof nextApproverRaw === 'string'
         ? nextApproverRaw
-        : JSON.stringify(nextApproverRaw);
+        : ((nextApproverRaw as { name?: string }).name ?? null);
 
     await prisma.report.upsert({
       where: { unit_periodId: { unit, periodId: period.id } },
