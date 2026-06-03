@@ -37,6 +37,7 @@ export function InputKontrakPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [bidang, setBidang] = useState('');
@@ -65,6 +66,7 @@ export function InputKontrakPage() {
     setShowForm(false);
     setEditingId(null);
     setNotice(null);
+    setFormError(null);
   };
 
   const handleEdit = (kontrak: KontrakManajemen) => {
@@ -86,11 +88,21 @@ export function InputKontrakPage() {
   };
 
   const handleSave = async () => {
-    if (!user || !bidang || !holder) return;
+    if (!user) return;
+    // Validasi dengan pesan yang jelas (bukan tombol mati diam-diam)
+    if (!bidang.trim() || !holder.trim()) {
+      setFormError('Lengkapi "Bidang / Unit" dan "Penanggung Jawab" sebelum menyimpan.');
+      return;
+    }
+    if (kpiItems.every((k) => !k.indikator.trim())) {
+      setFormError('Minimal satu Indikator Kinerja harus diisi.');
+      return;
+    }
+    setFormError(null);
     setSubmitting(true);
     try {
       await inputKontrak.save(
-        user.unit, bidang, holder,
+        user.unit, bidang.trim(), holder.trim(),
         kpiItems as unknown as Record<string, unknown>[],
         editingId ?? undefined,
       );
@@ -99,7 +111,7 @@ export function InputKontrakPage() {
       await loadData();
       setTimeout(() => setSubmitted(false), 3000);
     } catch (e) {
-      setError((e as Error)?.message ?? 'Gagal menyimpan');
+      setFormError((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? (e as Error)?.message ?? 'Gagal menyimpan');
     } finally {
       setSubmitting(false);
     }
@@ -250,14 +262,31 @@ export function InputKontrakPage() {
                 {notice}
               </div>
             )}
+            {formError && (
+              <div className="status-banner danger" style={{ margin: 0 }}>
+                <AlertCircle size={16} /> {formError}
+              </div>
+            )}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
               <div>
-                <label className="form-label">Bidang / Unit</label>
-                <input className="form-input" value={bidang} onChange={(e) => setBidang(e.target.value)} placeholder="Contoh: Bidang Teknik" />
+                <label className="form-label">Bidang / Unit <span style={{ color: 'var(--color-danger)' }}>*</span></label>
+                <input
+                  className="form-input"
+                  value={bidang}
+                  onChange={(e) => { setBidang(e.target.value); if (formError) setFormError(null); }}
+                  placeholder="Contoh: Bidang Teknik"
+                  style={formError && !bidang.trim() ? { borderColor: 'var(--color-danger)' } : undefined}
+                />
               </div>
               <div>
-                <label className="form-label">Penanggung Jawab</label>
-                <input className="form-input" value={holder} onChange={(e) => setHolder(e.target.value)} placeholder="Nama penanggung jawab" />
+                <label className="form-label">Penanggung Jawab <span style={{ color: 'var(--color-danger)' }}>*</span></label>
+                <input
+                  className="form-input"
+                  value={holder}
+                  onChange={(e) => { setHolder(e.target.value); if (formError) setFormError(null); }}
+                  placeholder="Nama penanggung jawab"
+                  style={formError && !holder.trim() ? { borderColor: 'var(--color-danger)' } : undefined}
+                />
               </div>
             </div>
 
@@ -308,9 +337,12 @@ export function InputKontrakPage() {
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', alignItems: 'center' }}>
+              <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-muted)' }}>
+                <span style={{ color: 'var(--color-danger)' }}>*</span> wajib diisi
+              </span>
               <button className="btn btn-ghost" onClick={resetForm}>Batal</button>
-              <button className="btn btn-primary" onClick={handleSave} disabled={submitting || !bidang || !holder || kpiItems.every((k) => !k.indikator)}>
+              <button className="btn btn-primary" onClick={handleSave} disabled={submitting}>
                 {submitting ? 'Menyimpan…' : editingId ? 'Update' : 'Simpan Draft'}
               </button>
             </div>
