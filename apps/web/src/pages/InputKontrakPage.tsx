@@ -21,7 +21,7 @@ const STATUS_LABEL: Record<string, string> = {
   draft: 'Draft', submitted: 'Menunggu Review', approved: 'Disetujui', rejected: 'Dikembalikan',
 };
 const KM_STAGE_LABEL: Record<number, string> = {
-  2: 'Asisten Manajer', 3: 'Manajer Bidang', 4: 'Senior Manajer',
+  2: 'Asisten Manajer', 3: 'Manajer Bidang', 4: 'Senior Manajer', 5: 'General Manager',
 };
 const STATUS_PILL: Record<string, string> = {
   draft: 'in-review', submitted: 'needs-revision', approved: 'completed', rejected: 'delayed',

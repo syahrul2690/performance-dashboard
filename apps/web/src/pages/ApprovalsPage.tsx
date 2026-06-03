@@ -7,9 +7,9 @@ import { CheckCircle, XCircle, Clock, CalendarClock, ClipboardList, FileText, Us
 import { SkeletonTable, EmptyState, ErrorState } from '../components/LoadState';
 
 const STAGES = ['', 'Staff', 'Asman', 'Manajer', 'Sr. Manajer', 'GM'];
-// Jenjang persetujuan usulan Kontrak Manajemen: Staff → Asman → Manajer → Sr. Manajer (final)
-const KM_STAGES = ['Staff', 'Asman', 'Manajer', 'Sr. Manajer'];
-const KM_FINAL_STAGE = 4;
+// Jenjang persetujuan usulan Kontrak Manajemen: Staff → Asman → Manajer → Sr. Manajer → GM (final)
+const KM_STAGES = ['Staff', 'Asman', 'Manajer', 'Sr. Manajer', 'GM'];
+const KM_FINAL_STAGE = 5;
 const UNIT_NAMES: Record<string, string> = {
   KP: 'Kantor Induk', UPMK1: 'UPMK I', UPMK2: 'UPMK II',
   UPMK3: 'UPMK III', UPMK4: 'UPMK IV', UPMK5: 'UPMK V',

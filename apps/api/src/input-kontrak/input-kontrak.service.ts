@@ -10,17 +10,17 @@ const UNIT_NAMES: Record<string, string> = {
   UPMK3: 'UPMK III', UPMK4: 'UPMK IV', UPMK5: 'UPMK V',
 };
 
-// Jenjang persetujuan usulan KM: Staff(1) → Asman(2) → Manajer(3) → Sr.Manajer(4, final)
+// Jenjang persetujuan usulan KM: Staff(1) → Asman(2) → Manajer(3) → Sr.Manajer(4) → GM(5, final)
 const ROLE_TO_STAGE: Record<Role, number> = {
   STAFF: 1, ASMAN: 2, MANAJER: 3, SRMANAJER: 4, GM: 5,
 };
 const STAGE_TO_ROLE: Record<number, Role> = {
-  2: Role.ASMAN, 3: Role.MANAJER, 4: Role.SRMANAJER,
+  2: Role.ASMAN, 3: Role.MANAJER, 4: Role.SRMANAJER, 5: Role.GM,
 };
 const STAGE_LABEL: Record<number, string> = {
-  1: 'Staff', 2: 'Asisten Manajer', 3: 'Manajer Bidang', 4: 'Senior Manajer',
+  1: 'Staff', 2: 'Asisten Manajer', 3: 'Manajer Bidang', 4: 'Senior Manajer', 5: 'General Manager',
 };
-const FINAL_STAGE = 4; // Senior Manajer = persetujuan akhir
+const FINAL_STAGE = 5; // General Manager = persetujuan akhir
 
 @Injectable()
 export class InputKontrakService {
