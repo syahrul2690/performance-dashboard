@@ -1,9 +1,9 @@
 import { useEffect, useState, Fragment, type ReactNode } from 'react';
-import { approvals as approvalsApi, inputKontrak } from '../lib/api';
+import { approvals as approvalsApi, inputKontrak, inputRealisasi } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useNotif } from '../context/NotifContext';
-import type { Report, KontrakManajemen } from '../lib/types';
-import { CheckCircle, XCircle, Clock, CalendarClock, ClipboardList, FileText, UsersRound, FileSignature, ChevronDown } from 'lucide-react';
+import type { Report, KontrakManajemen, RealisasiKinerja } from '../lib/types';
+import { CheckCircle, XCircle, Clock, CalendarClock, ClipboardList, FileText, UsersRound, FileSignature, ChevronDown, ClipboardCheck } from 'lucide-react';
 import { SkeletonTable, EmptyState, ErrorState } from '../components/LoadState';
 
 // Kartu yang bisa dilipat (fold-up): klik header untuk buka/tutup isi.
@@ -72,6 +72,13 @@ export function ApprovalsPage() {
   const [kmExpanded, setKmExpanded] = useState<string | null>(null);
   const [kmBusy, setKmBusy] = useState(false);
 
+  // Review Realisasi Kinerja Bulanan (untuk Asman ke atas)
+  const [realList, setRealList] = useState<RealisasiKinerja[]>([]);
+  const [realNote, setRealNote] = useState('');
+  const [realTarget, setRealTarget] = useState<string | null>(null);
+  const [realExpanded, setRealExpanded] = useState<string | null>(null);
+  const [realBusy, setRealBusy] = useState(false);
+
   const load = () => {
     approvalsApi.reports()
       .then(setReports)
@@ -84,7 +91,27 @@ export function ApprovalsPage() {
     inputKontrak.reviewList().then((d) => setKmList(d as KontrakManajemen[])).catch(() => {});
   };
 
-  useEffect(() => { load(); loadKm(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const loadReal = () => {
+    if (!canReview) return;
+    inputRealisasi.reviewList().then((d) => setRealList(d as RealisasiKinerja[])).catch(() => {});
+  };
+
+  useEffect(() => { load(); loadKm(); loadReal(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleRealReview = async (id: string, action: 'approve' | 'reject', returnTo?: 'konseptor' | 'previous') => {
+    if (action === 'reject' && !realNote) { alert('Isi catatan saat mengembalikan realisasi'); return; }
+    setRealBusy(true);
+    try {
+      await inputRealisasi.review(id, action, realNote || undefined, returnTo);
+      setRealTarget(null); setRealNote('');
+      loadReal();
+      refreshNotif();
+    } catch (e) {
+      alert((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Gagal memproses review');
+    } finally {
+      setRealBusy(false);
+    }
+  };
 
   const handleKmReview = async (id: string, action: 'approve' | 'reject', returnTo?: 'konseptor' | 'previous') => {
     if (action === 'reject' && !kmNote) { alert('Isi catatan saat mengembalikan usulan'); return; }
@@ -275,6 +302,128 @@ export function ApprovalsPage() {
                       )}
                     </Fragment>
                   ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </FoldCard>
+      )}
+
+      {/* Review Realisasi Kinerja Bulanan — hanya untuk Asman ke atas */}
+      {canReview && (
+        <FoldCard
+          accent="var(--color-info)"
+          icon={<ClipboardCheck size={14} />}
+          title="Realisasi Kinerja Bulanan Menunggu Review"
+          right={<span className="status-pill" style={{ background: 'var(--color-info-tint)', color: 'var(--color-info)', fontWeight: 'bold' }}>{realList.length} Realisasi</span>}
+        >
+          {realList.length === 0 ? (
+            <div className="card-body"><EmptyState title="Tidak ada realisasi" message="Belum ada realisasi kinerja yang menunggu review Anda." /></div>
+          ) : (
+            <div className="table-wrap">
+              <table className="data-table compact">
+                <thead>
+                  <tr>
+                    <th>Unit</th>
+                    <th>Pengirim</th>
+                    <th>Indikator</th>
+                    <th>Jenjang Persetujuan</th>
+                    <th>Tanggal</th>
+                    <th style={{ width: 260 }}>Tindakan</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {realList.map((rl) => {
+                    const entries = Object.values(rl.values ?? {});
+                    return (
+                      <Fragment key={rl.id}>
+                        <tr>
+                          <td style={{ fontWeight: 600 }}>{UNIT_NAMES[rl.unitCode] ?? rl.unitCode}</td>
+                          <td style={{ color: 'var(--color-text-muted)' }}>{rl.submitter}</td>
+                          <td>
+                            <button className="btn btn-ghost btn-sm" onClick={() => setRealExpanded(realExpanded === rl.id ? null : rl.id)}>
+                              {entries.length} indikator <ChevronDown size={12} style={{ transform: realExpanded === rl.id ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />
+                            </button>
+                          </td>
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                              {KM_STAGES.map((label, idx) => {
+                                const stage = idx + 1;
+                                const done = stage < rl.currentStage;
+                                const current = stage === rl.currentStage;
+                                return (
+                                  <div key={stage} title={label} style={{
+                                    width: 22, height: 22, borderRadius: '50%', fontSize: 9, fontWeight: 700,
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    background: done ? 'var(--color-success)' : current ? 'var(--color-info)' : 'var(--color-surface-2)',
+                                    color: done || current ? '#fff' : 'var(--color-text-muted)',
+                                  }}>{done ? '✓' : stage}</div>
+                                );
+                              })}
+                              <span style={{ fontSize: 10, color: 'var(--color-text-muted)', marginLeft: 2 }}>{KM_STAGES[rl.currentStage - 1]}</span>
+                            </div>
+                          </td>
+                          <td style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
+                            {new Date(rl.submittedAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })}
+                          </td>
+                          <td>
+                            {realTarget === rl.id ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                                <textarea
+                                  className="form-textarea"
+                                  style={{ fontSize: 'var(--text-xs)', minHeight: 48 }}
+                                  placeholder="Catatan (wajib untuk menolak)"
+                                  value={realNote}
+                                  onChange={(e) => setRealNote(e.target.value)}
+                                />
+                                <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                                  <button className="btn btn-sm" style={{ background: 'var(--color-success)', color: '#fff' }} disabled={realBusy} onClick={() => handleRealReview(rl.id, 'approve')}>
+                                    <CheckCircle size={12} /> {rl.currentStage >= KM_FINAL_STAGE ? 'Setujui (Final)' : 'Setujui & Teruskan'}
+                                  </button>
+                                  <button className="btn btn-sm" style={{ background: 'var(--color-danger)', color: '#fff' }} disabled={realBusy} onClick={() => handleRealReview(rl.id, 'reject', 'konseptor')}>
+                                    <XCircle size={12} /> Kembalikan ke Konseptor
+                                  </button>
+                                  {rl.currentStage >= 3 && (
+                                    <button className="btn btn-sm" style={{ background: 'var(--color-warning)', color: '#fff' }} disabled={realBusy} onClick={() => handleRealReview(rl.id, 'reject', 'previous')}>
+                                      <XCircle size={12} /> Kembalikan ke {KM_STAGES[rl.currentStage - 2]}
+                                    </button>
+                                  )}
+                                  <button className="btn btn-ghost btn-sm" onClick={() => { setRealTarget(null); setRealNote(''); }}>Batal</button>
+                                </div>
+                              </div>
+                            ) : (
+                              <button className="btn btn-secondary btn-sm" onClick={() => { setRealTarget(rl.id); setRealNote(''); }}>
+                                <Clock size={12} /> Tinjau
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                        {realExpanded === rl.id && (
+                          <tr>
+                            <td colSpan={6} style={{ background: 'var(--color-surface-2)', padding: 0 }}>
+                              <table className="data-table compact" style={{ margin: 0 }}>
+                                <thead>
+                                  <tr><th>No</th><th>Indikator</th><th>Satuan</th><th className="num">Bobot</th><th className="num">Target</th><th className="num">Realisasi</th></tr>
+                                </thead>
+                                <tbody>
+                                  {entries.map((it, idx) => (
+                                    <tr key={idx}>
+                                      <td>{idx + 1}</td>
+                                      <td>{it.indikator ?? '—'}</td>
+                                      <td>{it.satuan ?? '—'}</td>
+                                      <td className="num">{it.bobot ?? '—'}</td>
+                                      <td className="num">{it.target ?? '—'}</td>
+                                      <td className="num" style={{ fontWeight: 700 }}>{it.realisasi ?? '—'}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

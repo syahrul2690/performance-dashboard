@@ -126,6 +126,10 @@ export const inputRealisasi = {
     api.get('/input-realisasi/history', { params: { unitCode, periodId } }).then((r) => r.data),
   submit: (unitCode: string, values: Record<string, unknown>) =>
     api.put('/input-realisasi/submit', { unitCode, values }).then((r) => r.data),
+  reviewList: () =>
+    api.get('/input-realisasi/review/list').then((r) => r.data),
+  review: (id: string, action: 'approve' | 'reject', note?: string, returnTo?: 'konseptor' | 'previous') =>
+    api.post(`/input-realisasi/${id}/review`, { action, note, returnTo }).then((r) => r.data),
 };
 
 export const inputKontrak = {

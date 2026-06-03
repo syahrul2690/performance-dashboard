@@ -225,14 +225,20 @@ model KMReview {
 }
 
 model InputRealisasi {
-  id          String   @id @default(cuid())
-  periodId    String
-  unitCode    String
-  submitter   String
-  values      Json
-  status      String   @default("draft")
-  submittedAt DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String    @id @default(cuid())
+  periodId     String
+  unitCode     String
+  submitter    String
+  submitterId  String?
+  values       Json
+  status       String    @default("draft") // draft | submitted | approved | rejected
+  currentStage Int       @default(1) // 1=Staff 2=Asman 3=Manajer 4=Sr.Manajer 5=GM (final)
+  history      Json      @default("[]")
+  reviewer     String?
+  reviewNote   String?
+  reviewedAt   DateTime?
+  submittedAt  DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   @@unique([periodId, unitCode])
   @@map("input_realisasi")

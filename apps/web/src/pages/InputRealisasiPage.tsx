@@ -11,6 +11,16 @@ type KpiItem = {
   bidang?: string; realisasi?: number | string;
 };
 
+const STATUS_LABEL: Record<string, string> = {
+  draft: 'Draft', submitted: 'Menunggu Review', approved: 'Disetujui', rejected: 'Dikembalikan',
+};
+const STATUS_PILL: Record<string, string> = {
+  draft: 'in-review', submitted: 'needs-revision', approved: 'completed', rejected: 'delayed',
+};
+const STAGE_LABEL: Record<number, string> = {
+  2: 'Asisten Manajer', 3: 'Manajer Bidang', 4: 'Senior Manajer', 5: 'General Manager',
+};
+
 export function InputRealisasiPage() {
   const { user } = useAuth();
   const [history, setHistory] = useState<unknown[]>([]);
@@ -201,14 +211,22 @@ export function InputRealisasiPage() {
               <tbody>
                 {history.map((h, i) => {
                   const item = h as Record<string, unknown>;
+                  const status = String(item.status ?? '');
+                  const stage = Number(item.currentStage ?? 0);
                   return (
                     <tr key={i}>
                       <td style={{ fontWeight: 600 }}>{item.unitCode as string ?? '—'}</td>
                       <td>{item.submitter as string ?? '—'}</td>
                       <td>
-                        <span className={`status-pill ${item.status === 'approved' ? 'completed' : item.status === 'needs-revision' ? 'needs-revision' : 'in-review'}`} style={{ fontSize: 10 }}>
-                          {item.status as string ?? '—'}
+                        <span className={`status-pill ${STATUS_PILL[status] ?? 'in-review'}`} style={{ fontSize: 10 }}>
+                          {STATUS_LABEL[status] ?? status}
                         </span>
+                        {status === 'submitted' && STAGE_LABEL[stage] && (
+                          <div style={{ fontSize: 10, color: 'var(--color-text-muted)', marginTop: 2 }}>di {STAGE_LABEL[stage]}</div>
+                        )}
+                        {status === 'rejected' && item.reviewNote ? (
+                          <div style={{ fontSize: 10, color: 'var(--color-danger)', marginTop: 2, maxWidth: 240 }}>{item.reviewNote as string}</div>
+                        ) : null}
                       </td>
                       <td style={{ color: 'var(--color-text-muted)' }}>
                         {item.submittedAt ? new Date(item.submittedAt as string).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}

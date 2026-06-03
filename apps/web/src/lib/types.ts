@@ -177,6 +177,22 @@ export interface RiskItem {
   dueDate: string;
 }
 
+export interface RealisasiKinerja {
+  id: string;
+  periodId: string;
+  unitCode: string;
+  submitter: string;
+  submitterId?: string | null;
+  values: Record<string, { indikator?: string; target?: string | number; realisasi?: string | number; satuan?: string; bobot?: string | number }>;
+  status: 'draft' | 'submitted' | 'approved' | 'rejected';
+  currentStage: number;
+  reviewer?: string | null;
+  reviewNote?: string | null;
+  reviewedAt?: string | null;
+  submittedAt: string;
+  updatedAt: string;
+}
+
 export interface KontrakManajemen {
   id: string;
   periodId: string;
