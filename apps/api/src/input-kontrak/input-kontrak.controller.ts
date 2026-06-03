@@ -20,6 +20,7 @@ class SaveDto {
 class ReviewDto {
   @IsIn(['approve', 'reject']) action: 'approve' | 'reject';
   @IsOptional() @IsString() note?: string;
+  @IsOptional() @IsIn(['konseptor', 'previous']) returnTo?: 'konseptor' | 'previous';
 }
 
 @UseGuards(JwtAuthGuard)
@@ -70,7 +71,7 @@ export class InputKontrakController {
 
   @Post(':id/review')
   review(@CurrentUser() user: User, @Param('id') id: string, @Body() dto: ReviewDto) {
-    return this.svc.review(user, id, dto.action, dto.note);
+    return this.svc.review(user, id, dto.action, dto.note, dto.returnTo);
   }
 
   @Delete(':id')

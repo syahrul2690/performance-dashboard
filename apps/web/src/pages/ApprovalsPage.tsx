@@ -55,11 +55,11 @@ export function ApprovalsPage() {
 
   useEffect(() => { load(); loadKm(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleKmReview = async (id: string, action: 'approve' | 'reject') => {
+  const handleKmReview = async (id: string, action: 'approve' | 'reject', returnTo?: 'konseptor' | 'previous') => {
     if (action === 'reject' && !kmNote) { alert('Isi catatan saat mengembalikan usulan'); return; }
     setKmBusy(true);
     try {
-      await inputKontrak.review(id, action, kmNote || undefined);
+      await inputKontrak.review(id, action, kmNote || undefined, returnTo);
       setKmTarget(null); setKmNote('');
       loadKm();
       refreshNotif();
@@ -194,13 +194,18 @@ export function ApprovalsPage() {
                                 value={kmNote}
                                 onChange={(e) => setKmNote(e.target.value)}
                               />
-                              <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                              <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
                                 <button className="btn btn-sm" style={{ background: 'var(--color-success)', color: '#fff' }} disabled={kmBusy} onClick={() => handleKmReview(k.id, 'approve')}>
                                   <CheckCircle size={12} /> {k.currentStage >= KM_FINAL_STAGE ? 'Setujui (Final)' : 'Setujui & Teruskan'}
                                 </button>
-                                <button className="btn btn-sm" style={{ background: 'var(--color-danger)', color: '#fff' }} disabled={kmBusy} onClick={() => handleKmReview(k.id, 'reject')}>
-                                  <XCircle size={12} /> Kembalikan
+                                <button className="btn btn-sm" style={{ background: 'var(--color-danger)', color: '#fff' }} disabled={kmBusy} onClick={() => handleKmReview(k.id, 'reject', 'konseptor')} title="Kembalikan ke Staff untuk revisi isi (proses diulang dari Asman)">
+                                  <XCircle size={12} /> Kembalikan ke Konseptor
                                 </button>
+                                {k.currentStage >= 3 && (
+                                  <button className="btn btn-sm" style={{ background: 'var(--color-warning)', color: '#fff' }} disabled={kmBusy} onClick={() => handleKmReview(k.id, 'reject', 'previous')} title={`Kembalikan 1 tahap ke ${KM_STAGES[k.currentStage - 2]} untuk klarifikasi`}>
+                                    <XCircle size={12} /> Kembalikan ke {KM_STAGES[k.currentStage - 2]}
+                                  </button>
+                                )}
                                 <button className="btn btn-ghost btn-sm" onClick={() => { setKmTarget(null); setKmNote(''); }}>Batal</button>
                               </div>
                             </div>

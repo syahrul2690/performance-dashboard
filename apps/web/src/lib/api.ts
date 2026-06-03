@@ -147,8 +147,8 @@ export const inputKontrak = {
     api.delete(`/input-kontrak/${id}`).then((r) => r.data),
   reviewList: () =>
     api.get('/input-kontrak/review/list').then((r) => r.data),
-  review: (id: string, action: 'approve' | 'reject', note?: string) =>
-    api.post(`/input-kontrak/${id}/review`, { action, note }).then((r) => r.data),
+  review: (id: string, action: 'approve' | 'reject', note?: string, returnTo?: 'konseptor' | 'previous') =>
+    api.post(`/input-kontrak/${id}/review`, { action, note, returnTo }).then((r) => r.data),
   uploadExcel: (file: File) => {
     const form = new FormData();
     form.append('file', file);

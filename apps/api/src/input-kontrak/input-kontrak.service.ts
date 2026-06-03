@@ -157,9 +157,17 @@ export class InputKontrakService {
     });
   }
 
-  // Review berjenjang: approve → naik ke tahap berikutnya hingga Sr.Manajer (final);
-  // reject → kembali ke pengirim (draft/rejected).
-  async review(user: User, id: string, action: 'approve' | 'reject', note?: string) {
+  // Review berjenjang (hybrid):
+  //  - approve → naik ke tahap berikutnya hingga GM (final)
+  //  - reject + returnTo='konseptor' → kembali ke Staff untuk revisi isi (restart)
+  //  - reject + returnTo='previous'  → mundur 1 tahap ke approver sebelumnya (klarifikasi)
+  async review(
+    user: User,
+    id: string,
+    action: 'approve' | 'reject',
+    note?: string,
+    returnTo: 'konseptor' | 'previous' = 'konseptor',
+  ) {
     if (user.role === Role.STAFF) throw new ForbiddenException('Tidak berwenang me-review');
     if (action !== 'approve' && action !== 'reject') throw new BadRequestException('Aksi tidak valid');
 
@@ -176,6 +184,24 @@ export class InputKontrakService {
     const baseHistory = Array.isArray(kontrak.history) ? (kontrak.history as object[]) : [];
 
     if (action === 'reject') {
+      const prevStage = userStage - 1;
+      // "Kembalikan 1 tahap" hanya bermakna bila ada approver di bawahnya (prevStage >= 2).
+      const oneStep = returnTo === 'previous' && prevStage >= 2;
+
+      if (oneStep) {
+        const history = [...baseHistory, { stage: userStage, actor: user.name, role: user.role, action: 'returned_step', toStage: prevStage, note, ts: new Date().toISOString() }];
+        const result = await this.prisma.kontrakManajemen.update({
+          where: { id },
+          data: { status: 'submitted', currentStage: prevStage, history, reviewer: user.name, reviewNote: note ?? null, reviewedAt: new Date() },
+        });
+        // Notifikasi ke approver tahap sebelumnya untuk klarifikasi
+        await this.notifyStage(prevStage, result, user.name);
+        await this.prisma.auditLog.create({ data: { actor: user.name, userId: user.id, action: 'kontrak.return_step', entity: 'KontrakManajemen', targetId: id, note } });
+        await this.cache.del(`kontrak:${kontrak.unitCode}`);
+        return result;
+      }
+
+      // Kembalikan ke konseptor (Staff) → revisi isi, submit ulang restart dari Asman
       const history = [...baseHistory, { stage: userStage, actor: user.name, role: user.role, action: 'returned', note, ts: new Date().toISOString() }];
       const result = await this.prisma.kontrakManajemen.update({
         where: { id },
@@ -184,8 +210,8 @@ export class InputKontrakService {
       if (kontrak.submitterId) {
         await this.prisma.notification.create({
           data: {
-            userId: kontrak.submitterId, type: 'alert', title: 'Usulan KM Dikembalikan',
-            msg: `${user.name} (${STAGE_LABEL[userStage]}) mengembalikan usulan KM "${kontrak.bidang}": ${note}`,
+            userId: kontrak.submitterId, type: 'alert', title: 'Usulan KM Dikembalikan ke Konseptor',
+            msg: `${user.name} (${STAGE_LABEL[userStage]}) mengembalikan usulan KM "${kontrak.bidang}" untuk revisi: ${note}`,
             route: '/input-kontrak', targetId: id, unread: true,
           },
         });
