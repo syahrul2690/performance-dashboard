@@ -89,6 +89,23 @@ export class InputRealisasiService {
     });
   }
 
+  // Hapus realisasi — oleh pengirim sendiri (atau GM), selama belum disetujui final.
+  async delete(user: User, id: string) {
+    const r = await this.prisma.inputRealisasi.findUnique({ where: { id } });
+    if (!r) throw new NotFoundException('Realisasi tidak ditemukan');
+    if (r.status === 'approved') throw new ForbiddenException('Realisasi yang sudah disetujui final tidak dapat dihapus');
+    const isOwner = r.submitterId && r.submitterId === user.id;
+    if (!isOwner && user.role !== Role.GM) {
+      throw new ForbiddenException('Hanya pengirim atau GM yang dapat menghapus realisasi ini');
+    }
+    await this.prisma.inputRealisasi.delete({ where: { id } });
+    await this.prisma.auditLog.create({
+      data: { actor: user.name, userId: user.id, action: 'realisasi.delete', entity: 'InputRealisasi', targetId: id },
+    });
+    await this.cache.del(`realisasi:${r.unitCode}`);
+    return { success: true };
+  }
+
   // Daftar realisasi menunggu review pada TAHAP user
   async getReviewList(user: User) {
     if (user.role === Role.STAFF) throw new ForbiddenException('Tidak berwenang me-review');

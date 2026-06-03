@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { InputRealisasiService } from './input-realisasi.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -39,5 +39,10 @@ export class InputRealisasiController {
   @Post(':id/review')
   review(@CurrentUser() user: User, @Param('id') id: string, @Body() dto: ReviewDto) {
     return this.svc.review(user, id, dto.action, dto.note, dto.returnTo);
+  }
+
+  @Delete(':id')
+  remove(@CurrentUser() user: User, @Param('id') id: string) {
+    return this.svc.delete(user, id);
   }
 }

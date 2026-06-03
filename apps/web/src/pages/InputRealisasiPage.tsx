@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { inputRealisasi, inputKontrak } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
-import { ClipboardEdit, CheckCircle, Clock } from 'lucide-react';
+import { ClipboardEdit, CheckCircle, Clock, Trash2 } from 'lucide-react';
 import { SkeletonTable, EmptyState, ErrorState } from '../components/LoadState';
 import type { KontrakManajemen } from '../lib/types';
+
+const CURRENT_YEAR = new Date().getFullYear();
 
 type KpiItem = {
   no?: number; indikator?: string; formula?: string; satuan?: string;
@@ -77,6 +79,18 @@ export function InputRealisasiPage() {
     }
   };
 
+  const handleDelete = async (id: string) => {
+    if (!confirm('Hapus realisasi ini? Tindakan ini tidak dapat dibatalkan.')) return;
+    try {
+      await inputRealisasi.delete(id);
+      const hist = await inputRealisasi.history(user?.unit);
+      setHistory(hist as unknown[]);
+    } catch (e) {
+      const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? (e as Error)?.message ?? 'Gagal menghapus';
+      alert(msg);
+    }
+  };
+
   if (loading) {
     return (
       <div className="page">
@@ -146,7 +160,7 @@ export function InputRealisasiPage() {
                   <th>Satuan</th>
                   <th className="num">Bobot</th>
                   <th className="num">Target Sem I</th>
-                  <th className="num">Target Tahun</th>
+                  <th className="num">Target {CURRENT_YEAR}</th>
                   <th>Realisasi</th>
                 </tr>
               </thead>
@@ -206,6 +220,7 @@ export function InputRealisasiPage() {
                   <th>Submitter</th>
                   <th>Status</th>
                   <th>Tanggal Submit</th>
+                  <th style={{ width: 90 }}>Aksi</th>
                 </tr>
               </thead>
               <tbody>
@@ -213,6 +228,8 @@ export function InputRealisasiPage() {
                   const item = h as Record<string, unknown>;
                   const status = String(item.status ?? '');
                   const stage = Number(item.currentStage ?? 0);
+                  const canDelete = status !== 'approved'
+                    && (item.submitterId === user?.id || user?.role === 'GM');
                   return (
                     <tr key={i}>
                       <td style={{ fontWeight: 600 }}>{item.unitCode as string ?? '—'}</td>
@@ -230,6 +247,20 @@ export function InputRealisasiPage() {
                       </td>
                       <td style={{ color: 'var(--color-text-muted)' }}>
                         {item.submittedAt ? new Date(item.submittedAt as string).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                      </td>
+                      <td>
+                        {canDelete ? (
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => handleDelete(item.id as string)}
+                            title="Hapus realisasi"
+                            style={{ color: 'var(--color-danger)' }}
+                          >
+                            <Trash2 size={14} /> Hapus
+                          </button>
+                        ) : (
+                          <span style={{ fontSize: 10, color: 'var(--color-text-subtle)' }}>—</span>
+                        )}
                       </td>
                     </tr>
                   );
