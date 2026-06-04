@@ -47,18 +47,18 @@ export function OperationalPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const { periodId } = usePeriod();
+  const { periodId, mode } = usePeriod();
 
   useEffect(() => {
     setLoading(true);
-    Promise.allSettled([operational.get(periodId || undefined), kinerja.rekap(periodId || undefined)])
+    Promise.allSettled([operational.get(periodId || undefined), kinerja.rekap(periodId || undefined, mode)])
       .then(([op, rk]) => {
         if (op.status === 'fulfilled') setData(op.value);
         else setError((op.reason as Error)?.message ?? 'Gagal memuat data');
         if (rk.status === 'fulfilled') setRekap(rk.value as Rekap);
       })
       .finally(() => setLoading(false));
-  }, [periodId]);
+  }, [periodId, mode]);
 
   if (loading) {
     return (

@@ -63,18 +63,18 @@ export function ExecutivePage() {
   const [error, setError] = useState<string | null>(null);
   const [activeKpi, setActiveKpi] = useState(0);
 
-  const { periodId } = usePeriod();
+  const { periodId, mode } = usePeriod();
 
   useEffect(() => {
     setLoading(true);
-    Promise.allSettled([executive.summary(periodId || undefined), kinerja.rekap(periodId || undefined)])
+    Promise.allSettled([executive.summary(periodId || undefined), kinerja.rekap(periodId || undefined, mode)])
       .then(([sum, rk]) => {
         if (sum.status === 'fulfilled') setData(sum.value);
         else setError((sum.reason as Error)?.message ?? 'Gagal memuat data');
         if (rk.status === 'fulfilled') setRekap(rk.value as Rekap);
       })
       .finally(() => setLoading(false));
-  }, [periodId]);
+  }, [periodId, mode]);
 
   if (loading) {
     return (

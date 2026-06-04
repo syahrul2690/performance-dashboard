@@ -60,8 +60,11 @@ export class KinerjaService {
   }
 
   // Rekap kinerja dari REALISASI yang sudah DISETUJUI final (status approved).
-  async getRekap(periodId?: string) {
-    const cacheKey = `kinerja:${periodId || 'active'}`;
+  // mode: 'Bulan' = periode terpilih saja; 'Semester' = rata-rata Jan–Jun / Jul–Des;
+  //       'Tahun' = rata-rata seluruh bulan tahun berjalan. Agregasi = rata-rata realisasi
+  //       bulanan per indikator, lalu dijumlahkan menjadi skor unit.
+  async getRekap(periodId?: string, mode: 'Bulan' | 'Semester' | 'Tahun' = 'Bulan') {
+    const cacheKey = `kinerja:${periodId || 'active'}:${mode}`;
     const cached = await this.cache.get(cacheKey);
     if (cached) return cached;
 
@@ -70,32 +73,66 @@ export class KinerjaService {
       : await this.prisma.period.findFirst({ where: { isActive: true } });
 
     if (!period) {
-      return { period: null, hasData: false, overall: null, units: [] as UnitRekap[] };
+      return { period: null, mode, hasData: false, overall: null, units: [] as UnitRekap[] };
+    }
+
+    // Tentukan kumpulan periode dalam cakupan mode.
+    const year = period.yearMonth.slice(0, 4);
+    const month = parseInt(period.yearMonth.slice(5, 7), 10);
+    let scopePeriodIds: string[] = [period.id];
+    if (mode === 'Tahun' || mode === 'Semester') {
+      const yearPeriods = await this.prisma.period.findMany({
+        where: { yearMonth: { startsWith: `${year}-` } },
+        select: { id: true, yearMonth: true },
+      });
+      const inScope = yearPeriods.filter((p) => {
+        if (mode === 'Tahun') return true;
+        const m = parseInt(p.yearMonth.slice(5, 7), 10);
+        return month <= 6 ? m <= 6 : m >= 7; // semester sesuai bulan terpilih
+      });
+      scopePeriodIds = inScope.map((p) => p.id);
     }
 
     const realisasi = await this.prisma.inputRealisasi.findMany({
-      where: { periodId: period.id, status: 'approved' },
+      where: { periodId: { in: scopePeriodIds }, status: 'approved' },
       orderBy: { unitCode: 'asc' },
     });
 
-    const units: UnitRekap[] = realisasi.map((r) => {
-      const entries = Object.values((r.values ?? {}) as Record<string, Record<string, unknown>>);
+    // Kelompokkan per unit (gabung semua bidang & semua bulan dalam cakupan).
+    const byUnit: Record<string, typeof realisasi> = {};
+    for (const r of realisasi) (byUnit[r.unitCode] ||= []).push(r);
+
+    const units: UnitRekap[] = Object.entries(byUnit).map(([code, records]) => {
+      // Kumpulkan realisasi bulanan per indikator (key: bidang|indikator).
+      const kpiMap = new Map<string, { indikator: string; satuan: string; bobot: number; target: number; reals: number[] }>();
+      let lastSubmitter = '';
+      let lastReviewer: string | null = null;
+      for (const r of records) {
+        lastSubmitter = r.submitter;
+        lastReviewer = r.reviewer ?? lastReviewer;
+        const entries = Object.values((r.values ?? {}) as Record<string, Record<string, unknown>>);
+        for (const it of entries) {
+          const indikator = String(it.indikator ?? '—');
+          const key = `${r.bidang}|${indikator}`;
+          const e = kpiMap.get(key) ?? { indikator, satuan: String(it.satuan ?? ''), bobot: num(it.bobot), target: num(it.target), reals: [] };
+          e.reals.push(num(it.realisasi));
+          kpiMap.set(key, e);
+        }
+      }
       let totalBobot = 0;
       let totalNilai = 0;
-      const kpis: KpiRekap[] = entries.map((it) => {
-        const target = num(it.target);
-        const real = num(it.realisasi);
-        const bobot = num(it.bobot);
-        const capaian = target > 0 ? (real / target) * 100 : 0;
-        const nilai = (capaian / 100) * bobot;
-        totalBobot += bobot;
+      const kpis: KpiRekap[] = [...kpiMap.values()].map((e) => {
+        const avgReal = e.reals.length ? e.reals.reduce((a, b) => a + b, 0) / e.reals.length : 0;
+        const capaian = e.target > 0 ? (avgReal / e.target) * 100 : 0;
+        const nilai = (capaian / 100) * e.bobot;
+        totalBobot += e.bobot;
         totalNilai += nilai;
         return {
-          indikator: String(it.indikator ?? '—'),
-          satuan: String(it.satuan ?? ''),
-          bobot: round2(bobot),
-          target: round2(target),
-          realisasi: round2(real),
+          indikator: e.indikator,
+          satuan: e.satuan,
+          bobot: round2(e.bobot),
+          target: round2(e.target),
+          realisasi: round2(avgReal),
           capaian: round2(capaian),
           nilai: round2(nilai),
         };
@@ -103,13 +140,13 @@ export class KinerjaService {
       const score = round2(totalNilai);
       const status = score >= 100 ? 'Baik' : score >= 90 ? 'Hati-hati' : 'Tertinggal';
       return {
-        code: r.unitCode,
-        name: UNIT_NAMES[r.unitCode] ?? r.unitCode,
+        code,
+        name: UNIT_NAMES[code] ?? code,
         score,
         totalBobot: round2(totalBobot),
         status,
-        submitter: r.submitter,
-        reviewer: r.reviewer ?? null,
+        submitter: lastSubmitter,
+        reviewer: lastReviewer,
         kpis,
       };
     });
@@ -120,6 +157,8 @@ export class KinerjaService {
 
     const result = {
       period,
+      mode,
+      monthsIncluded: scopePeriodIds.length,
       hasData: units.length > 0,
       overall,
       units: units.sort((a, b) => b.score - a.score),

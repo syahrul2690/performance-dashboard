@@ -69,7 +69,7 @@ const ROUTE_NAMES: Record<string, string> = {
 
 export function AppShell() {
   const { user, logout, viewAs, setViewAs } = useAuth();
-  const { periods, periodId, setPeriodId } = usePeriod();
+  const { periods, periodId, setPeriodId, mode: periodMode, setMode: setPeriodMode } = usePeriod();
   const { theme, toggle: toggleTheme } = useTheme();
   const { items: notifs, unreadCount, markAllRead } = useNotif();
   const navigate = useNavigate();
@@ -80,7 +80,6 @@ export function AppShell() {
   const [exportOpen, setExportOpen] = useState(false);
   const [roleMenuOpen, setRoleMenuOpen] = useState(false);
   const [warRoomActive, setWarRoomActive] = useState(false);
-  const [periodMode, setPeriodMode] = useState<'Bulan' | 'Semester' | 'Tahun'>('Semester');
   const notifRef = useRef<HTMLDivElement>(null);
   const userRef = useRef<HTMLDivElement>(null);
   const exportRef = useRef<HTMLDivElement>(null);
