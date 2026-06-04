@@ -98,9 +98,10 @@ async function main() {
 
   // User demo per bidang (staff/asman/manajer/srmanajer) untuk demo gating
   // lintas-bidang. Bidang OMP sudah diwakili user generik di atas.
+  // Bidang selain OMP TIDAK memiliki lapisan ASMAN (sesuai struktur PUSMANPRO):
+  // alurnya Staff → Manajer → SM. ASMAN hanya ada di OMP (diwakili user generik 'asman@').
   const PER_BIDANG_ROLES: Array<{ key: string; role: Role; label: string }> = [
     { key: 'staff', role: Role.STAFF, label: 'Staff' },
-    { key: 'asman', role: Role.ASMAN, label: 'Asisten Manajer' },
     { key: 'manajer', role: Role.MANAJER, label: 'Manajer' },
     { key: 'srmanajer', role: Role.SRMANAJER, label: 'Senior Manajer' },
   ];

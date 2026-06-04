@@ -26,7 +26,6 @@ const DEMO_GROUPS: Array<{ label: string; accounts: Array<{ role: string; email:
     label: 'KI — QA/QC',
     accounts: [
       { role: 'Staff Officer', email: 'staff.qaqc@pusmanpro.pln.co.id' },
-      { role: 'ASMAN', email: 'asman.qaqc@pusmanpro.pln.co.id' },
       { role: 'Manajer', email: 'manajer.qaqc@pusmanpro.pln.co.id' },
       { role: 'Senior Manajer', email: 'srmanajer.qaqc@pusmanpro.pln.co.id' },
     ],
@@ -35,7 +34,6 @@ const DEMO_GROUPS: Array<{ label: string; accounts: Array<{ role: string; email:
     label: 'KI — Perencanaan & Project Control (RPC)',
     accounts: [
       { role: 'Staff Officer', email: 'staff.rpc@pusmanpro.pln.co.id' },
-      { role: 'ASMAN', email: 'asman.rpc@pusmanpro.pln.co.id' },
       { role: 'Manajer', email: 'manajer.rpc@pusmanpro.pln.co.id' },
       { role: 'Senior Manajer', email: 'srmanajer.rpc@pusmanpro.pln.co.id' },
     ],
@@ -44,7 +42,6 @@ const DEMO_GROUPS: Array<{ label: string; accounts: Array<{ role: string; email:
     label: 'KI — Keuangan, Komunikasi & Umum (KKU)',
     accounts: [
       { role: 'Staff Officer', email: 'staff.kku@pusmanpro.pln.co.id' },
-      { role: 'ASMAN', email: 'asman.kku@pusmanpro.pln.co.id' },
       { role: 'Manajer', email: 'manajer.kku@pusmanpro.pln.co.id' },
       { role: 'Senior Manajer', email: 'srmanajer.kku@pusmanpro.pln.co.id' },
     ],
