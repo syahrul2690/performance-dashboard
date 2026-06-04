@@ -3,78 +3,18 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { PrismaService } from '../prisma/prisma.service';
 import { Role, User } from '@prisma/client';
+import { Step, buildSteps, stepMatches, slaRemainingDays, uname } from '../common/workflow-steps';
+import * as fs from 'fs';
+import * as path from 'path';
+import { randomUUID } from 'crypto';
 
-const UNIT_NAMES: Record<string, string> = {
-  KP: 'Kantor Induk', UPMK1: 'UPMK I', UPMK2: 'UPMK II',
-  UPMK3: 'UPMK III', UPMK4: 'UPMK IV', UPMK5: 'UPMK V',
-};
-
-const RPC_BIDANG = 'Perencanaan & Project Control';
-const OMP_BIDANG = 'Operasi Manajemen Proyek';
-const ROLE_LABEL: Record<Role, string> = {
-  STAFF: 'Staff', ASMAN: 'ASMAN', MANAJER: 'Manajer', SRMANAJER: 'Senior Manajer', GM: 'General Manager',
-};
-
-// Langkah alur (urut). Tiap langkah dipegang oleh peran + lingkup (bidang/unit).
-interface Step {
-  role: Role;
-  bidang?: string;  // lingkup bidang Kantor Induk (mis. OMP/QA-QC/KKU/RPC)
-  unit?: string;    // lingkup unit (KP atau UPMKx)
-  label: string;
-}
-
-const uname = (u: string) => UNIT_NAMES[u] ?? u;
-
-// Mesin alur: bangun urutan langkah berdasarkan unit + bidang.
-// Indeks 0 = PIC/Staff (penyusun). Indeks 1..n = jenjang review hingga SM RPC.
-// Persetujuan GM dilakukan terpisah pada level BUNDLE periode.
-function buildSteps(unitCode: string, bidang: string): Step[] {
-  const isUPMK = unitCode !== 'KP';
-  const steps: Step[] = [];
-
-  if (isUPMK) {
-    // Segmen internal UPMK
-    steps.push({ role: Role.STAFF, unit: unitCode, label: `Staff Kinerja ${uname(unitCode)}` });
-    steps.push({ role: Role.ASMAN, unit: unitCode, label: `ASMAN ${uname(unitCode)}` });
-    steps.push({ role: Role.MANAJER, unit: unitCode, label: `Manajer (MUP) ${uname(unitCode)}` });
-    // Segmen Bidang Kantor Induk terkait (auto sesuai bidang KPI)
-    if (bidang === OMP_BIDANG) steps.push({ role: Role.ASMAN, bidang, unit: 'KP', label: `ASMAN ${bidang}` });
-    steps.push({ role: Role.MANAJER, bidang, unit: 'KP', label: `Manajer ${bidang}` });
-    steps.push({ role: Role.SRMANAJER, bidang, unit: 'KP', label: `SM ${bidang}` });
-  } else {
-    // Segmen bidang Kantor Induk sendiri
-    steps.push({ role: Role.STAFF, bidang, unit: 'KP', label: `Staff Kinerja ${bidang}` });
-    if (bidang === OMP_BIDANG) steps.push({ role: Role.ASMAN, bidang, unit: 'KP', label: `ASMAN ${bidang}` });
-    steps.push({ role: Role.MANAJER, bidang, unit: 'KP', label: `Manajer ${bidang}` });
-    steps.push({ role: Role.SRMANAJER, bidang, unit: 'KP', label: `SM ${bidang}` });
-  }
-
-  // Segmen konsolidasi Perencanaan & Project Control (RPC).
-  // Untuk realisasi bidang RPC sendiri, segmen ini menyatu dengan rantai bidangnya (tidak dobel).
-  const isOwnRpc = !isUPMK && bidang === RPC_BIDANG;
-  if (!isOwnRpc) {
-    steps.push({ role: Role.STAFF, bidang: RPC_BIDANG, unit: 'KP', label: 'Staff Kinerja Perencanaan (RPC)' });
-    steps.push({ role: Role.MANAJER, bidang: RPC_BIDANG, unit: 'KP', label: 'Manajer Perencanaan' });
-    steps.push({ role: Role.SRMANAJER, bidang: RPC_BIDANG, unit: 'KP', label: 'SM Perencanaan & Project Control' });
-  }
-  return steps;
-}
-
-// Apakah user berhak memegang langkah ini?
-function stepMatches(step: Step | undefined, user: { role: Role; bidang?: string | null; unit?: string | null }): boolean {
-  if (!step) return false;
-  if (user.role !== step.role) return false;
-  if (step.bidang && user.bidang !== step.bidang) return false;
-  if (step.unit && user.unit !== step.unit) return false;
-  return true;
-}
-
-// SLA per langkah (hari kalender) — reminder di level manajemen.
-const SLA_DAYS_PER_STEP = 2;
-function slaRemainingDays(r: { submittedAt: Date }): number {
-  const deadline = new Date(r.submittedAt).getTime() + SLA_DAYS_PER_STEP * 86400000;
-  return Math.ceil((deadline - Date.now()) / 86400000);
-}
+// Evidence: batas & tipe yang diizinkan
+const EVIDENCE_MAX_FILES = 5;
+const EVIDENCE_MAX_BYTES = 10 * 1024 * 1024; // 10 MB/file
+const EVIDENCE_EXT = ['.pdf', '.xls', '.xlsx', '.doc', '.docx', '.jpg', '.jpeg', '.png'];
+const EVIDENCE_DIR = path.join(process.cwd(), 'uploads', 'realisasi');
+type UploadFile = { originalname: string; buffer: Buffer; size: number; mimetype: string };
+export interface Attachment { id: string; name: string; size: number; type: string; file: string; uploadedAt: string; uploader: string }
 
 @Injectable()
 export class InputRealisasiService {
@@ -216,6 +156,62 @@ export class InputRealisasiService {
     return result;
   }
 
+  // ===== EVIDENCE (lampiran realisasi) =====
+  async addEvidence(user: User, id: string, files: UploadFile[]) {
+    if (!files?.length) throw new BadRequestException('Tidak ada berkas yang diunggah');
+    const r = await this.prisma.inputRealisasi.findUnique({ where: { id } });
+    if (!r) throw new NotFoundException('Realisasi tidak ditemukan');
+    const steps = (r.steps as unknown as Step[]) ?? [];
+    const allowed = r.submitterId === user.id || user.role === Role.GM || stepMatches(steps[r.currentStepIndex], user);
+    if (!allowed) throw new ForbiddenException('Anda tidak berwenang melampirkan evidence pada realisasi ini');
+
+    const existing: Attachment[] = Array.isArray(r.attachments) ? (r.attachments as unknown as Attachment[]) : [];
+    if (existing.length + files.length > EVIDENCE_MAX_FILES) {
+      throw new BadRequestException(`Maksimal ${EVIDENCE_MAX_FILES} berkas per realisasi`);
+    }
+    for (const f of files) {
+      const ext = path.extname(f.originalname).toLowerCase();
+      if (!EVIDENCE_EXT.includes(ext)) throw new BadRequestException(`Tipe berkas tidak didukung: ${f.originalname}. Hanya PDF, Excel, Word, JPG/PNG.`);
+      if (f.size > EVIDENCE_MAX_BYTES) throw new BadRequestException(`Berkas ${f.originalname} melebihi 10 MB`);
+    }
+    const dir = path.join(EVIDENCE_DIR, id);
+    fs.mkdirSync(dir, { recursive: true });
+    const added: Attachment[] = files.map((f) => {
+      const fid = randomUUID();
+      const safe = f.originalname.replace(/[^\w.\-]+/g, '_');
+      const fname = `${fid}__${safe}`;
+      fs.writeFileSync(path.join(dir, fname), f.buffer);
+      return { id: fid, name: f.originalname, size: f.size, type: f.mimetype, file: fname, uploadedAt: new Date().toISOString(), uploader: user.name };
+    });
+    const attachments = [...existing, ...added];
+    await this.prisma.inputRealisasi.update({ where: { id }, data: { attachments: attachments as object } });
+    await this.prisma.auditLog.create({ data: { actor: user.name, userId: user.id, action: 'realisasi.evidence.add', entity: 'InputRealisasi', targetId: id, note: added.map((a) => a.name).join(', ') } });
+    return attachments;
+  }
+
+  async getEvidenceFile(id: string, fileId: string) {
+    const r = await this.prisma.inputRealisasi.findUnique({ where: { id } });
+    if (!r) throw new NotFoundException('Realisasi tidak ditemukan');
+    const att = (Array.isArray(r.attachments) ? (r.attachments as unknown as Attachment[]) : []).find((a) => a.id === fileId);
+    if (!att) throw new NotFoundException('Berkas tidak ditemukan');
+    const fp = path.join(EVIDENCE_DIR, id, att.file);
+    if (!fs.existsSync(fp)) throw new NotFoundException('Berkas hilang dari penyimpanan');
+    return { path: fp, name: att.name, type: att.type };
+  }
+
+  async deleteEvidence(user: User, id: string, fileId: string) {
+    const r = await this.prisma.inputRealisasi.findUnique({ where: { id } });
+    if (!r) throw new NotFoundException('Realisasi tidak ditemukan');
+    const list: Attachment[] = Array.isArray(r.attachments) ? (r.attachments as unknown as Attachment[]) : [];
+    const att = list.find((a) => a.id === fileId);
+    if (!att) throw new NotFoundException('Berkas tidak ditemukan');
+    if (r.submitterId !== user.id && user.role !== Role.GM) throw new ForbiddenException('Hanya pengunggah/pengirim atau GM yang dapat menghapus evidence');
+    try { fs.unlinkSync(path.join(EVIDENCE_DIR, id, att.file)); } catch { /* abaikan */ }
+    const attachments = list.filter((a) => a.id !== fileId);
+    await this.prisma.inputRealisasi.update({ where: { id }, data: { attachments: attachments as object } });
+    return attachments;
+  }
+
   // Review berjenjang mengikuti `steps`:
   //  approve → maju 1 langkah; bila lewat langkah terakhir → status 'ready' (menunggu bundle GM)
   //  reject  → 'konseptor' (kembali ke penyusun) atau 'previous' (mundur 1 langkah)
@@ -315,9 +311,10 @@ export class InputRealisasiService {
     const bundle = await this.prisma.realisasiBundle.findUnique({ where: { periodId: period.id } });
     const readyCount = components.filter((c) => c.status === 'ready').length;
     const approvedCount = components.filter((c) => c.status === 'approved').length;
+    const submittedCount = components.filter((c) => c.status === 'submitted').length;
     const inflight = components.length;
-    // GM dapat menyetujui bila ada komponen & SEMUA komponen in-flight sudah 'ready' (belum ada yg approved).
-    const canApprove = inflight > 0 && components.every((c) => c.status === 'ready');
+    // GM dapat menyetujui bila ada komponen 'ready' & tak ada lagi yang masih dalam proses review.
+    const canApprove = readyCount > 0 && submittedCount === 0;
     return {
       period,
       status: bundle?.status ?? 'open',

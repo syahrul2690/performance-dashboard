@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, Fragment } from 'react';
 import { inputRealisasi, inputKontrak, meta } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
-import { ClipboardEdit, CheckCircle, Clock, Trash2 } from 'lucide-react';
+import { ClipboardEdit, CheckCircle, Clock, Trash2, Paperclip, Upload, X } from 'lucide-react';
 import { SkeletonTable, EmptyState, ErrorState } from '../components/LoadState';
 import type { KontrakManajemen, Period } from '../lib/types';
 
@@ -43,6 +43,34 @@ export function InputRealisasiPage() {
   const [values, setValues] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  // Evidence (lampiran)
+  const [evidOpen, setEvidOpen] = useState<string | null>(null);
+  const [evidBusy, setEvidBusy] = useState(false);
+  const evidInputRef = useRef<HTMLInputElement>(null);
+
+  const reloadHistory = async () => {
+    const hist = await inputRealisasi.history(selectedUnit, selectedPeriodId);
+    setHistory(hist as unknown[]);
+  };
+  const handleUploadEvid = async (id: string, files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setEvidBusy(true);
+    try {
+      await inputRealisasi.uploadEvidence(id, Array.from(files));
+      await reloadHistory();
+    } catch (e) {
+      alert((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Gagal mengunggah evidence');
+    } finally {
+      setEvidBusy(false);
+      if (evidInputRef.current) evidInputRef.current.value = '';
+    }
+  };
+  const handleDeleteEvid = async (id: string, fileId: string) => {
+    if (!confirm('Hapus berkas evidence ini?')) return;
+    try { await inputRealisasi.deleteEvidence(id, fileId); await reloadHistory(); }
+    catch (e) { alert((e as Error)?.message ?? 'Gagal menghapus'); }
+  };
+  const fmtSize = (b: number) => (b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB');
 
   // Default unit mengikuti unit user (bila ada)
   useEffect(() => { if (user?.unit) setSelectedUnit(user.unit); }, [user?.unit]);
@@ -296,8 +324,11 @@ export function InputRealisasiPage() {
                   const stepLabel = itemSteps[Number(item.currentStepIndex ?? 0)]?.label;
                   const canDelete = status !== 'approved'
                     && (item.submitterId === user?.id || user?.role === 'GM');
+                  const atts = (item.attachments as Array<{ id: string; name: string; size: number }> | undefined) ?? [];
+                  const rid = item.id as string;
                   return (
-                    <tr key={i}>
+                    <Fragment key={i}>
+                    <tr>
                       <td style={{ fontWeight: 600 }}>{item.unitCode as string ?? '—'}</td>
                       <td style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{item.bidang as string ?? '—'}</td>
                       <td>{item.submitter as string ?? '—'}</td>
@@ -316,20 +347,47 @@ export function InputRealisasiPage() {
                         {item.submittedAt ? new Date(item.submittedAt as string).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
                       </td>
                       <td>
-                        {canDelete ? (
-                          <button
-                            className="btn btn-ghost btn-sm"
-                            onClick={() => handleDelete(item.id as string)}
-                            title="Hapus realisasi"
-                            style={{ color: 'var(--color-danger)' }}
-                          >
-                            <Trash2 size={14} /> Hapus
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <button className="btn btn-ghost btn-sm" onClick={() => setEvidOpen(evidOpen === rid ? null : rid)} title="Lampiran evidence">
+                            <Paperclip size={14} /> {atts.length}
                           </button>
-                        ) : (
-                          <span style={{ fontSize: 10, color: 'var(--color-text-subtle)' }}>—</span>
-                        )}
+                          {canDelete && (
+                            <button className="btn btn-ghost btn-sm" onClick={() => handleDelete(rid)} title="Hapus realisasi" style={{ color: 'var(--color-danger)' }}>
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
+                    {evidOpen === rid && (
+                      <tr>
+                        <td colSpan={6} style={{ background: 'var(--color-surface-2)', padding: 'var(--space-3)' }}>
+                          <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6 }}>Evidence Realisasi</div>
+                          {atts.length === 0 ? (
+                            <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 6 }}>Belum ada berkas.</div>
+                          ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 }}>
+                              {atts.map((a) => (
+                                <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11 }}>
+                                  <Paperclip size={12} style={{ color: 'var(--color-text-muted)' }} />
+                                  <a href={inputRealisasi.evidenceUrl(rid, a.id)} target="_blank" rel="noreferrer" style={{ color: 'var(--color-accent)' }}>{a.name}</a>
+                                  <span style={{ color: 'var(--color-text-subtle)' }}>({fmtSize(a.size)})</span>
+                                  <button className="btn btn-ghost btn-sm" onClick={() => handleDeleteEvid(rid, a.id)} title="Hapus berkas" style={{ color: 'var(--color-danger)', padding: '0 4px' }}><X size={12} /></button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          <input ref={evidInputRef} type="file" multiple accept=".pdf,.xls,.xlsx,.doc,.docx,.jpg,.jpeg,.png" style={{ display: 'none' }} onChange={(e) => handleUploadEvid(rid, e.target.files)} />
+                          <button className="btn btn-secondary btn-sm" disabled={evidBusy || atts.length >= 5} onClick={() => evidInputRef.current?.click()}>
+                            <Upload size={12} /> {evidBusy ? 'Mengunggah…' : 'Unggah Evidence'}
+                          </button>
+                          <span style={{ fontSize: 10, color: 'var(--color-text-muted)', marginLeft: 8 }}>
+                            Maks 5 berkas · ≤ 10 MB/berkas · PDF, Excel, Word, JPG/PNG {atts.length >= 5 ? '· (batas tercapai)' : ''}
+                          </span>
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
                   );
                 })}
               </tbody>

@@ -138,6 +138,14 @@ export const inputRealisasi = {
     api.get('/input-realisasi/bundle', { params: { periodId } }).then((r) => r.data),
   reviewBundle: (action: 'approve' | 'reject', note: string, periodId?: string) =>
     api.post('/input-realisasi/bundle/review', { action, note, periodId }).then((r) => r.data),
+  uploadEvidence: (id: string, files: File[]) => {
+    const form = new FormData();
+    files.forEach((f) => form.append('files', f));
+    return api.post(`/input-realisasi/${id}/evidence`, form).then((r) => r.data);
+  },
+  deleteEvidence: (id: string, fileId: string) =>
+    api.delete(`/input-realisasi/${id}/evidence/${fileId}`).then((r) => r.data),
+  evidenceUrl: (id: string, fileId: string) => `/api/input-realisasi/${id}/evidence/${fileId}`,
 };
 
 export const inputKontrak = {
@@ -163,6 +171,10 @@ export const inputKontrak = {
     api.get('/input-kontrak/approved', { params: { unitCode, year } }).then((r) => r.data),
   review: (id: string, action: 'approve' | 'reject', note?: string, returnTo?: 'konseptor' | 'previous') =>
     api.post(`/input-kontrak/${id}/review`, { action, note, returnTo }).then((r) => r.data),
+  bundle: (year?: string) =>
+    api.get('/input-kontrak/bundle', { params: { year } }).then((r) => r.data),
+  reviewBundle: (action: 'approve' | 'reject', note: string, year?: string) =>
+    api.post('/input-kontrak/bundle/review', { action, note, year }).then((r) => r.data),
   uploadExcel: (file: File) => {
     const form = new FormData();
     form.append('file', file);

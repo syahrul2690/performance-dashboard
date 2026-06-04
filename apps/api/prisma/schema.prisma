@@ -237,6 +237,7 @@ model InputRealisasi {
   currentStage Int       @default(1) // legacy; kini = currentStepIndex
   steps        Json      @default("[]") // template langkah alur (urut) — mesin alur multi-segmen
   currentStepIndex Int   @default(0)    // pointer ke langkah berjalan dalam `steps`
+  attachments  Json      @default("[]") // evidence: [{id,name,size,type,uploadedAt}]
   history      Json      @default("[]")
   reviewer     String?
   reviewNote   String?
@@ -348,8 +349,10 @@ model KontrakManajemen {
   bidang      String
   holder      String
   kpiItems    Json
-  status      String    @default("draft") // draft | submitted | approved | rejected
-  currentStage Int      @default(1) // 1=Staff 2=Asman 3=Manajer 4=Sr.Manajer (final)
+  status      String    @default("draft") // draft | submitted | ready | approved | rejected
+  currentStage Int      @default(1) // legacy; kini = currentStepIndex
+  steps        Json     @default("[]") // mesin alur multi-segmen (sama seperti realisasi)
+  currentStepIndex Int  @default(0)
   history     Json      @default("[]")
   submitter   String
   submitterId String?
@@ -361,4 +364,18 @@ model KontrakManajemen {
 
   @@index([periodId, unitCode])
   @@map("kontrak_manajemen")
+}
+
+// Konsolidasi KM per TAHUN — GM menyetujui sekali seluruh KM (semua bidang KI + UPMK) tahun tsb.
+model KMBundle {
+  id         String    @id @default(cuid())
+  year       String    @unique
+  status     String    @default("open") // open | approved | rejected
+  reviewer   String?
+  reviewNote String?
+  reviewedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@map("km_bundles")
 }

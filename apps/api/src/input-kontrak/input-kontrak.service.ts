@@ -4,31 +4,7 @@ import { Cache } from 'cache-manager';
 import { PrismaService } from '../prisma/prisma.service';
 import { Role, User } from '@prisma/client';
 import * as XLSX from 'xlsx';
-
-const UNIT_NAMES: Record<string, string> = {
-  KP: 'Kantor Induk', UPMK1: 'UPMK I', UPMK2: 'UPMK II',
-  UPMK3: 'UPMK III', UPMK4: 'UPMK IV', UPMK5: 'UPMK V',
-};
-
-// Jenjang persetujuan usulan KM: Staff(1) → Asman(2) → Manajer(3) → Sr.Manajer(4) → GM(5, final)
-const ROLE_TO_STAGE: Record<Role, number> = {
-  STAFF: 1, ASMAN: 2, MANAJER: 3, SRMANAJER: 4, GM: 5,
-};
-const STAGE_TO_ROLE: Record<number, Role> = {
-  2: Role.ASMAN, 3: Role.MANAJER, 4: Role.SRMANAJER, 5: Role.GM,
-};
-const STAGE_LABEL: Record<number, string> = {
-  1: 'Staff', 2: 'Asisten Manajer', 3: 'Manajer Bidang', 4: 'Senior Manajer', 5: 'General Manager',
-};
-const FINAL_STAGE = 5; // General Manager = persetujuan akhir
-
-// SLA approval per tahap (hari kalender). Task 6.
-const SLA_DAYS: Record<number, number> = { 2: 2, 3: 2, 4: 2, 5: 3 };
-function slaRemainingDays(r: { currentStage: number; submittedAt: Date }): number {
-  const days = SLA_DAYS[r.currentStage] ?? 2;
-  const deadline = new Date(r.submittedAt).getTime() + days * 86400000;
-  return Math.ceil((deadline - Date.now()) / 86400000);
-}
+import { Step, buildSteps, stepMatches, slaRemainingDays, uname } from '../common/workflow-steps';
 
 @Injectable()
 export class InputKontrakService {
@@ -115,55 +91,51 @@ export class InputKontrakService {
     return result;
   }
 
-  // Notifikasi push ke semua user pada tahap tertentu (Asman/Manajer/Sr.Manajer)
-  private async notifyStage(stage: number, kontrak: { id: string; bidang: string; unitCode: string }, actorName: string) {
-    const role = STAGE_TO_ROLE[stage];
-    if (!role) return;
-    // Task 8: reviewer non-GM hanya yang sebidang. GM (final) tidak difilter bidang.
+  // Notifikasi ke pemegang langkah berjalan.
+  private async notifyStep(kontrakId: string, steps: Step[], stepIndex: number, unitCode: string, bidang: string, actorName: string) {
+    const step = steps[stepIndex];
+    if (!step) return;
     const recipients = await this.prisma.user.findMany({
       where: {
-        role, isActive: true,
-        ...(role !== Role.GM ? { bidang: kontrak.bidang } : {}),
+        role: step.role, isActive: true,
+        ...(step.bidang ? { bidang: step.bidang } : {}),
+        ...(step.unit ? { unit: step.unit } : {}),
       },
     });
     if (recipients.length === 0) return;
-    const unitLabel = UNIT_NAMES[kontrak.unitCode] ?? kontrak.unitCode;
     await this.prisma.notification.createMany({
       data: recipients.map((u) => ({
-        userId: u.id,
-        type: 'approval',
-        title: 'Usulan Kontrak Manajemen Menunggu Review',
-        msg: `${actorName} meneruskan usulan KM "${kontrak.bidang}" (${unitLabel}) untuk review ${STAGE_LABEL[stage]}.`,
-        route: '/approvals?type=km',
-        targetId: kontrak.id,
-        unread: true,
+        userId: u.id, type: 'approval', title: 'Usulan Kontrak Manajemen Menunggu Review',
+        msg: `${actorName} meneruskan usulan KM ${uname(unitCode)} — ${bidang} untuk review: ${step.label}.`,
+        route: '/approvals?type=km', targetId: kontrakId, unread: true,
       })),
     });
   }
 
-  // Submit untuk review → masuk tahap 2 (Asman), notifikasi ke Asman.
+  // Submit untuk review → mulai jenjang alur (rantai bidang KI → RPC).
   async submit(user: User, id: string) {
     if (user.unit !== 'KP') throw new ForbiddenException('Kontrak Manajemen hanya dapat dikirim oleh Kantor Induk');
     const kontrak = await this.prisma.kontrakManajemen.findUnique({ where: { id } });
     if (!kontrak) throw new NotFoundException('Kontrak tidak ditemukan');
 
+    // KM selalu rantai bidang KI (mode 'km'), termasuk KM untuk UPMK.
+    const steps = buildSteps(kontrak.unitCode, kontrak.bidang, 'km');
+    if (!stepMatches(steps[0], user)) {
+      throw new ForbiddenException('Hanya PIC/Staff Kinerja bidang terkait yang dapat mengirim KM ini');
+    }
     const history = [
       ...(Array.isArray(kontrak.history) ? (kontrak.history as object[]) : []),
-      { stage: 1, actor: user.name, role: user.role, action: 'submitted', ts: new Date().toISOString() },
+      { stepIndex: 0, actor: user.name, role: user.role, action: 'submitted', label: steps[0].label, ts: new Date().toISOString() },
     ];
-
     const result = await this.prisma.kontrakManajemen.update({
       where: { id },
       data: {
-        status: 'submitted',
-        currentStage: 2,
-        history,
-        reviewer: null, reviewNote: null, reviewedAt: null,
+        status: 'submitted', steps: steps as object, currentStepIndex: 1, currentStage: 1,
+        history, reviewer: null, reviewNote: null, reviewedAt: null,
         submitter: user.name, submitterId: user.id, submittedAt: new Date(),
       },
     });
-
-    await this.notifyStage(2, result, user.name);
+    await this.notifyStep(id, steps, 1, kontrak.unitCode, kontrak.bidang, user.name);
     await this.prisma.auditLog.create({
       data: { actor: user.name, userId: user.id, action: 'kontrak.submit', entity: 'KontrakManajemen', targetId: id },
     });
@@ -186,25 +158,24 @@ export class InputKontrakService {
     return { success: true };
   }
 
-  // Daftar usulan yang menunggu review pada TAHAP user (Asman/Manajer/Sr.Manajer)
+  // Daftar usulan KM yang menunggu review pada LANGKAH milik user.
   async getReviewList(user: User) {
-    if (user.role === Role.STAFF) throw new ForbiddenException('Tidak berwenang me-review');
-    const stage = ROLE_TO_STAGE[user.role];
-    // Task 8: non-GM hanya melihat usulan sebidang; GM lintas-bidang.
-    const items = await this.prisma.kontrakManajemen.findMany({
-      where: {
-        status: 'submitted', currentStage: stage,
-        ...(user.role !== Role.GM && user.bidang ? { bidang: user.bidang } : {}),
-      },
+    const submitted = await this.prisma.kontrakManajemen.findMany({
+      where: { status: 'submitted' },
       orderBy: { submittedAt: 'desc' },
     });
-    return items.map((k) => ({ ...k, slaRemainingDays: slaRemainingDays(k) }));
+    return submitted
+      .filter((k) => {
+        const steps = (k.steps as unknown as Step[]) ?? [];
+        return stepMatches(steps[k.currentStepIndex], user);
+      })
+      .map((k) => {
+        const steps = (k.steps as unknown as Step[]) ?? [];
+        return { ...k, stepLabel: steps[k.currentStepIndex]?.label ?? '—', slaRemainingDays: slaRemainingDays(k) };
+      });
   }
 
-  // Review berjenjang (hybrid):
-  //  - approve → naik ke tahap berikutnya hingga GM (final)
-  //  - reject + returnTo='konseptor' → kembali ke Staff untuk revisi isi (restart)
-  //  - reject + returnTo='previous'  → mundur 1 tahap ke approver sebelumnya (klarifikasi)
+  // Review berjenjang mengikuti `steps` (rantai bidang KI → RPC). GM menyetujui via BUNDLE tahunan.
   async review(
     user: User,
     id: string,
@@ -212,98 +183,139 @@ export class InputKontrakService {
     note?: string,
     returnTo: 'konseptor' | 'previous' = 'konseptor',
   ) {
-    if (user.role === Role.STAFF) throw new ForbiddenException('Tidak berwenang me-review');
     if (action !== 'approve' && action !== 'reject') throw new BadRequestException('Aksi tidak valid');
-
-    const kontrak = await this.prisma.kontrakManajemen.findUnique({ where: { id } });
-    if (!kontrak) throw new NotFoundException('Kontrak tidak ditemukan');
-    if (kontrak.status !== 'submitted') throw new ForbiddenException('Kontrak tidak dalam status menunggu review');
-    // Task 3: komentar wajib untuk setiap keputusan (approve maupun reject).
+    const k = await this.prisma.kontrakManajemen.findUnique({ where: { id } });
+    if (!k) throw new NotFoundException('Kontrak tidak ditemukan');
+    if (k.status !== 'submitted') throw new ForbiddenException('Kontrak tidak dalam status menunggu review');
     if (!note?.trim()) throw new BadRequestException('Catatan/komentar wajib diisi saat menyetujui atau menolak');
-    // Task 8: non-GM hanya boleh me-review usulan sebidang.
-    if (user.role !== Role.GM && user.bidang && kontrak.bidang !== user.bidang) {
-      throw new ForbiddenException('Anda hanya dapat menyetujui usulan pada bidang Anda');
-    }
 
-    const userStage = ROLE_TO_STAGE[user.role];
-    if (kontrak.currentStage !== userStage) {
-      throw new ForbiddenException(`Usulan ini menunggu review ${STAGE_LABEL[kontrak.currentStage] ?? 'tahap lain'}, bukan tahap Anda`);
+    const steps = (k.steps as unknown as Step[]) ?? [];
+    const curIdx = k.currentStepIndex;
+    if (!stepMatches(steps[curIdx], user)) {
+      throw new ForbiddenException(`Usulan ini menunggu langkah "${steps[curIdx]?.label ?? 'lain'}", bukan langkah Anda`);
     }
-
-    const baseHistory = Array.isArray(kontrak.history) ? (kontrak.history as object[]) : [];
+    const baseHistory = Array.isArray(k.history) ? (k.history as object[]) : [];
 
     if (action === 'reject') {
-      const prevStage = userStage - 1;
-      // "Kembalikan 1 tahap" hanya bermakna bila ada approver di bawahnya (prevStage >= 2).
-      const oneStep = returnTo === 'previous' && prevStage >= 2;
-
-      if (oneStep) {
-        const history = [...baseHistory, { stage: userStage, actor: user.name, role: user.role, action: 'returned_step', toStage: prevStage, note, ts: new Date().toISOString() }];
-        const result = await this.prisma.kontrakManajemen.update({
-          where: { id },
-          data: { status: 'submitted', currentStage: prevStage, history, reviewer: user.name, reviewNote: note ?? null, reviewedAt: new Date() },
-        });
-        // Notifikasi ke approver tahap sebelumnya untuk klarifikasi
-        await this.notifyStage(prevStage, result, user.name);
-        await this.prisma.auditLog.create({ data: { actor: user.name, userId: user.id, action: 'kontrak.return_step', entity: 'KontrakManajemen', targetId: id, note } });
-        await this.cache.del(`kontrak:${kontrak.unitCode}`);
-        return result;
-      }
-
-      // Kembalikan ke konseptor (Staff) → revisi isi, submit ulang restart dari Asman
-      const history = [...baseHistory, { stage: userStage, actor: user.name, role: user.role, action: 'returned', note, ts: new Date().toISOString() }];
+      const toPrev = returnTo === 'previous' && curIdx - 1 >= 1;
+      const newIdx = toPrev ? curIdx - 1 : 0;
+      const history = [...baseHistory, { stepIndex: curIdx, actor: user.name, role: user.role, action: toPrev ? 'returned_step' : 'returned', toStepIndex: newIdx, label: steps[curIdx]?.label, note, ts: new Date().toISOString() }];
       const result = await this.prisma.kontrakManajemen.update({
         where: { id },
-        data: { status: 'rejected', currentStage: 1, history, reviewer: user.name, reviewNote: note ?? null, reviewedAt: new Date() },
+        data: { status: toPrev ? 'submitted' : 'rejected', currentStepIndex: newIdx, currentStage: newIdx, history, reviewer: user.name, reviewNote: note, reviewedAt: new Date() },
       });
-      if (kontrak.submitterId) {
+      if (toPrev) {
+        await this.notifyStep(id, steps, newIdx, k.unitCode, k.bidang, user.name);
+      } else if (k.submitterId) {
         await this.prisma.notification.create({
           data: {
-            userId: kontrak.submitterId, type: 'alert', title: 'Usulan KM Dikembalikan ke Konseptor',
-            msg: `${user.name} (${STAGE_LABEL[userStage]}) mengembalikan usulan KM "${kontrak.bidang}" untuk revisi: ${note}`,
+            userId: k.submitterId, type: 'alert', title: 'Usulan KM Dikembalikan ke Konseptor',
+            msg: `${user.name} (${steps[curIdx]?.label}) mengembalikan usulan KM ${uname(k.unitCode)} — ${k.bidang}: ${note}`,
             route: '/input-kontrak', targetId: id, unread: true,
           },
         });
       }
-      await this.prisma.auditLog.create({ data: { actor: user.name, userId: user.id, action: 'kontrak.reject', entity: 'KontrakManajemen', targetId: id, note } });
-      await this.cache.del(`kontrak:${kontrak.unitCode}`);
+      await this.prisma.auditLog.create({ data: { actor: user.name, userId: user.id, action: toPrev ? 'kontrak.return_step' : 'kontrak.reject', entity: 'KontrakManajemen', targetId: id, note } });
+      await this.cache.del(`kontrak:${k.unitCode}`);
       return result;
     }
 
-    // approve
-    const isFinal = userStage >= FINAL_STAGE;
-    const nextStage = isFinal ? userStage : userStage + 1;
-    const history = [...baseHistory, { stage: userStage, actor: user.name, role: user.role, action: 'approved', note, ts: new Date().toISOString() }];
-
+    // approve → maju
+    const nextIdx = curIdx + 1;
+    const chainDone = nextIdx >= steps.length;
+    const history = [...baseHistory, { stepIndex: curIdx, actor: user.name, role: user.role, action: 'approved', label: steps[curIdx]?.label, note, ts: new Date().toISOString() }];
     const result = await this.prisma.kontrakManajemen.update({
       where: { id },
       data: {
-        status: isFinal ? 'approved' : 'submitted',
-        currentStage: nextStage,
-        history,
-        reviewer: user.name, reviewNote: note ?? null, reviewedAt: new Date(),
+        status: chainDone ? 'ready' : 'submitted',
+        currentStepIndex: chainDone ? steps.length : nextIdx,
+        currentStage: chainDone ? steps.length : nextIdx,
+        history, reviewer: user.name, reviewNote: note, reviewedAt: new Date(),
       },
     });
-
-    if (isFinal) {
-      // Final disetujui Sr.Manajer → notifikasi pengirim
-      if (kontrak.submitterId) {
-        await this.prisma.notification.create({
-          data: {
-            userId: kontrak.submitterId, type: 'success', title: 'Usulan KM Disetujui (Final)',
-            msg: `Usulan KM "${kontrak.bidang}" telah disetujui penuh hingga ${STAGE_LABEL[FINAL_STAGE]} oleh ${user.name}.`,
-            route: '/input-kontrak', targetId: id, unread: true,
-          },
+    if (chainDone) {
+      const gms = await this.prisma.user.findMany({ where: { role: Role.GM, isActive: true } });
+      if (gms.length) {
+        await this.prisma.notification.createMany({
+          data: gms.map((g) => ({
+            userId: g.id, type: 'approval', title: 'KM Siap Masuk Bundle Tahunan',
+            msg: `KM ${uname(k.unitCode)} — ${k.bidang} lolos hingga SM Perencanaan & PC, siap dikonsolidasi tahunan.`,
+            route: '/approvals?type=km', targetId: id, unread: true,
+          })),
         });
       }
     } else {
-      // Teruskan ke tahap berikutnya → notifikasi reviewer berikut
-      await this.notifyStage(nextStage, result, user.name);
+      await this.notifyStep(id, steps, nextIdx, k.unitCode, k.bidang, user.name);
     }
-
     await this.prisma.auditLog.create({ data: { actor: user.name, userId: user.id, action: 'kontrak.approve', entity: 'KontrakManajemen', targetId: id, note } });
-    await this.cache.del(`kontrak:${kontrak.unitCode}`);
+    await this.cache.del(`kontrak:${k.unitCode}`);
     return result;
+  }
+
+  // ===== BUNDLE KM tahunan (persetujuan akhir GM, sekali untuk seluruh KM tahun tsb) =====
+  private async periodIdsForYear(year: string) {
+    const periods = await this.prisma.period.findMany({ where: { yearMonth: { startsWith: `${year}-` } }, select: { id: true } });
+    return periods.map((p) => p.id);
+  }
+  private async resolveYear(year?: string) {
+    if (year) return year;
+    const active = await this.prisma.period.findFirst({ where: { isActive: true } });
+    return active ? active.yearMonth.slice(0, 4) : String(new Date().getFullYear());
+  }
+
+  async getBundle(year?: string) {
+    const yr = await this.resolveYear(year);
+    const pids = await this.periodIdsForYear(yr);
+    const components = await this.prisma.kontrakManajemen.findMany({
+      where: { periodId: { in: pids }, status: { in: ['submitted', 'ready', 'approved'] } },
+      orderBy: [{ unitCode: 'asc' }, { bidang: 'asc' }],
+    });
+    const bundle = await this.prisma.kMBundle.findUnique({ where: { year: yr } });
+    const readyCount = components.filter((c) => c.status === 'ready').length;
+    const submittedCount = components.filter((c) => c.status === 'submitted').length;
+    // GM dapat mengesahkan bila ada KM 'ready' & tak ada lagi yang masih dalam proses review.
+    const canApprove = readyCount > 0 && submittedCount === 0;
+    return {
+      year: yr, status: bundle?.status ?? 'open', reviewer: bundle?.reviewer ?? null,
+      reviewNote: bundle?.reviewNote ?? null, reviewedAt: bundle?.reviewedAt ?? null,
+      total: components.length, readyCount, canApprove,
+      components: components.map((c) => ({ id: c.id, unitCode: c.unitCode, bidang: c.bidang, status: c.status, submitter: c.submitter })),
+    };
+  }
+
+  async reviewBundle(user: User, action: 'approve' | 'reject', note: string, year?: string) {
+    if (user.role !== Role.GM) throw new ForbiddenException('Hanya General Manager yang menyetujui bundle KM');
+    if (!note?.trim()) throw new BadRequestException('Catatan/komentar wajib diisi');
+    const yr = await this.resolveYear(year);
+    const pids = await this.periodIdsForYear(yr);
+    const components = await this.prisma.kontrakManajemen.findMany({ where: { periodId: { in: pids }, status: { in: ['submitted', 'ready'] } } });
+    if (components.length === 0) throw new BadRequestException('Tidak ada KM yang siap dikonsolidasi pada tahun ini');
+
+    if (action === 'approve') {
+      if (!components.every((c) => c.status === 'ready')) throw new ForbiddenException('Masih ada KM yang belum lolos sampai SM Perencanaan & PC');
+      await this.prisma.kontrakManajemen.updateMany({ where: { periodId: { in: pids }, status: 'ready' }, data: { status: 'approved', reviewer: user.name, reviewedAt: new Date() } });
+    } else {
+      await this.prisma.kontrakManajemen.updateMany({ where: { periodId: { in: pids }, status: 'ready' }, data: { status: 'rejected', currentStepIndex: 0, currentStage: 0, reviewer: user.name, reviewNote: note, reviewedAt: new Date() } });
+    }
+    const bundle = await this.prisma.kMBundle.upsert({
+      where: { year: yr },
+      update: { status: action === 'approve' ? 'approved' : 'rejected', reviewer: user.name, reviewNote: note, reviewedAt: new Date() },
+      create: { year: yr, status: action === 'approve' ? 'approved' : 'rejected', reviewer: user.name, reviewNote: note, reviewedAt: new Date() },
+    });
+    const submitterIds = [...new Set(components.map((c) => c.submitterId).filter(Boolean))] as string[];
+    if (submitterIds.length) {
+      await this.prisma.notification.createMany({
+        data: submitterIds.map((sid) => ({
+          userId: sid, type: action === 'approve' ? 'success' : 'alert',
+          title: action === 'approve' ? 'Bundle KM Disetujui GM' : 'Bundle KM Dikembalikan GM',
+          msg: action === 'approve' ? `Kontrak Manajemen tahun ${yr} disahkan penuh oleh ${user.name}.` : `Bundle KM tahun ${yr} dikembalikan oleh ${user.name}: ${note}`,
+          route: '/input-kontrak', unread: true,
+        })),
+      });
+    }
+    await this.prisma.auditLog.create({ data: { actor: user.name, userId: user.id, action: `kontrak.bundle.${action}`, entity: 'KMBundle', targetId: bundle.id, note } });
+    for (const c of components) await this.cache.del(`kontrak:${c.unitCode}`);
+    return bundle;
   }
 
   // Alias kolom yang dikenali (case-insensitive). Boleh ada baris judul di atas tabel.

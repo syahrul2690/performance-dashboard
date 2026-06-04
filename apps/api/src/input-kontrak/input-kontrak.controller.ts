@@ -23,6 +23,12 @@ class ReviewDto {
   @IsOptional() @IsIn(['konseptor', 'previous']) returnTo?: 'konseptor' | 'previous';
 }
 
+class BundleReviewDto {
+  @IsIn(['approve', 'reject']) action: 'approve' | 'reject';
+  @IsString() note: string;
+  @IsOptional() @IsString() year?: string;
+}
+
 @UseGuards(JwtAuthGuard)
 @Controller('input-kontrak')
 export class InputKontrakController {
@@ -41,6 +47,16 @@ export class InputKontrakController {
   @Get('approved')
   approved(@Query('unitCode') unitCode?: string, @Query('year') year?: string) {
     return this.svc.getApproved(unitCode, year);
+  }
+
+  @Get('bundle')
+  bundle(@Query('year') year?: string) {
+    return this.svc.getBundle(year);
+  }
+
+  @Post('bundle/review')
+  reviewBundle(@CurrentUser() user: User, @Body() dto: BundleReviewDto) {
+    return this.svc.reviewBundle(user, dto.action, dto.note, dto.year);
   }
 
   @Get(':id')

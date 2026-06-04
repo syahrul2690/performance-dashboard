@@ -86,7 +86,6 @@ function FoldCard({
 const STAGES = ['', 'Staff', 'Asman', 'Manajer', 'Sr. Manajer', 'GM'];
 // Jenjang persetujuan usulan Kontrak Manajemen: Staff → Asman → Manajer → Sr. Manajer → GM (final)
 const KM_STAGES = ['Staff', 'Asman', 'Manajer', 'Sr. Manajer', 'GM'];
-const KM_FINAL_STAGE = 5;
 
 const DOC_STATUS_LABEL: Record<string, string> = {
   draft: 'Draft', submitted: 'Menunggu Review', approved: 'Disetujui', rejected: 'Dikembalikan',
@@ -159,6 +158,17 @@ export function ApprovalsPage() {
   const loadBundle = () => {
     inputRealisasi.bundle(periodId || undefined).then((d) => setBundle(d as BundleData)).catch(() => {});
   };
+  // Bundle KM tahunan (GM)
+  type KmBundleData = {
+    year?: string; status: string; total: number; readyCount: number; canApprove: boolean;
+    components: Array<{ id: string; unitCode: string; bidang: string; status: string; submitter: string }>;
+  };
+  const [kmBundle, setKmBundle] = useState<KmBundleData | null>(null);
+  const [kmBundleNote, setKmBundleNote] = useState('');
+  const [kmBundleBusy, setKmBundleBusy] = useState(false);
+  const loadKmBundle = () => {
+    inputKontrak.bundle().then((d) => setKmBundle(d as KmBundleData)).catch(() => {});
+  };
 
   const load = () => {
     approvalsApi.reports()
@@ -191,7 +201,21 @@ export function ApprovalsPage() {
   };
 
   useEffect(() => { load(); loadKm(); loadReal(); loadDocs(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { loadBundle(); }, [periodId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { loadBundle(); loadKmBundle(); }, [periodId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleKmBundleReview = async (action: 'approve' | 'reject') => {
+    if (!kmBundleNote.trim()) { alert('Catatan/komentar wajib diisi'); return; }
+    setKmBundleBusy(true);
+    try {
+      await inputKontrak.reviewBundle(action, kmBundleNote);
+      setKmBundleNote('');
+      loadKmBundle(); loadKm(); refreshNotif();
+    } catch (e) {
+      alert((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Gagal memproses bundle KM');
+    } finally {
+      setKmBundleBusy(false);
+    }
+  };
 
   const handleBundleReview = async (action: 'approve' | 'reject') => {
     if (!bundleNote.trim()) { alert('Catatan/komentar wajib diisi'); return; }
@@ -374,7 +398,13 @@ export function ApprovalsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {kmList.map((k) => (
+                  {kmList.map((k) => {
+                    const kk = k as KontrakManajemen & { steps?: { label: string }[]; currentStepIndex?: number; stepLabel?: string };
+                    const ksteps = kk.steps ?? [];
+                    const kci = kk.currentStepIndex ?? 0;
+                    const kIsLast = kci >= ksteps.length - 1;
+                    const kPrev = ksteps[kci - 1]?.label;
+                    return (
                     <Fragment key={k.id}>
                       <tr>
                         <td style={{ fontWeight: 600 }}>{UNIT_NAMES[k.unitCode] ?? k.unitCode}</td>
@@ -388,24 +418,19 @@ export function ApprovalsPage() {
                             {k.kpiItems.length} indikator <ChevronDown size={12} style={{ transform: kmExpanded === k.id ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />
                           </button>
                         </td>
-                        <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                            {KM_STAGES.map((label, idx) => {
-                              const stage = idx + 1;
-                              const done = stage < k.currentStage;
-                              const current = stage === k.currentStage;
-                              return (
-                                <div key={stage} title={label} style={{
-                                  width: 22, height: 22, borderRadius: '50%', fontSize: 9, fontWeight: 700,
-                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                  background: done ? 'var(--color-success)' : current ? 'var(--color-accent)' : 'var(--color-surface-2)',
-                                  color: done || current ? '#fff' : 'var(--color-text-muted)',
-                                }}>
-                                  {done ? '✓' : stage}
-                                </div>
-                              );
-                            })}
-                            <span style={{ fontSize: 10, color: 'var(--color-text-muted)', marginLeft: 2 }}>{KM_STAGES[k.currentStage - 1]}</span>
+                        <td style={{ minWidth: 200 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 3 }}>
+                            {ksteps.map((_, idx) => (
+                              <div key={idx} title={ksteps[idx]?.label} style={{
+                                width: 16, height: 16, borderRadius: '50%', fontSize: 8, fontWeight: 700,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                background: idx < kci ? 'var(--color-success)' : idx === kci ? 'var(--color-accent)' : 'var(--color-surface-2)',
+                                color: idx <= kci ? '#fff' : 'var(--color-text-muted)',
+                              }}>{idx < kci ? '✓' : idx + 1}</div>
+                            ))}
+                          </div>
+                          <div style={{ fontSize: 10, color: 'var(--color-accent)', fontWeight: 600 }}>
+                            Langkah {kci}/{ksteps.length - 1}: {kk.stepLabel ?? ksteps[kci]?.label ?? '—'}
                           </div>
                         </td>
                         <td><SlaBadge days={(k as KontrakManajemen & { slaRemainingDays?: number }).slaRemainingDays} /></td>
@@ -424,14 +449,14 @@ export function ApprovalsPage() {
                               />
                               <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
                                 <button className="btn btn-sm" style={{ background: 'var(--color-success)', color: '#fff' }} disabled={kmBusy} onClick={() => handleKmReview(k.id, 'approve')}>
-                                  <CheckCircle size={12} /> {k.currentStage >= KM_FINAL_STAGE ? 'Setujui (Final)' : 'Setujui & Teruskan'}
+                                  <CheckCircle size={12} /> {kIsLast ? 'Setujui (Selesai → Bundle)' : 'Setujui & Teruskan'}
                                 </button>
-                                <button className="btn btn-sm" style={{ background: 'var(--color-danger)', color: '#fff' }} disabled={kmBusy} onClick={() => handleKmReview(k.id, 'reject', 'konseptor')} title="Kembalikan ke Staff untuk revisi isi (proses diulang dari Asman)">
+                                <button className="btn btn-sm" style={{ background: 'var(--color-danger)', color: '#fff' }} disabled={kmBusy} onClick={() => handleKmReview(k.id, 'reject', 'konseptor')} title="Kembalikan ke konseptor untuk revisi">
                                   <XCircle size={12} /> Kembalikan ke Konseptor
                                 </button>
-                                {k.currentStage >= 3 && (
-                                  <button className="btn btn-sm" style={{ background: 'var(--color-warning)', color: '#fff' }} disabled={kmBusy} onClick={() => handleKmReview(k.id, 'reject', 'previous')} title={`Kembalikan 1 tahap ke ${KM_STAGES[k.currentStage - 2]} untuk klarifikasi`}>
-                                    <XCircle size={12} /> Kembalikan ke {KM_STAGES[k.currentStage - 2]}
+                                {kci >= 2 && (
+                                  <button className="btn btn-sm" style={{ background: 'var(--color-warning)', color: '#fff' }} disabled={kmBusy} onClick={() => handleKmReview(k.id, 'reject', 'previous')}>
+                                    <XCircle size={12} /> Kembalikan ke {kPrev ?? 'langkah sebelumnya'}
                                   </button>
                                 )}
                                 <button className="btn btn-ghost btn-sm" onClick={() => { setKmTarget(null); setKmNote(''); }}>Batal</button>
@@ -472,9 +497,66 @@ export function ApprovalsPage() {
                         </tr>
                       )}
                     </Fragment>
-                  ))}
+                  );
+                  })}
                 </tbody>
               </table>
+            </div>
+          )}
+        </FoldCard>
+      )}
+
+      {/* Bundle Konsolidasi KM Tahunan — persetujuan akhir GM */}
+      {canReview && kmBundle && (
+        <FoldCard
+          accent="var(--color-accent)"
+          icon={<Layers size={14} />}
+          title={`Konsolidasi Kontrak Manajemen Tahunan${kmBundle.year ? ' — ' + kmBundle.year : ''}`}
+          right={<span className="status-pill" style={{ fontWeight: 700 }}>{kmBundle.readyCount}/{kmBundle.total} siap</span>}
+        >
+          <div className="table-wrap">
+            <table className="data-table compact">
+              <thead><tr><th>Unit</th><th>Bidang</th><th>Penyusun</th><th>Status</th></tr></thead>
+              <tbody>
+                {kmBundle.components.length === 0 && (
+                  <tr><td colSpan={4}><EmptyState title="Belum ada KM" message="Belum ada KM yang masuk konsolidasi tahun ini." /></td></tr>
+                )}
+                {kmBundle.components.map((c) => (
+                  <tr key={c.id}>
+                    <td style={{ fontWeight: 600 }}>{UNIT_NAMES[c.unitCode] ?? c.unitCode}</td>
+                    <td style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{c.bidang}</td>
+                    <td style={{ color: 'var(--color-text-muted)' }}>{c.submitter}</td>
+                    <td>
+                      <span className={`status-pill ${c.status === 'approved' ? 'completed' : c.status === 'ready' ? 'at-risk' : 'in-review'}`} style={{ fontSize: 10 }}>
+                        {c.status === 'ready' ? 'Siap (lolos SM RPC)' : c.status === 'approved' ? 'Disahkan GM' : c.status === 'submitted' ? 'Dalam proses review' : c.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {user?.role === 'GM' && kmBundle.status !== 'approved' && (
+            <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+              {!kmBundle.canApprove && kmBundle.total > 0 && (
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-warning)' }}>
+                  Belum semua KM "siap" — GM dapat mengesahkan setelah seluruh KM lolos hingga SM Perencanaan & PC.
+                </div>
+              )}
+              <textarea className="form-textarea" style={{ fontSize: 'var(--text-xs)', minHeight: 48 }} placeholder="Catatan pengesahan/penolakan bundle KM (wajib)" value={kmBundleNote} onChange={(e) => setKmBundleNote(e.target.value)} />
+              <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                <button className="btn btn-sm" style={{ background: 'var(--color-success)', color: '#fff' }} disabled={kmBundleBusy || !kmBundle.canApprove} onClick={() => handleKmBundleReview('approve')}>
+                  <CheckCircle size={12} /> Sahkan Seluruh KM (Final)
+                </button>
+                <button className="btn btn-sm" style={{ background: 'var(--color-danger)', color: '#fff' }} disabled={kmBundleBusy || kmBundle.total === 0} onClick={() => handleKmBundleReview('reject')}>
+                  <XCircle size={12} /> Kembalikan Seluruh Bundle
+                </button>
+              </div>
+            </div>
+          )}
+          {kmBundle.status === 'approved' && (
+            <div className="card-body" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-success)' }}>
+              ✓ Bundle KM tahun ini telah disahkan penuh oleh General Manager.
             </div>
           )}
         </FoldCard>

@@ -1,4 +1,6 @@
-import { Controller, Get, Post, Put, Patch, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Body, Param, Query, UseGuards, UseInterceptors, UploadedFiles, Res } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import type { Response } from 'express';
 import { InputRealisasiService } from './input-realisasi.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -67,6 +69,28 @@ export class InputRealisasiController {
   @Post(':id/review')
   review(@CurrentUser() user: User, @Param('id') id: string, @Body() dto: ReviewDto) {
     return this.svc.review(user, id, dto.action, dto.note, dto.returnTo);
+  }
+
+  // ===== Evidence (lampiran) =====
+  @Post(':id/evidence')
+  @UseInterceptors(FilesInterceptor('files', 5, { limits: { fileSize: 10 * 1024 * 1024 } }))
+  addEvidence(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @UploadedFiles() files: Array<{ originalname: string; buffer: Buffer; size: number; mimetype: string }>,
+  ) {
+    return this.svc.addEvidence(user, id, files);
+  }
+
+  @Get(':id/evidence/:fileId')
+  async downloadEvidence(@Param('id') id: string, @Param('fileId') fileId: string, @Res() res: Response) {
+    const f = await this.svc.getEvidenceFile(id, fileId);
+    return res.download(f.path, f.name);
+  }
+
+  @Delete(':id/evidence/:fileId')
+  deleteEvidence(@CurrentUser() user: User, @Param('id') id: string, @Param('fileId') fileId: string) {
+    return this.svc.deleteEvidence(user, id, fileId);
   }
 
   @Delete(':id')
