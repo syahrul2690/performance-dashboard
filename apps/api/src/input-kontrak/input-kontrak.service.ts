@@ -51,14 +51,23 @@ export class InputKontrakService {
     return this.prisma.kontrakManajemen.findUnique({ where: { id } });
   }
 
-  // Registri KM yang sudah DISETUJUI penuh (final oleh GM). Untuk arsip (Opsi A)
-  // dan acuan Input Realisasi per unit (Opsi B).
-  async getApproved(unitCode?: string, periodId?: string) {
+  // Registri KM yang sudah DISETUJUI penuh (final oleh GM).
+  // KM bersifat TAHUNAN: acuan realisasi dicocokkan per-tahun (bukan per-bulan),
+  // sehingga realisasi bulan apa pun pada tahun yg sama memakai KM tahun itu.
+  async getApproved(unitCode?: string, year?: string) {
+    let periodIdsInYear: string[] | undefined;
+    if (year) {
+      const periods = await this.prisma.period.findMany({
+        where: { yearMonth: { startsWith: `${year}-` } },
+        select: { id: true },
+      });
+      periodIdsInYear = periods.map((p) => p.id);
+    }
     return this.prisma.kontrakManajemen.findMany({
       where: {
         status: 'approved',
         ...(unitCode ? { unitCode } : {}),
-        ...(periodId ? { periodId } : {}),
+        ...(periodIdsInYear ? { periodId: { in: periodIdsInYear } } : {}),
       },
       orderBy: [{ unitCode: 'asc' }, { reviewedAt: 'desc' }],
     });
@@ -74,6 +83,8 @@ export class InputKontrakService {
     holder: string,
     kpiItems: object,
   ) {
+    // Hanya Kantor Induk yang membuat KM (termasuk KM untuk UPMK). UPMK hanya mengisi realisasi.
+    if (user.unit !== 'KP') throw new ForbiddenException('Kontrak Manajemen hanya dapat dibuat oleh Kantor Induk');
     const period = await this.prisma.period.findFirst({ where: { isActive: true } });
     if (!period) throw new BadRequestException('Tidak ada periode aktif');
 
@@ -132,6 +143,7 @@ export class InputKontrakService {
 
   // Submit untuk review → masuk tahap 2 (Asman), notifikasi ke Asman.
   async submit(user: User, id: string) {
+    if (user.unit !== 'KP') throw new ForbiddenException('Kontrak Manajemen hanya dapat dikirim oleh Kantor Induk');
     const kontrak = await this.prisma.kontrakManajemen.findUnique({ where: { id } });
     if (!kontrak) throw new NotFoundException('Kontrak tidak ditemukan');
 

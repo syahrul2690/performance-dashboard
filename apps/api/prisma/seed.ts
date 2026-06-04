@@ -306,6 +306,21 @@ async function main() {
       currentStage: 2,
       submitter: 'Staff Officer',
     },
+    {
+      // KM UPMK disusun Kantor Induk, di-tag ke bidang KI terkait (OMP) — acuan realisasi UPMK I.
+      unitCode: 'UPMK1',
+      bidang: 'Operasi Manajemen Proyek',
+      holder: 'MUP UPMK I',
+      kpiItems: [
+        { indikator: 'Kapasitas Pembangkit COD', target: '1200', satuan: 'MW', bobot: '30' },
+        { indikator: 'Transmisi Baru Beroperasi', target: '450', satuan: 'KMS', bobot: '25' },
+        { indikator: 'GI Baru COD', target: '2400', satuan: 'MVA', bobot: '25' },
+        { indikator: '% Konstruksi Tepat Waktu', target: '85', satuan: '%', bobot: '20' },
+      ],
+      status: 'approved',
+      currentStage: 5,
+      submitter: 'Staff Officer',
+    },
   ];
 
   const staffUser = await prisma.user.findFirst({ where: { role: Role.STAFF } });

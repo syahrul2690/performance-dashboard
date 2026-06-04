@@ -39,8 +39,8 @@ export class InputKontrakController {
   }
 
   @Get('approved')
-  approved(@Query('unitCode') unitCode?: string, @Query('periodId') periodId?: string) {
-    return this.svc.getApproved(unitCode, periodId);
+  approved(@Query('unitCode') unitCode?: string, @Query('year') year?: string) {
+    return this.svc.getApproved(unitCode, year);
   }
 
   @Get(':id')

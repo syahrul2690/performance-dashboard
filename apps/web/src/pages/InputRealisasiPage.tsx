@@ -65,9 +65,11 @@ export function InputRealisasiPage() {
     if (!selectedPeriodId) return;
     const loadData = async () => {
       try {
+        // KM bersifat tahunan → acuan realisasi ditarik per TAHUN dari periode terpilih.
+        const selectedYear = periods.find((p) => p.id === selectedPeriodId)?.yearMonth?.slice(0, 4);
         const [histRes, approvedRes] = await Promise.allSettled([
           inputRealisasi.history(selectedUnit, selectedPeriodId),
-          inputKontrak.approved(selectedUnit, selectedPeriodId),
+          inputKontrak.approved(selectedUnit, selectedYear),
         ]);
         if (histRes.status === 'fulfilled') setHistory(histRes.value as unknown[]);
         if (approvedRes.status === 'fulfilled') {

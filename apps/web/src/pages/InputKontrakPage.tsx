@@ -234,6 +234,8 @@ export function InputKontrakPage() {
 
   const draftCount = kontrakList.filter((k) => k.status === 'draft').length;
   const submittedCount = kontrakList.filter((k) => k.status === 'submitted').length;
+  // Hanya Kantor Induk yang boleh membuat KM (termasuk KM untuk UPMK). UPMK hanya mengisi realisasi.
+  const canCreateKm = user?.unit === 'KP';
 
   return (
     <div className="page input-kontrak-page">
@@ -267,15 +269,19 @@ export function InputKontrakPage() {
             style={{ display: 'none' }}
             onChange={handleUpload}
           />
-          <button className="btn btn-ghost" onClick={handleDownloadTemplate} title="Unduh template Excel">
-            <Download size={16} /> Template
-          </button>
-          <button className="btn btn-ghost" onClick={() => fileRef.current?.click()} disabled={submitting} title="Format: .xlsx/.xls/.csv dengan kolom Indikator Kinerja, Formula, Satuan, Bobot, Target Semester I, Target tahun">
-            <Upload size={16} /> Upload Excel
-          </button>
-          <button className="btn btn-primary" onClick={() => { resetForm(); setShowForm(true); }} disabled={showForm}>
-            <Plus size={16} /> Tambah Kontrak
-          </button>
+          {canCreateKm && (
+            <>
+              <button className="btn btn-ghost" onClick={handleDownloadTemplate} title="Unduh template Excel">
+                <Download size={16} /> Template
+              </button>
+              <button className="btn btn-ghost" onClick={() => fileRef.current?.click()} disabled={submitting} title="Format: .xlsx/.xls/.csv dengan kolom Indikator Kinerja, Formula, Satuan, Bobot, Target Semester I, Target tahun">
+                <Upload size={16} /> Upload Excel
+              </button>
+              <button className="btn btn-primary" onClick={() => { resetForm(); setShowForm(true); }} disabled={showForm}>
+                <Plus size={16} /> Tambah Kontrak
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -292,8 +298,15 @@ export function InputKontrakPage() {
         </div>
       )}
 
+      {/* Catatan untuk unit non-Kantor Induk (UPMK): KM disusun oleh Kantor Induk */}
+      {!canCreateKm && (
+        <div className="status-banner" style={{ marginBottom: 'var(--space-4)', background: 'var(--color-surface-2)' }}>
+          <AlertCircle size={16} /> Kontrak Manajemen disusun & diajukan oleh Kantor Induk. Unit Anda cukup mengisi <strong>Input Realisasi Bulanan</strong> terhadap KM yang sudah disahkan.
+        </div>
+      )}
+
       {/* Form */}
-      {showForm && (
+      {canCreateKm && showForm && (
         <div className="card" style={{ marginBottom: 'var(--space-6)', borderLeft: '4px solid var(--color-warning)' }}>
           <div className="card-header compact">
             <div className="card-title"><Edit2 size={14} />{editingId ? 'Edit Kontrak' : 'Kontrak Baru'}</div>
