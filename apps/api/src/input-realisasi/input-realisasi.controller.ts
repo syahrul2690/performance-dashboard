@@ -22,6 +22,12 @@ class UpdateValuesDto {
   @IsObject() values: Record<string, unknown>;
 }
 
+class BundleReviewDto {
+  @IsIn(['approve', 'reject']) action: 'approve' | 'reject';
+  @IsString() note: string;
+  @IsOptional() @IsString() periodId?: string;
+}
+
 @UseGuards(JwtAuthGuard)
 @Controller('input-realisasi')
 export class InputRealisasiController {
@@ -35,6 +41,17 @@ export class InputRealisasiController {
   @Get('review/list')
   reviewList(@CurrentUser() user: User) {
     return this.svc.getReviewList(user);
+  }
+
+  // Bundle periode (deklarasikan sebelum rute :id agar tidak tertangkap param)
+  @Get('bundle')
+  bundle(@Query('periodId') periodId?: string) {
+    return this.svc.getBundle(periodId);
+  }
+
+  @Post('bundle/review')
+  reviewBundle(@CurrentUser() user: User, @Body() dto: BundleReviewDto) {
+    return this.svc.reviewBundle(user, dto.action, dto.note, dto.periodId);
   }
 
   @Put('submit')

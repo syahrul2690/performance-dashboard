@@ -14,13 +14,10 @@ type KpiItem = {
 };
 
 const STATUS_LABEL: Record<string, string> = {
-  draft: 'Draft', submitted: 'Menunggu Review', approved: 'Disetujui', rejected: 'Dikembalikan',
+  draft: 'Draft', submitted: 'Menunggu Review', ready: 'Siap Konsolidasi (GM)', approved: 'Disetujui', rejected: 'Dikembalikan',
 };
 const STATUS_PILL: Record<string, string> = {
-  draft: 'in-review', submitted: 'needs-revision', approved: 'completed', rejected: 'delayed',
-};
-const STAGE_LABEL: Record<number, string> = {
-  2: 'Asisten Manajer', 3: 'Manajer Bidang', 4: 'Senior Manajer', 5: 'General Manager',
+  draft: 'in-review', submitted: 'needs-revision', ready: 'at-risk', approved: 'completed', rejected: 'delayed',
 };
 
 // Unit yang bisa mengisi realisasi: Kantor Induk + 5 UPMK
@@ -295,7 +292,8 @@ export function InputRealisasiPage() {
                 {history.map((h, i) => {
                   const item = h as Record<string, unknown>;
                   const status = String(item.status ?? '');
-                  const stage = Number(item.currentStage ?? 0);
+                  const itemSteps = (item.steps as { label?: string }[] | undefined) ?? [];
+                  const stepLabel = itemSteps[Number(item.currentStepIndex ?? 0)]?.label;
                   const canDelete = status !== 'approved'
                     && (item.submitterId === user?.id || user?.role === 'GM');
                   return (
@@ -307,8 +305,8 @@ export function InputRealisasiPage() {
                         <span className={`status-pill ${STATUS_PILL[status] ?? 'in-review'}`} style={{ fontSize: 10 }}>
                           {STATUS_LABEL[status] ?? status}
                         </span>
-                        {status === 'submitted' && STAGE_LABEL[stage] && (
-                          <div style={{ fontSize: 10, color: 'var(--color-text-muted)', marginTop: 2 }}>di {STAGE_LABEL[stage]}</div>
+                        {status === 'submitted' && stepLabel && (
+                          <div style={{ fontSize: 10, color: 'var(--color-text-muted)', marginTop: 2 }}>di {stepLabel}</div>
                         )}
                         {status === 'rejected' && item.reviewNote ? (
                           <div style={{ fontSize: 10, color: 'var(--color-danger)', marginTop: 2, maxWidth: 240 }}>{item.reviewNote as string}</div>

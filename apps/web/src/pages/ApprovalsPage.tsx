@@ -2,9 +2,10 @@ import { useEffect, useState, Fragment, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { approvals as approvalsApi, inputKontrak, inputRealisasi, meta as metaApi } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { usePeriod } from '../context/PeriodContext';
 import { useNotif } from '../context/NotifContext';
 import type { Report, KontrakManajemen, RealisasiKinerja } from '../lib/types';
-import { CheckCircle, XCircle, Clock, CalendarClock, FileText, UsersRound, FileSignature, ChevronDown, ClipboardCheck, Timer, MessageSquare, Pencil } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, CalendarClock, FileText, UsersRound, FileSignature, ChevronDown, ClipboardCheck, Timer, MessageSquare, Pencil, Layers } from 'lucide-react';
 import { SkeletonTable, EmptyState, ErrorState } from '../components/LoadState';
 
 // Badge SLA approval (Task 6): hari tersisa hingga deadline tahap berjalan.
@@ -146,6 +147,19 @@ export function ApprovalsPage() {
   // Task 4: ekspansi riwayat komentar pada kartu "Semua Dokumen Persetujuan".
   const [docExpanded, setDocExpanded] = useState<string | null>(null);
 
+  // B4: Bundle konsolidasi realisasi periode (persetujuan GM sekali).
+  const { periodId } = usePeriod();
+  type BundleData = {
+    period?: { label?: string } | null; status: string; total: number; readyCount: number; canApprove: boolean;
+    components: Array<{ id: string; unitCode: string; bidang: string; status: string; submitter: string }>;
+  };
+  const [bundle, setBundle] = useState<BundleData | null>(null);
+  const [bundleNote, setBundleNote] = useState('');
+  const [bundleBusy, setBundleBusy] = useState(false);
+  const loadBundle = () => {
+    inputRealisasi.bundle(periodId || undefined).then((d) => setBundle(d as BundleData)).catch(() => {});
+  };
+
   const load = () => {
     approvalsApi.reports()
       .then(setReports)
@@ -177,6 +191,21 @@ export function ApprovalsPage() {
   };
 
   useEffect(() => { load(); loadKm(); loadReal(); loadDocs(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { loadBundle(); }, [periodId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleBundleReview = async (action: 'approve' | 'reject') => {
+    if (!bundleNote.trim()) { alert('Catatan/komentar wajib diisi'); return; }
+    setBundleBusy(true);
+    try {
+      await inputRealisasi.reviewBundle(action, bundleNote, periodId || undefined);
+      setBundleNote('');
+      loadBundle(); loadReal(); refreshNotif();
+    } catch (e) {
+      alert((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Gagal memproses bundle');
+    } finally {
+      setBundleBusy(false);
+    }
+  };
 
   // Saat tiba dari notifikasi: tentukan kartu yang di-highlight & scroll ke sana.
   // Prioritas: Realisasi Kinerja Bulanan; fallback ke Usulan KM yang menunggu.
@@ -481,6 +510,12 @@ export function ApprovalsPage() {
                 <tbody>
                   {realList.map((rl) => {
                     const entries = Object.values(rl.values ?? {});
+                    const rr = rl as RealisasiKinerja & { steps?: { label: string }[]; currentStepIndex?: number; stepLabel?: string };
+                    const steps = rr.steps ?? [];
+                    const ci = rr.currentStepIndex ?? 0;
+                    const stepCount = steps.length;
+                    const isLastStep = ci >= stepCount - 1;
+                    const prevLabel = steps[ci - 1]?.label;
                     return (
                       <Fragment key={rl.id}>
                         <tr>
@@ -492,22 +527,19 @@ export function ApprovalsPage() {
                               {entries.length} indikator <ChevronDown size={12} style={{ transform: realExpanded === rl.id ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />
                             </button>
                           </td>
-                          <td>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                              {KM_STAGES.map((label, idx) => {
-                                const stage = idx + 1;
-                                const done = stage < rl.currentStage;
-                                const current = stage === rl.currentStage;
-                                return (
-                                  <div key={stage} title={label} style={{
-                                    width: 22, height: 22, borderRadius: '50%', fontSize: 9, fontWeight: 700,
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    background: done ? 'var(--color-success)' : current ? 'var(--color-info)' : 'var(--color-surface-2)',
-                                    color: done || current ? '#fff' : 'var(--color-text-muted)',
-                                  }}>{done ? '✓' : stage}</div>
-                                );
-                              })}
-                              <span style={{ fontSize: 10, color: 'var(--color-text-muted)', marginLeft: 2 }}>{KM_STAGES[rl.currentStage - 1]}</span>
+                          <td style={{ minWidth: 200 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 3 }}>
+                              {steps.map((_, idx) => (
+                                <div key={idx} title={steps[idx]?.label} style={{
+                                  width: 16, height: 16, borderRadius: '50%', fontSize: 8, fontWeight: 700,
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  background: idx < ci ? 'var(--color-success)' : idx === ci ? 'var(--color-info)' : 'var(--color-surface-2)',
+                                  color: idx <= ci ? '#fff' : 'var(--color-text-muted)',
+                                }}>{idx < ci ? '✓' : idx + 1}</div>
+                              ))}
+                            </div>
+                            <div style={{ fontSize: 10, color: 'var(--color-info)', fontWeight: 600 }}>
+                              Langkah {ci}/{stepCount - 1}: {rr.stepLabel ?? steps[ci]?.label ?? '—'}
                             </div>
                           </td>
                           <td><SlaBadge days={(rl as RealisasiKinerja & { slaRemainingDays?: number }).slaRemainingDays} /></td>
@@ -526,14 +558,14 @@ export function ApprovalsPage() {
                                 />
                                 <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
                                   <button className="btn btn-sm" style={{ background: 'var(--color-success)', color: '#fff' }} disabled={realBusy} onClick={() => handleRealReview(rl.id, 'approve')}>
-                                    <CheckCircle size={12} /> {rl.currentStage >= KM_FINAL_STAGE ? 'Setujui (Final)' : 'Setujui & Teruskan'}
+                                    <CheckCircle size={12} /> {isLastStep ? 'Setujui (Selesai → Bundle)' : 'Setujui & Teruskan'}
                                   </button>
                                   <button className="btn btn-sm" style={{ background: 'var(--color-danger)', color: '#fff' }} disabled={realBusy} onClick={() => handleRealReview(rl.id, 'reject', 'konseptor')}>
                                     <XCircle size={12} /> Kembalikan ke Konseptor
                                   </button>
-                                  {rl.currentStage >= 3 && (
+                                  {ci >= 2 && (
                                     <button className="btn btn-sm" style={{ background: 'var(--color-warning)', color: '#fff' }} disabled={realBusy} onClick={() => handleRealReview(rl.id, 'reject', 'previous')}>
-                                      <XCircle size={12} /> Kembalikan ke {KM_STAGES[rl.currentStage - 2]}
+                                      <XCircle size={12} /> Kembalikan ke {prevLabel ?? 'langkah sebelumnya'}
                                     </button>
                                   )}
                                   <button className="btn btn-ghost btn-sm" onClick={() => { setRealTarget(null); setRealNote(''); }}>Batal</button>
@@ -604,6 +636,70 @@ export function ApprovalsPage() {
                   })}
                 </tbody>
               </table>
+            </div>
+          )}
+        </FoldCard>
+      )}
+
+      {/* Bundle Konsolidasi Realisasi — persetujuan akhir GM (sekali untuk seluruh periode) */}
+      {canReview && bundle && (
+        <FoldCard
+          accent="var(--color-brand, #125D72)"
+          icon={<Layers size={14} />}
+          title={`Konsolidasi Realisasi Periode${bundle.period?.label ? ' — ' + bundle.period.label : ''}`}
+          right={<span className="status-pill" style={{ fontWeight: 700 }}>{bundle.readyCount}/{bundle.total} siap</span>}
+        >
+          <div className="table-wrap">
+            <table className="data-table compact">
+              <thead>
+                <tr><th>Unit</th><th>Bidang</th><th>Penyusun</th><th>Status</th></tr>
+              </thead>
+              <tbody>
+                {bundle.components.length === 0 && (
+                  <tr><td colSpan={4}><EmptyState title="Belum ada realisasi" message="Belum ada realisasi yang masuk konsolidasi periode ini." /></td></tr>
+                )}
+                {bundle.components.map((c) => (
+                  <tr key={c.id}>
+                    <td style={{ fontWeight: 600 }}>{UNIT_NAMES[c.unitCode] ?? c.unitCode}</td>
+                    <td style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{c.bidang}</td>
+                    <td style={{ color: 'var(--color-text-muted)' }}>{c.submitter}</td>
+                    <td>
+                      <span className={`status-pill ${c.status === 'approved' ? 'completed' : c.status === 'ready' ? 'at-risk' : 'in-review'}`} style={{ fontSize: 10 }}>
+                        {c.status === 'ready' ? 'Siap (lolos SM RPC)' : c.status === 'approved' ? 'Disetujui GM' : c.status === 'submitted' ? 'Dalam proses review' : c.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {user?.role === 'GM' && bundle.status !== 'approved' && (
+            <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+              {!bundle.canApprove && bundle.total > 0 && (
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-warning)' }}>
+                  Belum semua komponen "siap" — GM dapat menyetujui setelah seluruh realisasi lolos hingga SM Perencanaan & PC.
+                </div>
+              )}
+              <textarea
+                className="form-textarea"
+                style={{ fontSize: 'var(--text-xs)', minHeight: 48 }}
+                placeholder="Catatan persetujuan/penolakan bundle (wajib)"
+                value={bundleNote}
+                onChange={(e) => setBundleNote(e.target.value)}
+              />
+              <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                <button className="btn btn-sm" style={{ background: 'var(--color-success)', color: '#fff' }} disabled={bundleBusy || !bundle.canApprove} onClick={() => handleBundleReview('approve')}>
+                  <CheckCircle size={12} /> Setujui Seluruh Bundle (Final)
+                </button>
+                <button className="btn btn-sm" style={{ background: 'var(--color-danger)', color: '#fff' }} disabled={bundleBusy || bundle.total === 0} onClick={() => handleBundleReview('reject')}>
+                  <XCircle size={12} /> Kembalikan Seluruh Bundle
+                </button>
+              </div>
+            </div>
+          )}
+          {bundle.status === 'approved' && (
+            <div className="card-body" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-success)' }}>
+              ✓ Bundle periode ini telah disetujui penuh oleh General Manager.
             </div>
           )}
         </FoldCard>

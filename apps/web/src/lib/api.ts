@@ -134,6 +134,10 @@ export const inputRealisasi = {
     api.patch(`/input-realisasi/${id}/values`, { values }).then((r) => r.data),
   delete: (id: string) =>
     api.delete(`/input-realisasi/${id}`).then((r) => r.data),
+  bundle: (periodId?: string) =>
+    api.get('/input-realisasi/bundle', { params: { periodId } }).then((r) => r.data),
+  reviewBundle: (action: 'approve' | 'reject', note: string, periodId?: string) =>
+    api.post('/input-realisasi/bundle/review', { action, note, periodId }).then((r) => r.data),
 };
 
 export const inputKontrak = {

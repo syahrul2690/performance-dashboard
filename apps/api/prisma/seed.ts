@@ -130,6 +130,30 @@ async function main() {
     console.log('  users bidang:', bidang);
   }
 
+  // User UPMK (Staff Kinerja / ASMAN / MUP-Manajer) per UPMK I–V untuk alur realisasi UPMK.
+  const UPMK_CODES = ['UPMK1', 'UPMK2', 'UPMK3', 'UPMK4', 'UPMK5'];
+  const UPMK_ROLES: Array<{ key: string; role: Role; label: string }> = [
+    { key: 'staff', role: Role.STAFF, label: 'Staff Kinerja' },
+    { key: 'asman', role: Role.ASMAN, label: 'ASMAN' },
+    { key: 'manajer', role: Role.MANAJER, label: 'MUP' },
+  ];
+  for (const code of UPMK_CODES) {
+    const slug = code.toLowerCase();
+    for (const r of UPMK_ROLES) {
+      const email = `${r.key}.${slug}@pusmanpro.pln.co.id`;
+      const variant = await prisma.roleVariant.findUnique({ where: { code: REP_VARIANT[r.key] } });
+      await prisma.user.upsert({
+        where: { email },
+        update: { unit: code, bidang: null, roleVariantId: variant?.id ?? null },
+        create: {
+          email, name: `${r.label} ${code}`, role: r.role, unit: code, bidang: null,
+          passwordHash: hash, isActive: true, roleVariantId: variant?.id ?? null, prefs: { create: {} },
+        },
+      });
+    }
+    console.log('  users upmk:', code);
+  }
+
   // Periode — 12 bulan tahun berjalan 2026. Aktif = Februari 2026 (selaras snapshot domain).
   const BULAN_ID = [
     'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',

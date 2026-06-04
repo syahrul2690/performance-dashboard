@@ -233,8 +233,10 @@ model InputRealisasi {
   submitter    String
   submitterId  String?
   values       Json
-  status       String    @default("draft") // draft | submitted | approved | rejected
-  currentStage Int       @default(1) // 1=Staff 2=Asman 3=Manajer 4=Sr.Manajer 5=GM (final)
+  status       String    @default("draft") // draft | submitted | ready | approved | rejected
+  currentStage Int       @default(1) // legacy; kini = currentStepIndex
+  steps        Json      @default("[]") // template langkah alur (urut) — mesin alur multi-segmen
+  currentStepIndex Int   @default(0)    // pointer ke langkah berjalan dalam `steps`
   history      Json      @default("[]")
   reviewer     String?
   reviewNote   String?
@@ -244,6 +246,22 @@ model InputRealisasi {
 
   @@unique([periodId, unitCode, bidang])
   @@map("input_realisasi")
+}
+
+// Dokumen konsolidasi realisasi per periode — dikumpulkan sistem dari semua
+// slice realisasi (semua bidang KI + semua UPMK) yang sudah lolos sampai SM RPC,
+// lalu disetujui SEKALI oleh General Manager.
+model RealisasiBundle {
+  id         String    @id @default(cuid())
+  periodId   String    @unique
+  status     String    @default("open") // open | approved | rejected
+  reviewer   String?
+  reviewNote String?
+  reviewedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@map("realisasi_bundles")
 }
 
 model Notification {
