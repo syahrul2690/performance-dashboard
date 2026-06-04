@@ -235,8 +235,12 @@ export function InputKontrakPage() {
   // Hanya Kantor Induk yang boleh membuat KM (termasuk KM untuk UPMK). UPMK hanya mengisi realisasi.
   const canCreateKm = user?.unit === 'KP';
   // Tampilkan KM sesuai bidang user saja (GM / tanpa bidang = semua bidang).
+  // Role konsolidasi RPC (SO RPC, Manajer Perencanaan, SM RPC) boleh melihat KM lintas bidang & UPMK.
   const myBidang = user?.bidang ?? null;
-  const scopeAllBidang = user?.role === 'GM' || !myBidang;
+  const vc = user?.roleVariant?.code;
+  const isRpcKonsolidasi = vc === 'man_perencanaan' || vc === 'sm_pc'
+    || (user?.role === 'STAFF' && myBidang === 'Perencanaan & Project Control');
+  const scopeAllBidang = user?.role === 'GM' || isRpcKonsolidasi || !myBidang;
   const visibleKontrak = scopeAllBidang ? kontrakList : kontrakList.filter((k) => k.bidang === myBidang);
   const visibleApproved = scopeAllBidang ? approvedList : approvedList.filter((k) => k.bidang === myBidang);
   const draftCount = visibleKontrak.filter((k) => k.status === 'draft').length;

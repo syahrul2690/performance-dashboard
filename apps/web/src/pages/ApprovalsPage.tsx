@@ -329,9 +329,13 @@ export function ApprovalsPage() {
   if (error) return <ErrorState title="Gagal memuat laporan" message={error} />;
 
   // B2-4: dokumen di-scope ke bidang user (GM / tanpa bidang = lintas-bidang).
+  // Role konsolidasi RPC (SO RPC, Manajer Perencanaan, SM RPC) boleh melihat lintas bidang & UPMK.
   const isGM = user?.role === 'GM';
   const myBidang = user?.bidang ?? null;
-  const scopeByBidang = isGM || !myBidang;
+  const vc = user?.roleVariant?.code;
+  const isRpcKonsolidasi = vc === 'man_perencanaan' || vc === 'sm_pc'
+    || (user?.role === 'STAFF' && myBidang === 'Perencanaan & Project Control');
+  const scopeByBidang = isGM || isRpcKonsolidasi || !myBidang;
   const scopeKm = scopeByBidang ? allKm : allKm.filter((k) => k.bidang === myBidang);
   const scopeReal = scopeByBidang ? allReal : allReal.filter((r) => (r as RealisasiKinerja & { bidang?: string }).bidang === myBidang);
 
