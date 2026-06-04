@@ -57,79 +57,51 @@ async function main() {
   console.log('  role_variants:', extra.roleVariants.length);
 
   // 4 Bidang baku PUSMANPRO (Kantor Induk)
-  const BIDANG_LIST = [
-    'Operasi Manajemen Proyek',
-    'QA/QC',
-    'Perencanaan & Project Control',
-    'Keuangan, Komunikasi & Umum',
-  ];
-  const BIDANG_SLUG: Record<string, string> = {
-    'Operasi Manajemen Proyek': 'omp',
-    'QA/QC': 'qaqc',
-    'Perencanaan & Project Control': 'rpc',
-    'Keuangan, Komunikasi & Umum': 'kku',
-  };
+  const OMP = 'Operasi Manajemen Proyek';
+  const QAQC = 'QA/QC';
+  const RPC = 'Perencanaan & Project Control';
+  const KKU = 'Keuangan, Komunikasi & Umum';
 
-  // Users — one per role from ROLES constant (generik). Non-GM diberi bidang OMP
-  // agar fungsional; GM lintas-bidang (bidang = null).
-  for (const [roleKey, info] of Object.entries(ROLES)) {
-    const email = info.email || `${roleKey}@pusmanpro.pln.co.id`;
-    const variant = await prisma.roleVariant.findUnique({
-      where: { code: REP_VARIANT[roleKey] },
-    });
-    const bidang = roleKey === 'gm' ? null : BIDANG_LIST[0];
+  const variantId = async (code: string) => (await prisma.roleVariant.findUnique({ where: { code } }))?.id ?? null;
+  const upsertUser = async (slug: string, name: string, role: Role, bidang: string | null, variantCode: string, unit = 'KP') => {
+    const email = `${slug}@pusmanpro.pln.co.id`;
+    const rvId = await variantId(variantCode);
     await prisma.user.upsert({
       where: { email },
-      update: { roleVariantId: variant?.id ?? null, bidang },
-      create: {
-        email,
-        name: info.name,
-        role: ROLE_MAP[roleKey],
-        unit: info.unit || 'KP',
-        bidang,
-        passwordHash: hash,
-        isActive: true,
-        roleVariantId: variant?.id ?? null,
-        prefs: { create: {} },
-      },
+      update: { name, role, bidang, unit, roleVariantId: rvId },
+      create: { email, name, role, unit, bidang, passwordHash: hash, isActive: true, roleVariantId: rvId, prefs: { create: {} } },
     });
-    console.log('  user:', email, ROLE_MAP[roleKey], bidang ?? 'lintas-bidang');
-  }
+  };
 
-  // User demo per bidang (staff/asman/manajer/srmanajer) untuk demo gating
-  // lintas-bidang. Bidang OMP sudah diwakili user generik di atas.
-  // Bidang selain OMP TIDAK memiliki lapisan ASMAN (sesuai struktur PUSMANPRO):
-  // alurnya Staff → Manajer → SM. ASMAN hanya ada di OMP (diwakili user generik 'asman@').
-  const PER_BIDANG_ROLES: Array<{ key: string; role: Role; label: string }> = [
-    { key: 'staff', role: Role.STAFF, label: 'Staff' },
-    { key: 'manajer', role: Role.MANAJER, label: 'Manajer' },
-    { key: 'srmanajer', role: Role.SRMANAJER, label: 'Senior Manajer' },
+  // Akun Kantor Induk per JABATAN (sesuai pendetailan rantai per bidang).
+  const KI_USERS: Array<[string, string, Role, string, string]> = [
+    // OMP
+    ['staff.officer', 'Staff Kinerja OMP', Role.STAFF, OMP, 'staff_general'],
+    ['asman.em.omp', 'ASMAN Elektromekanik', Role.ASMAN, OMP, 'asman_elektromekanik'],
+    ['asman.jr.omp', 'ASMAN Jaringan', Role.ASMAN, OMP, 'asman_jaringan'],
+    ['man.pembangkit.omp', 'Manajer Operasi Proyek Pembangkit', Role.MANAJER, OMP, 'man_operasi_pembangkit'],
+    ['man.jaringan.omp', 'Manajer Operasi Proyek Jaringan', Role.MANAJER, OMP, 'man_operasi_jaringan'],
+    ['sm.omp', 'SM Operasi Manajemen Proyek', Role.SRMANAJER, OMP, 'sm_omp'],
+    // QA/QC
+    ['staff.qaqc', 'Staff Kinerja QA/QC', Role.STAFF, QAQC, 'staff_general'],
+    ['man.qaqc.pembangkit', 'Manajer QA/QC Pembangkit', Role.MANAJER, QAQC, 'man_qaqc_pembangkit'],
+    ['man.qaqc.jaringan', 'Manajer QA/QC Jaringan', Role.MANAJER, QAQC, 'man_qaqc_jaringan'],
+    ['sm.qaqc', 'SM QA/QC', Role.SRMANAJER, QAQC, 'sm_qaqc'],
+    // RPC (Perencanaan & Project Control)
+    ['staff.rpc', 'Staff Kinerja RPC', Role.STAFF, RPC, 'staff_general'],
+    ['man.pc', 'Manajer Project Control', Role.MANAJER, RPC, 'man_project_control'],
+    ['man.perencanaan', 'Manajer Perencanaan', Role.MANAJER, RPC, 'man_perencanaan'],
+    ['sm.rpc', 'SM Perencanaan & Project Control', Role.SRMANAJER, RPC, 'sm_pc'],
+    // KKU
+    ['staff.kku', 'Staff Kinerja KKU', Role.STAFF, KKU, 'staff_general'],
+    ['man.keuangan', 'Manajer Keuangan', Role.MANAJER, KKU, 'man_keuangan'],
+    ['man.akuntansi', 'Manajer Akuntansi', Role.MANAJER, KKU, 'man_akuntansi'],
+    ['man.aset', 'Manajer Aset & Properti', Role.MANAJER, KKU, 'man_aset_properti'],
+    ['sm.kku', 'SM Keuangan, Komunikasi & Umum', Role.SRMANAJER, KKU, 'sm_kku'],
   ];
-  for (const bidang of BIDANG_LIST.slice(1)) {
-    const slug = BIDANG_SLUG[bidang];
-    for (const r of PER_BIDANG_ROLES) {
-      const email = `${r.key}.${slug}@pusmanpro.pln.co.id`;
-      const variant = await prisma.roleVariant.findUnique({
-        where: { code: REP_VARIANT[r.key] },
-      });
-      await prisma.user.upsert({
-        where: { email },
-        update: { bidang, roleVariantId: variant?.id ?? null },
-        create: {
-          email,
-          name: `${r.label} ${bidang}`,
-          role: r.role,
-          unit: 'KP',
-          bidang,
-          passwordHash: hash,
-          isActive: true,
-          roleVariantId: variant?.id ?? null,
-          prefs: { create: {} },
-        },
-      });
-    }
-    console.log('  users bidang:', bidang);
-  }
+  for (const [slug, name, role, bidang, vc] of KI_USERS) await upsertUser(slug, name, role, bidang, vc);
+  await upsertUser('gm', 'General Manager PUSMANPRO', Role.GM, null, 'gm_pusmanpro');
+  console.log('  KI users per jabatan:', KI_USERS.length + 1);
 
   // User UPMK (Staff Kinerja / ASMAN / MUP-Manajer) per UPMK I–V untuk alur realisasi UPMK.
   const UPMK_CODES = ['UPMK1', 'UPMK2', 'UPMK3', 'UPMK4', 'UPMK5'];
@@ -326,9 +298,9 @@ async function main() {
         { indikator: 'Efisiensi Biaya Operasional', target: '85', satuan: '%', bobot: '35' },
         { indikator: 'Realisasi Anggaran', target: '90', satuan: '%', bobot: '30' },
       ],
-      // Menunggu review Asman → demo gating approval per-bidang.
-      status: 'submitted',
-      currentStage: 2,
+      // Draft → PIC KKU bisa men-submit untuk memulai alur jabatan baru.
+      status: 'draft',
+      currentStage: 1,
       submitter: 'Staff Officer',
     },
     {

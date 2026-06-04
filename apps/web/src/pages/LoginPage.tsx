@@ -16,34 +16,40 @@ const DEMO_GROUPS: Array<{ label: string; accounts: Array<{ role: string; email:
   {
     label: 'KI — Operasi Manajemen Proyek (OMP)',
     accounts: [
-      { role: 'Staff Officer', email: 'staff.officer@pusmanpro.pln.co.id' },
-      { role: 'ASMAN', email: 'asman@pusmanpro.pln.co.id' },
-      { role: 'Manajer', email: 'manajer@pusmanpro.pln.co.id' },
-      { role: 'Senior Manajer', email: 'srmanajer@pusmanpro.pln.co.id' },
+      { role: 'Staff/PIC Kinerja', email: 'staff.officer@pusmanpro.pln.co.id' },
+      { role: 'ASMAN Elektromekanik', email: 'asman.em.omp@pusmanpro.pln.co.id' },
+      { role: 'ASMAN Jaringan', email: 'asman.jr.omp@pusmanpro.pln.co.id' },
+      { role: 'Manajer Operasi Pembangkit', email: 'man.pembangkit.omp@pusmanpro.pln.co.id' },
+      { role: 'Manajer Operasi Jaringan', email: 'man.jaringan.omp@pusmanpro.pln.co.id' },
+      { role: 'Senior Manajer OMP', email: 'sm.omp@pusmanpro.pln.co.id' },
     ],
   },
   {
     label: 'KI — QA/QC',
     accounts: [
-      { role: 'Staff Officer', email: 'staff.qaqc@pusmanpro.pln.co.id' },
-      { role: 'Manajer', email: 'manajer.qaqc@pusmanpro.pln.co.id' },
-      { role: 'Senior Manajer', email: 'srmanajer.qaqc@pusmanpro.pln.co.id' },
+      { role: 'Staff/PIC Kinerja', email: 'staff.qaqc@pusmanpro.pln.co.id' },
+      { role: 'Manajer QA/QC Pembangkit', email: 'man.qaqc.pembangkit@pusmanpro.pln.co.id' },
+      { role: 'Manajer QA/QC Jaringan', email: 'man.qaqc.jaringan@pusmanpro.pln.co.id' },
+      { role: 'Senior Manajer QA/QC', email: 'sm.qaqc@pusmanpro.pln.co.id' },
     ],
   },
   {
     label: 'KI — Perencanaan & Project Control (RPC)',
     accounts: [
-      { role: 'Staff Officer', email: 'staff.rpc@pusmanpro.pln.co.id' },
-      { role: 'Manajer', email: 'manajer.rpc@pusmanpro.pln.co.id' },
-      { role: 'Senior Manajer', email: 'srmanajer.rpc@pusmanpro.pln.co.id' },
+      { role: 'Staff/PIC Kinerja', email: 'staff.rpc@pusmanpro.pln.co.id' },
+      { role: 'Manajer Project Control', email: 'man.pc@pusmanpro.pln.co.id' },
+      { role: 'Manajer Perencanaan', email: 'man.perencanaan@pusmanpro.pln.co.id' },
+      { role: 'Senior Manajer RPC', email: 'sm.rpc@pusmanpro.pln.co.id' },
     ],
   },
   {
     label: 'KI — Keuangan, Komunikasi & Umum (KKU)',
     accounts: [
-      { role: 'Staff Officer', email: 'staff.kku@pusmanpro.pln.co.id' },
-      { role: 'Manajer', email: 'manajer.kku@pusmanpro.pln.co.id' },
-      { role: 'Senior Manajer', email: 'srmanajer.kku@pusmanpro.pln.co.id' },
+      { role: 'Staff/PIC Kinerja', email: 'staff.kku@pusmanpro.pln.co.id' },
+      { role: 'Manajer Keuangan', email: 'man.keuangan@pusmanpro.pln.co.id' },
+      { role: 'Manajer Akuntansi', email: 'man.akuntansi@pusmanpro.pln.co.id' },
+      { role: 'Manajer Aset & Properti', email: 'man.aset@pusmanpro.pln.co.id' },
+      { role: 'Senior Manajer KKU', email: 'sm.kku@pusmanpro.pln.co.id' },
     ],
   },
   ...(['1', '2', '3', '4', '5'].map((n) => ({

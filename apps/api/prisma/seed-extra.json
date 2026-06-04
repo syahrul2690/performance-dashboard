@@ -1,25 +1,152 @@
 {
   "procBiz": {
     "groups": [
-      { "code": "1.0",  "name": "Visi & Strategi",               "icon": "compass",       "desc": "RJPU, strategic alignment, OKR korporat",            "maturity": 3, "score": 78, "owner": "GM PUSMANPRO",      "core": false },
-      { "code": "2.0",  "name": "Pengembangan Jasa",             "icon": "lightbulb",     "desc": "Service portfolio management",                       "maturity": 2, "score": 65, "owner": "SM Perencanaan",    "core": false },
-      { "code": "3.0",  "name": "Pemasaran & Penjualan",         "icon": "megaphone",     "desc": "Market research, pricing, sales strategy",           "maturity": 2, "score": 60, "owner": "SM Perencanaan",    "core": false },
-      { "code": "4.0",  "name": "Pengadaan",                     "icon": "shopping-cart", "desc": "Planning, execution, contracts, supplier",           "maturity": 3, "score": 82, "owner": "MAN Pengadaan",     "core": false },
-      { "code": "5.0",  "name": "Menyediakan Jasa",              "icon": "hard-hat",      "desc": "Core: MK (5.3) · QA/QC (5.4) · Project Control (5.5)", "maturity": 4, "score": 92, "owner": "4 SM Bidang",     "core": true },
-      { "code": "6.0",  "name": "Pelayanan Pelanggan",           "icon": "users",         "desc": "Customer experience, complaint handling",            "maturity": 3, "score": 80, "owner": "MAN OMP",           "core": false },
-      { "code": "7.0",  "name": "SDM",                           "icon": "user-check",    "desc": "Workforce, performance, development, relations",      "maturity": 3, "score": 85, "owner": "SM Keu/Kom/Umum",   "core": false },
-      { "code": "8.0",  "name": "Teknologi Informasi",           "icon": "cpu",           "desc": "IT strategy, UAT, deployment, maintenance",           "maturity": 3, "score": 88, "owner": "MAN OMP",           "core": false },
-      { "code": "9.0",  "name": "Keuangan",                      "icon": "wallet",        "desc": "Budget, akuntansi, aset, revenue, kas, control",      "maturity": 3, "score": 86, "owner": "SM Keu/Kom/Umum",   "core": false },
-      { "code": "10.0", "name": "Aset",                          "icon": "building-2",    "desc": "Property maintenance, non-PIK projects",              "maturity": 2, "score": 70, "owner": "MAN Aset Properti", "core": false },
-      { "code": "11.0", "name": "Risiko, Kepatuhan, Audit, BCM", "icon": "shield-check",  "desc": "Risk, compliance, audit response, BCM",               "maturity": 3, "score": 84, "owner": "ASMAN Risiko",      "core": false },
-      { "code": "12.0", "name": "Hubungan Eksternal",            "icon": "handshake",     "desc": "Government relations, communications, CSR",           "maturity": 2, "score": 72, "owner": "SM Keu/Kom/Umum",   "core": false },
-      { "code": "13.0", "name": "Perbaikan & Perubahan",         "icon": "refresh-ccw",   "desc": "Process, knowledge mgmt, KPI benchmarking",           "maturity": 2, "score": 68, "owner": "GM PUSMANPRO",      "core": false }
+      {
+        "code": "1.0",
+        "name": "Visi & Strategi",
+        "icon": "compass",
+        "desc": "RJPU, strategic alignment, OKR korporat",
+        "maturity": 3,
+        "score": 78,
+        "owner": "GM PUSMANPRO",
+        "core": false
+      },
+      {
+        "code": "2.0",
+        "name": "Pengembangan Jasa",
+        "icon": "lightbulb",
+        "desc": "Service portfolio management",
+        "maturity": 2,
+        "score": 65,
+        "owner": "SM Perencanaan",
+        "core": false
+      },
+      {
+        "code": "3.0",
+        "name": "Pemasaran & Penjualan",
+        "icon": "megaphone",
+        "desc": "Market research, pricing, sales strategy",
+        "maturity": 2,
+        "score": 60,
+        "owner": "SM Perencanaan",
+        "core": false
+      },
+      {
+        "code": "4.0",
+        "name": "Pengadaan",
+        "icon": "shopping-cart",
+        "desc": "Planning, execution, contracts, supplier",
+        "maturity": 3,
+        "score": 82,
+        "owner": "MAN Pengadaan",
+        "core": false
+      },
+      {
+        "code": "5.0",
+        "name": "Menyediakan Jasa",
+        "icon": "hard-hat",
+        "desc": "Core: MK (5.3) · QA/QC (5.4) · Project Control (5.5)",
+        "maturity": 4,
+        "score": 92,
+        "owner": "4 SM Bidang",
+        "core": true
+      },
+      {
+        "code": "6.0",
+        "name": "Pelayanan Pelanggan",
+        "icon": "users",
+        "desc": "Customer experience, complaint handling",
+        "maturity": 3,
+        "score": 80,
+        "owner": "MAN OMP",
+        "core": false
+      },
+      {
+        "code": "7.0",
+        "name": "SDM",
+        "icon": "user-check",
+        "desc": "Workforce, performance, development, relations",
+        "maturity": 3,
+        "score": 85,
+        "owner": "SM Keu/Kom/Umum",
+        "core": false
+      },
+      {
+        "code": "8.0",
+        "name": "Teknologi Informasi",
+        "icon": "cpu",
+        "desc": "IT strategy, UAT, deployment, maintenance",
+        "maturity": 3,
+        "score": 88,
+        "owner": "MAN OMP",
+        "core": false
+      },
+      {
+        "code": "9.0",
+        "name": "Keuangan",
+        "icon": "wallet",
+        "desc": "Budget, akuntansi, aset, revenue, kas, control",
+        "maturity": 3,
+        "score": 86,
+        "owner": "SM Keu/Kom/Umum",
+        "core": false
+      },
+      {
+        "code": "10.0",
+        "name": "Aset",
+        "icon": "building-2",
+        "desc": "Property maintenance, non-PIK projects",
+        "maturity": 2,
+        "score": 70,
+        "owner": "MAN Aset Properti",
+        "core": false
+      },
+      {
+        "code": "11.0",
+        "name": "Risiko, Kepatuhan, Audit, BCM",
+        "icon": "shield-check",
+        "desc": "Risk, compliance, audit response, BCM",
+        "maturity": 3,
+        "score": 84,
+        "owner": "ASMAN Risiko",
+        "core": false
+      },
+      {
+        "code": "12.0",
+        "name": "Hubungan Eksternal",
+        "icon": "handshake",
+        "desc": "Government relations, communications, CSR",
+        "maturity": 2,
+        "score": 72,
+        "owner": "SM Keu/Kom/Umum",
+        "core": false
+      },
+      {
+        "code": "13.0",
+        "name": "Perbaikan & Perubahan",
+        "icon": "refresh-ccw",
+        "desc": "Process, knowledge mgmt, KPI benchmarking",
+        "maturity": 2,
+        "score": 68,
+        "owner": "GM PUSMANPRO",
+        "core": false
+      }
     ],
-    "maturityLabels": { "1": "Foundational", "2": "Practitioner", "3": "Advanced", "4": "Mastery" }
+    "maturityLabels": {
+      "1": "Foundational",
+      "2": "Practitioner",
+      "3": "Advanced",
+      "4": "Mastery"
+    }
   },
   "organisasi": {
     "gm": {
-      "id": "gm", "code": "GM", "name": "General Manager PUSMANPRO", "tier": "gm", "icon": "crown", "formasi": 1,
+      "id": "gm",
+      "code": "GM",
+      "name": "General Manager PUSMANPRO",
+      "tier": "gm",
+      "icon": "crown",
+      "formasi": 1,
       "tugasPokok": [
         "Pimpinan tertinggi PUSMANPRO, bertanggung jawab langsung ke Direktur HST PT PLN (Persero).",
         "Menetapkan kebijakan strategis, target kinerja, dan arah transformasi PUSMANPRO.",
@@ -29,160 +156,919 @@
       "regulasi": "PDIR 0110.P/DIR/2025 Pasal 4"
     },
     "sm": [
-      { "id": "sm_pc",   "code": "SM-PC",   "name": "SM Perencanaan & Project Control", "tier": "srmanajer", "icon": "compass",      "formasi": 1, "parent": "gm", "tugasPokok": ["Mengkoordinasikan perencanaan strategis, evaluasi proyek, kajian, dan project control korporat.", "Membawahi MAN Project Control dan MAN Perencanaan.", "Akuntabel atas KPI/PI: Evaluasi Analisa Rekomendasi Proyek, Kajian Proyek, Akurasi Data Aplikasi."] },
-      { "id": "sm_omp",  "code": "SM-OMP",  "name": "SM Operasi Manajemen Proyek (OMP)", "tier": "srmanajer", "icon": "hard-hat",    "formasi": 1, "parent": "gm", "tugasPokok": ["Mengkoordinasikan supervisi konstruksi seluruh proyek pembangkit, transmisi, dan gardu induk.", "Membawahi MAN Operasi Pembangkit dan MAN Operasi Jaringan.", "Akuntabel atas KPI: % Pelaksanaan Konstruksi, Penambahan Kapasitas MW/KMS/MVA, Digitalisasi (BIM)."] },
-      { "id": "sm_qaqc", "code": "SM-QAQC", "name": "SM QA/QC",                          "tier": "srmanajer", "icon": "shield-check", "formasi": 1, "parent": "gm", "tugasPokok": ["Mengelola jaminan & pengendalian mutu konstruksi (Pembangkit & Jaringan).", "Membawahi MAN QA/QC Pembangkit dan MAN QA/QC Jaringan.", "Akuntabel atas KPI: IQC <=5 HK, Proses Bisnis Ekselen (BE/ESG/SMAP), ASMAN K3L."] },
-      { "id": "sm_kku",  "code": "SM-KKU",  "name": "SM Keuangan, Komunikasi & Umum",    "tier": "srmanajer", "icon": "wallet",       "formasi": 1, "parent": "gm", "tugasPokok": ["Mengelola fungsi keuangan, akuntansi, aset, komunikasi, SDM, dan TJSL.", "Membawahi MAN Keuangan, MAN Akuntansi, MAN Aset & Properti.", "Akuntabel atas KPI: Pengendalian Anggaran, PDN, SDM/Komunikasi/TJSL."] }
+      {
+        "id": "sm_pc",
+        "code": "SM-PC",
+        "name": "SM Perencanaan & Project Control",
+        "tier": "srmanajer",
+        "icon": "compass",
+        "formasi": 1,
+        "parent": "gm",
+        "tugasPokok": [
+          "Mengkoordinasikan perencanaan strategis, evaluasi proyek, kajian, dan project control korporat.",
+          "Membawahi MAN Project Control dan MAN Perencanaan.",
+          "Akuntabel atas KPI/PI: Evaluasi Analisa Rekomendasi Proyek, Kajian Proyek, Akurasi Data Aplikasi."
+        ]
+      },
+      {
+        "id": "sm_omp",
+        "code": "SM-OMP",
+        "name": "SM Operasi Manajemen Proyek (OMP)",
+        "tier": "srmanajer",
+        "icon": "hard-hat",
+        "formasi": 1,
+        "parent": "gm",
+        "tugasPokok": [
+          "Mengkoordinasikan supervisi konstruksi seluruh proyek pembangkit, transmisi, dan gardu induk.",
+          "Membawahi MAN Operasi Pembangkit dan MAN Operasi Jaringan.",
+          "Akuntabel atas KPI: % Pelaksanaan Konstruksi, Penambahan Kapasitas MW/KMS/MVA, Digitalisasi (BIM)."
+        ]
+      },
+      {
+        "id": "sm_qaqc",
+        "code": "SM-QAQC",
+        "name": "SM QA/QC",
+        "tier": "srmanajer",
+        "icon": "shield-check",
+        "formasi": 1,
+        "parent": "gm",
+        "tugasPokok": [
+          "Mengelola jaminan & pengendalian mutu konstruksi (Pembangkit & Jaringan).",
+          "Membawahi MAN QA/QC Pembangkit dan MAN QA/QC Jaringan.",
+          "Akuntabel atas KPI: IQC <=5 HK, Proses Bisnis Ekselen (BE/ESG/SMAP), ASMAN K3L."
+        ]
+      },
+      {
+        "id": "sm_kku",
+        "code": "SM-KKU",
+        "name": "SM Keuangan, Komunikasi & Umum",
+        "tier": "srmanajer",
+        "icon": "wallet",
+        "formasi": 1,
+        "parent": "gm",
+        "tugasPokok": [
+          "Mengelola fungsi keuangan, akuntansi, aset, komunikasi, SDM, dan TJSL.",
+          "Membawahi MAN Keuangan, MAN Akuntansi, MAN Aset & Properti.",
+          "Akuntabel atas KPI: Pengendalian Anggaran, PDN, SDM/Komunikasi/TJSL."
+        ]
+      }
     ],
     "manager": [
-      { "id": "man_project_control",    "code": "MAN PC",  "name": "MAN Project Control",            "parent": "sm_pc",   "icon": "gauge",          "formasi": 1 },
-      { "id": "man_perencanaan",        "code": "MAN PRC", "name": "MAN Perencanaan",                 "parent": "sm_pc",   "icon": "lightbulb",      "formasi": 1 },
-      { "id": "man_operasi_pembangkit", "code": "MAN OPB", "name": "MAN Operasi Pembangkit",          "parent": "sm_omp",  "icon": "flame",          "formasi": 1 },
-      { "id": "man_operasi_jaringan",   "code": "MAN OJR", "name": "MAN Operasi Jaringan",            "parent": "sm_omp",  "icon": "cable",          "formasi": 1 },
-      { "id": "man_qaqc_pembangkit",    "code": "MAN QPB", "name": "MAN QA/QC Pembangkit",            "parent": "sm_qaqc", "icon": "badge-check",    "formasi": 1 },
-      { "id": "man_qaqc_jaringan",      "code": "MAN QJR", "name": "MAN QA/QC Jaringan",              "parent": "sm_qaqc", "icon": "shield-check",   "formasi": 1 },
-      { "id": "man_keuangan",           "code": "MAN KEU", "name": "MAN Keuangan",                    "parent": "sm_kku",  "icon": "wallet",         "formasi": 1 },
-      { "id": "man_akuntansi",          "code": "MAN AKT", "name": "MAN Akuntansi",                   "parent": "sm_kku",  "icon": "calculator",     "formasi": 1 },
-      { "id": "man_aset_properti",      "code": "MAN APR", "name": "MAN Aset & Properti",             "parent": "sm_kku",  "icon": "building-2",     "formasi": 1 },
-      { "id": "man_pengadaan",          "code": "MAN PGD", "name": "MAN Perencana/Pelaksana Pengadaan", "parent": "gm",    "icon": "shopping-cart",  "formasi": 2, "tugasPokok": ["Garis koordinasi langsung di bawah GM (di luar 4 SM utama).", "Bertanggung jawab atas perencanaan & pelaksanaan pengadaan strategis korporat."] }
+      {
+        "id": "man_project_control",
+        "code": "MAN PC",
+        "name": "MAN Project Control",
+        "parent": "sm_pc",
+        "icon": "gauge",
+        "formasi": 1
+      },
+      {
+        "id": "man_perencanaan",
+        "code": "MAN PRC",
+        "name": "MAN Perencanaan",
+        "parent": "sm_pc",
+        "icon": "lightbulb",
+        "formasi": 1
+      },
+      {
+        "id": "man_operasi_pembangkit",
+        "code": "MAN OPB",
+        "name": "MAN Operasi Pembangkit",
+        "parent": "sm_omp",
+        "icon": "flame",
+        "formasi": 1
+      },
+      {
+        "id": "man_operasi_jaringan",
+        "code": "MAN OJR",
+        "name": "MAN Operasi Jaringan",
+        "parent": "sm_omp",
+        "icon": "cable",
+        "formasi": 1
+      },
+      {
+        "id": "man_qaqc_pembangkit",
+        "code": "MAN QPB",
+        "name": "MAN QA/QC Pembangkit",
+        "parent": "sm_qaqc",
+        "icon": "badge-check",
+        "formasi": 1
+      },
+      {
+        "id": "man_qaqc_jaringan",
+        "code": "MAN QJR",
+        "name": "MAN QA/QC Jaringan",
+        "parent": "sm_qaqc",
+        "icon": "shield-check",
+        "formasi": 1
+      },
+      {
+        "id": "man_keuangan",
+        "code": "MAN KEU",
+        "name": "MAN Keuangan",
+        "parent": "sm_kku",
+        "icon": "wallet",
+        "formasi": 1
+      },
+      {
+        "id": "man_akuntansi",
+        "code": "MAN AKT",
+        "name": "MAN Akuntansi",
+        "parent": "sm_kku",
+        "icon": "calculator",
+        "formasi": 1
+      },
+      {
+        "id": "man_aset_properti",
+        "code": "MAN APR",
+        "name": "MAN Aset & Properti",
+        "parent": "sm_kku",
+        "icon": "building-2",
+        "formasi": 1
+      },
+      {
+        "id": "man_pengadaan",
+        "code": "MAN PGD",
+        "name": "MAN Perencana/Pelaksana Pengadaan",
+        "parent": "gm",
+        "icon": "shopping-cart",
+        "formasi": 2,
+        "tugasPokok": [
+          "Garis koordinasi langsung di bawah GM (di luar 4 SM utama).",
+          "Bertanggung jawab atas perencanaan & pelaksanaan pengadaan strategis korporat."
+        ]
+      }
     ],
     "asman": [
-      { "id": "asman_elektromekanik", "code": "ASMAN EM",    "name": "ASMAN Elektromekanik",                "parent": "man_operasi_pembangkit", "icon": "zap",        "formasi": 1 },
-      { "id": "asman_sipil_pbjr",     "code": "ASMAN SIPIL", "name": "ASMAN Sipil Pembangkit & Jaringan",   "parent": "man_operasi_pembangkit", "icon": "building-2", "formasi": 1 },
-      { "id": "asman_adm_kontrak",    "code": "ASMAN ADM",   "name": "ASMAN Administrasi Kontrak",          "parent": "man_operasi_jaringan",   "icon": "file-text", "formasi": 1 },
-      { "id": "asman_jaringan",       "code": "ASMAN JR",    "name": "ASMAN Jaringan",                      "parent": "man_operasi_jaringan",   "icon": "cable",      "formasi": 1 }
+      {
+        "id": "asman_elektromekanik",
+        "code": "ASMAN EM",
+        "name": "ASMAN Elektromekanik",
+        "parent": "man_operasi_pembangkit",
+        "icon": "zap",
+        "formasi": 1
+      },
+      {
+        "id": "asman_sipil_pbjr",
+        "code": "ASMAN SIPIL",
+        "name": "ASMAN Sipil Pembangkit & Jaringan",
+        "parent": "man_operasi_pembangkit",
+        "icon": "building-2",
+        "formasi": 1
+      },
+      {
+        "id": "asman_adm_kontrak",
+        "code": "ASMAN ADM",
+        "name": "ASMAN Administrasi Kontrak",
+        "parent": "man_operasi_jaringan",
+        "icon": "file-text",
+        "formasi": 1
+      },
+      {
+        "id": "asman_jaringan",
+        "code": "ASMAN JR",
+        "name": "ASMAN Jaringan",
+        "parent": "man_operasi_jaringan",
+        "icon": "cable",
+        "formasi": 1
+      }
     ],
     "asmanKhusus": [
-      { "id": "asman_k3l",    "code": "ASMAN K3L",  "name": "ASMAN K3L",                       "parent": "gm", "icon": "hard-hat",     "formasi": 1, "tugasPokok": ["Mengelola fungsi K3L korporat termasuk koordinasi K3L UPMK.", "Akuntabel atas Pengelolaan HSSE (Kepatuhan max -8)."] },
-      { "id": "asman_risiko", "code": "ASMAN MR&K", "name": "ASMAN Manajemen Risiko & Kepatuhan", "parent": "gm", "icon": "shield-alert", "formasi": 1, "tugasPokok": ["Mengelola risk register, kepatuhan SMAP ISO 37001, dan tindak lanjut audit.", "Akuntabel atas Maturity Level Kepatuhan & Tindak Lanjut Auditor."] }
+      {
+        "id": "asman_k3l",
+        "code": "ASMAN K3L",
+        "name": "ASMAN K3L",
+        "parent": "gm",
+        "icon": "hard-hat",
+        "formasi": 1,
+        "tugasPokok": [
+          "Mengelola fungsi K3L korporat termasuk koordinasi K3L UPMK.",
+          "Akuntabel atas Pengelolaan HSSE (Kepatuhan max -8)."
+        ]
+      },
+      {
+        "id": "asman_risiko",
+        "code": "ASMAN MR&K",
+        "name": "ASMAN Manajemen Risiko & Kepatuhan",
+        "parent": "gm",
+        "icon": "shield-alert",
+        "formasi": 1,
+        "tugasPokok": [
+          "Mengelola risk register, kepatuhan SMAP ISO 37001, dan tindak lanjut audit.",
+          "Akuntabel atas Maturity Level Kepatuhan & Tindak Lanjut Auditor."
+        ]
+      }
     ],
     "upmk": [
-      { "id": "mup_upmk1", "code": "MUP I",   "name": "MUP UPMK I",   "parent": "gm", "icon": "map-pin", "formasi": 1, "wilayah": "Banten · DKI Jakarta · Jawa Tengah",                  "headcount": 68 },
-      { "id": "mup_upmk2", "code": "MUP II",  "name": "MUP UPMK II",  "parent": "gm", "icon": "map-pin", "formasi": 1, "wilayah": "Jatim · DIY · Bali · NTB · NTT · Pulau Kalimantan",   "headcount": 84 },
-      { "id": "mup_upmk3", "code": "MUP III", "name": "MUP UPMK III", "parent": "gm", "icon": "map-pin", "formasi": 1, "wilayah": "Lampung · Bengkulu · Sumsel · Bangka-Belitung",        "headcount": 52 },
-      { "id": "mup_upmk4", "code": "MUP IV",  "name": "MUP UPMK IV",  "parent": "gm", "icon": "map-pin", "formasi": 1, "wilayah": "Jambi · Riau · Sumbar · Sumut · Aceh",                 "headcount": 61 },
-      { "id": "mup_upmk5", "code": "MUP V",   "name": "MUP UPMK V",   "parent": "gm", "icon": "map-pin", "formasi": 1, "wilayah": "Sulawesi · Maluku · Maluku Utara · Pulau Papua",       "headcount": 71 }
+      {
+        "id": "mup_upmk1",
+        "code": "MUP I",
+        "name": "MUP UPMK I",
+        "parent": "gm",
+        "icon": "map-pin",
+        "formasi": 1,
+        "wilayah": "Banten · DKI Jakarta · Jawa Tengah",
+        "headcount": 68
+      },
+      {
+        "id": "mup_upmk2",
+        "code": "MUP II",
+        "name": "MUP UPMK II",
+        "parent": "gm",
+        "icon": "map-pin",
+        "formasi": 1,
+        "wilayah": "Jatim · DIY · Bali · NTB · NTT · Pulau Kalimantan",
+        "headcount": 84
+      },
+      {
+        "id": "mup_upmk3",
+        "code": "MUP III",
+        "name": "MUP UPMK III",
+        "parent": "gm",
+        "icon": "map-pin",
+        "formasi": 1,
+        "wilayah": "Lampung · Bengkulu · Sumsel · Bangka-Belitung",
+        "headcount": 52
+      },
+      {
+        "id": "mup_upmk4",
+        "code": "MUP IV",
+        "name": "MUP UPMK IV",
+        "parent": "gm",
+        "icon": "map-pin",
+        "formasi": 1,
+        "wilayah": "Jambi · Riau · Sumbar · Sumut · Aceh",
+        "headcount": 61
+      },
+      {
+        "id": "mup_upmk5",
+        "code": "MUP V",
+        "name": "MUP UPMK V",
+        "parent": "gm",
+        "icon": "map-pin",
+        "formasi": 1,
+        "wilayah": "Sulawesi · Maluku · Maluku Utara · Pulau Papua",
+        "headcount": 71
+      }
     ],
     "upmkSub": {
       "standard": [
-        { "code": "ASMAN MK-PB", "name": "ASMAN Manajemen Konstruksi Pembangkit", "icon": "flame" },
-        { "code": "ASMAN MK-JR", "name": "ASMAN Manajemen Konstruksi Jaringan",   "icon": "cable" },
-        { "code": "ASMAN KEU",   "name": "ASMAN Keuangan UPMK",                   "icon": "wallet" },
-        { "code": "TL PGD",      "name": "TL Pengadaan UPMK",                     "icon": "shopping-cart" },
-        { "code": "TL K3L",      "name": "TL K3L UPMK",                           "icon": "hard-hat" }
+        {
+          "code": "ASMAN MK-PB",
+          "name": "ASMAN Manajemen Konstruksi Pembangkit",
+          "icon": "flame"
+        },
+        {
+          "code": "ASMAN MK-JR",
+          "name": "ASMAN Manajemen Konstruksi Jaringan",
+          "icon": "cable"
+        },
+        {
+          "code": "ASMAN KEU",
+          "name": "ASMAN Keuangan UPMK",
+          "icon": "wallet"
+        },
+        {
+          "code": "TL PGD",
+          "name": "TL Pengadaan UPMK",
+          "icon": "shopping-cart"
+        },
+        {
+          "code": "TL K3L",
+          "name": "TL K3L UPMK",
+          "icon": "hard-hat"
+        }
       ]
     },
-    "totals": { "managerial": 22, "asman": 18, "staff": 441, "total": 481 },
+    "totals": {
+      "managerial": 22,
+      "asman": 18,
+      "staff": 441,
+      "total": 481
+    },
     "regulasi": "PDIR 0110.P/DIR/2025 & PDIR 0153.P/DIR/2025 (berlaku 5 Des 2025)"
   },
   "gcgEsg": {
     "gcg": {
-      "overallScore": 92.4, "target": 95, "label": "GCG Composite Score", "maxScore": 100,
-      "previousScore": 89.7, "gapToTarget": -2.6,
+      "overallScore": 92.4,
+      "target": 95,
+      "label": "GCG Composite Score",
+      "maxScore": 100,
+      "previousScore": 89.7,
+      "gapToTarget": -2.6,
       "principles": [
-        { "id": "tra", "name": "Transparansi",    "icon": "eye",            "actual": 94, "target": 95, "desc": "Keterbukaan informasi material & relevan" },
-        { "id": "akt", "name": "Akuntabilitas",   "icon": "scale",          "actual": 91, "target": 95, "desc": "Pertanggungjawaban kinerja organisasi yang jelas" },
-        { "id": "rsp", "name": "Responsibilitas", "icon": "check-circle-2", "actual": 93, "target": 95, "desc": "Kesesuaian dengan peraturan & UU" },
-        { "id": "ind", "name": "Independensi",    "icon": "shield",         "actual": 90, "target": 90, "desc": "Pengelolaan profesional tanpa benturan kepentingan" },
-        { "id": "wjr", "name": "Kewajaran",       "icon": "gavel",          "actual": 94, "target": 95, "desc": "Keadilan & kesetaraan pemenuhan hak stakeholder" }
+        {
+          "id": "tra",
+          "name": "Transparansi",
+          "icon": "eye",
+          "actual": 94,
+          "target": 95,
+          "desc": "Keterbukaan informasi material & relevan"
+        },
+        {
+          "id": "akt",
+          "name": "Akuntabilitas",
+          "icon": "scale",
+          "actual": 91,
+          "target": 95,
+          "desc": "Pertanggungjawaban kinerja organisasi yang jelas"
+        },
+        {
+          "id": "rsp",
+          "name": "Responsibilitas",
+          "icon": "check-circle-2",
+          "actual": 93,
+          "target": 95,
+          "desc": "Kesesuaian dengan peraturan & UU"
+        },
+        {
+          "id": "ind",
+          "name": "Independensi",
+          "icon": "shield",
+          "actual": 90,
+          "target": 90,
+          "desc": "Pengelolaan profesional tanpa benturan kepentingan"
+        },
+        {
+          "id": "wjr",
+          "name": "Kewajaran",
+          "icon": "gavel",
+          "actual": 94,
+          "target": 95,
+          "desc": "Keadilan & kesetaraan pemenuhan hak stakeholder"
+        }
       ],
-      "audit": { "findings2025": 18, "closed": 16, "closureRate": 88.9 },
-      "smap": { "iso": "ISO 37001:2025", "maturity": "Level 4 (Managed)", "score": 87 },
-      "whistleblower": { "reports2026": 7, "resolved": 6, "avgDaysToResolve": 14 }
+      "audit": {
+        "findings2025": 18,
+        "closed": 16,
+        "closureRate": 88.9
+      },
+      "smap": {
+        "iso": "ISO 37001:2025",
+        "maturity": "Level 4 (Managed)",
+        "score": 87
+      },
+      "whistleblower": {
+        "reports2026": 7,
+        "resolved": 6,
+        "avgDaysToResolve": 14
+      }
     },
     "esg": {
-      "score": { "e": 78, "s": 86, "g": 92, "composite": 85.3, "target": 88 },
+      "score": {
+        "e": 78,
+        "s": 86,
+        "g": 92,
+        "composite": 85.3,
+        "target": 88
+      },
       "environment": {
         "nzePathway": "Roadmap NZE 2060",
         "metrics": [
-          { "id": "co2",    "name": "Emisi CO2 Project (kt CO2e)",       "actual": 142,  "baseline": 178, "target": 120, "unit": "kt",        "trend": "down", "better": "lower" },
-          { "id": "energy", "name": "Konsumsi Energi Kantor",            "actual": 87,   "baseline": 100, "target": 75,  "unit": "%",         "trend": "down", "better": "lower" },
-          { "id": "pdn",    "name": "Sertifikasi Hijau Vendor (% PDN)",  "actual": 98.3, "baseline": 95,  "target": 95,  "unit": "%",         "trend": "up",   "better": "higher" },
-          { "id": "k3l",    "name": "K3L Incident Rate (LTIR)",          "actual": 0.12, "baseline": 0.45, "target": 0.2, "unit": "/100k jam", "trend": "down", "better": "lower" },
-          { "id": "bim",    "name": "BIM Adoption (Paperless Design)",   "actual": 100,  "baseline": 60,  "target": 100, "unit": "%",         "trend": "up",   "better": "higher" }
+          {
+            "id": "co2",
+            "name": "Emisi CO2 Project (kt CO2e)",
+            "actual": 142,
+            "baseline": 178,
+            "target": 120,
+            "unit": "kt",
+            "trend": "down",
+            "better": "lower"
+          },
+          {
+            "id": "energy",
+            "name": "Konsumsi Energi Kantor",
+            "actual": 87,
+            "baseline": 100,
+            "target": 75,
+            "unit": "%",
+            "trend": "down",
+            "better": "lower"
+          },
+          {
+            "id": "pdn",
+            "name": "Sertifikasi Hijau Vendor (% PDN)",
+            "actual": 98.3,
+            "baseline": 95,
+            "target": 95,
+            "unit": "%",
+            "trend": "up",
+            "better": "higher"
+          },
+          {
+            "id": "k3l",
+            "name": "K3L Incident Rate (LTIR)",
+            "actual": 0.12,
+            "baseline": 0.45,
+            "target": 0.2,
+            "unit": "/100k jam",
+            "trend": "down",
+            "better": "lower"
+          },
+          {
+            "id": "bim",
+            "name": "BIM Adoption (Paperless Design)",
+            "actual": 100,
+            "baseline": 60,
+            "target": 100,
+            "unit": "%",
+            "trend": "up",
+            "better": "higher"
+          }
         ]
       },
       "social": {
         "metrics": [
-          { "id": "tjsl",     "name": "TJSL Program Completion",       "actual": 100,  "baseline": 92, "target": 100, "unit": "%",    "trend": "up", "better": "higher" },
-          { "id": "sroi",     "name": "SROI Program Pemberdayaan",     "actual": 3.8,  "baseline": 2.4, "target": 3.0, "unit": "x",    "trend": "up", "better": "higher" },
-          { "id": "gender",   "name": "Female Workforce Ratio",        "actual": 28.9, "baseline": 24.0, "target": 30, "unit": "%",    "trend": "up", "better": "higher" },
-          { "id": "training", "name": "Training Hours per FTE",        "actual": 41.2, "baseline": 32, "target": 40,  "unit": "jam",  "trend": "up", "better": "higher" },
-          { "id": "comm",     "name": "Community Engagement Programs", "actual": 28,   "baseline": 18, "target": 25,  "unit": "prog", "trend": "up", "better": "higher" }
+          {
+            "id": "tjsl",
+            "name": "TJSL Program Completion",
+            "actual": 100,
+            "baseline": 92,
+            "target": 100,
+            "unit": "%",
+            "trend": "up",
+            "better": "higher"
+          },
+          {
+            "id": "sroi",
+            "name": "SROI Program Pemberdayaan",
+            "actual": 3.8,
+            "baseline": 2.4,
+            "target": 3,
+            "unit": "x",
+            "trend": "up",
+            "better": "higher"
+          },
+          {
+            "id": "gender",
+            "name": "Female Workforce Ratio",
+            "actual": 28.9,
+            "baseline": 24,
+            "target": 30,
+            "unit": "%",
+            "trend": "up",
+            "better": "higher"
+          },
+          {
+            "id": "training",
+            "name": "Training Hours per FTE",
+            "actual": 41.2,
+            "baseline": 32,
+            "target": 40,
+            "unit": "jam",
+            "trend": "up",
+            "better": "higher"
+          },
+          {
+            "id": "comm",
+            "name": "Community Engagement Programs",
+            "actual": 28,
+            "baseline": 18,
+            "target": 25,
+            "unit": "prog",
+            "trend": "up",
+            "better": "higher"
+          }
         ],
         "beneficiaries": 14280,
         "tjslBudgetSpentRpM": 248
       },
       "governance": {
         "metrics": [
-          { "id": "gcg",   "name": "GCG Composite Score",         "actual": 92.4, "baseline": 86, "target": 95,  "unit": "pts", "trend": "up", "better": "higher" },
-          { "id": "audit", "name": "Audit Findings Closure Rate", "actual": 88.9, "baseline": 75, "target": 95,  "unit": "%",   "trend": "up", "better": "higher" },
-          { "id": "smap",  "name": "SMAP ISO 37001 Maturity",     "actual": 87,   "baseline": 72, "target": 90,  "unit": "pts", "trend": "up", "better": "higher" },
-          { "id": "wb",    "name": "Whistleblower Resolution Rate", "actual": 85.7, "baseline": 80, "target": 90, "unit": "%",   "trend": "up", "better": "higher" },
-          { "id": "cmp",   "name": "Compliance Rate (4 Pilar K2)", "actual": 100,  "baseline": 96, "target": 100, "unit": "%",   "trend": "up", "better": "higher" }
+          {
+            "id": "gcg",
+            "name": "GCG Composite Score",
+            "actual": 92.4,
+            "baseline": 86,
+            "target": 95,
+            "unit": "pts",
+            "trend": "up",
+            "better": "higher"
+          },
+          {
+            "id": "audit",
+            "name": "Audit Findings Closure Rate",
+            "actual": 88.9,
+            "baseline": 75,
+            "target": 95,
+            "unit": "%",
+            "trend": "up",
+            "better": "higher"
+          },
+          {
+            "id": "smap",
+            "name": "SMAP ISO 37001 Maturity",
+            "actual": 87,
+            "baseline": 72,
+            "target": 90,
+            "unit": "pts",
+            "trend": "up",
+            "better": "higher"
+          },
+          {
+            "id": "wb",
+            "name": "Whistleblower Resolution Rate",
+            "actual": 85.7,
+            "baseline": 80,
+            "target": 90,
+            "unit": "%",
+            "trend": "up",
+            "better": "higher"
+          },
+          {
+            "id": "cmp",
+            "name": "Compliance Rate (4 Pilar K2)",
+            "actual": 100,
+            "baseline": 96,
+            "target": 100,
+            "unit": "%",
+            "trend": "up",
+            "better": "higher"
+          }
         ]
       }
     },
     "risk": {
       "total": 24,
       "byCategory": [
-        { "cat": "Operasional",  "count": 8, "high": 2 },
-        { "cat": "Finansial",    "count": 5, "high": 1 },
-        { "cat": "Kepatuhan",    "count": 4, "high": 1 },
-        { "cat": "Reputasi/ESG", "count": 3, "high": 1 },
-        { "cat": "Strategis",    "count": 4, "high": 0 }
+        {
+          "cat": "Operasional",
+          "count": 8,
+          "high": 2
+        },
+        {
+          "cat": "Finansial",
+          "count": 5,
+          "high": 1
+        },
+        {
+          "cat": "Kepatuhan",
+          "count": 4,
+          "high": 1
+        },
+        {
+          "cat": "Reputasi/ESG",
+          "count": 3,
+          "high": 1
+        },
+        {
+          "cat": "Strategis",
+          "count": 4,
+          "high": 0
+        }
       ],
-      "highRisk": 5, "mitigated": 18, "mitigationRate": 75.0,
+      "highRisk": 5,
+      "mitigated": 18,
+      "mitigationRate": 75,
       "topRisks": [
-        { "id": "R-01", "name": "Keterlambatan Konstruksi UPMK III (% Konstruksi 88,4)", "cat": "Operasional",  "severity": "high",   "prob": "high",   "mitigation": "Eskalasi ke Pemberi Kerja, Weekly Steering Committee" },
-        { "id": "R-02", "name": "Belum tercapainya target sertifikasi BIM SKKNI 45%",     "cat": "Kepatuhan",    "severity": "medium", "prob": "medium", "mitigation": "Akselerasi training BSI batch berikut Q3 2026" },
-        { "id": "R-03", "name": "Risiko reputasi imbas insiden K3L proyek",               "cat": "Reputasi/ESG", "severity": "high",   "prob": "low",    "mitigation": "Strict zero-accident campaign, monthly review" }
+        {
+          "id": "R-01",
+          "name": "Keterlambatan Konstruksi UPMK III (% Konstruksi 88,4)",
+          "cat": "Operasional",
+          "severity": "high",
+          "prob": "high",
+          "mitigation": "Eskalasi ke Pemberi Kerja, Weekly Steering Committee"
+        },
+        {
+          "id": "R-02",
+          "name": "Belum tercapainya target sertifikasi BIM SKKNI 45%",
+          "cat": "Kepatuhan",
+          "severity": "medium",
+          "prob": "medium",
+          "mitigation": "Akselerasi training BSI batch berikut Q3 2026"
+        },
+        {
+          "id": "R-03",
+          "name": "Risiko reputasi imbas insiden K3L proyek",
+          "cat": "Reputasi/ESG",
+          "severity": "high",
+          "prob": "low",
+          "mitigation": "Strict zero-accident campaign, monthly review"
+        }
       ]
     }
   },
   "peta": {
-    "center": { "lat": -2.5, "lng": 117.0 },
+    "center": {
+      "lat": -2.5,
+      "lng": 117
+    },
     "zoom": 4,
     "units": [
-      { "code": "KP",    "label": "KP", "name": "Kantor Induk PUSMANPRO", "short": "Kantor Induk", "wilayah": "Semarang, Jawa Tengah",                                          "lat": -6.9667, "lng": 110.4167, "headcount": 145, "projects": 76, "score": 103.87, "status": "Baik",      "fieldTeams": { "elektromekanik": 24, "sipil": 18, "jaringan": 15, "admKontrak": 12 } },
-      { "code": "UPMK1", "label": "1",  "name": "UPMK I",                 "short": "UPMK I",       "wilayah": "Banten, DKI Jakarta, Jawa Tengah",                               "lat": -6.2293, "lng": 106.8770, "headcount": 68,  "projects": 18, "score": 101.30, "status": "Baik",      "fieldTeams": { "elektromekanik": 14, "sipil": 11, "jaringan": 9,  "admKontrak": 6 } },
-      { "code": "UPMK2", "label": "2",  "name": "UPMK II",                "short": "UPMK II",      "wilayah": "Jawa Timur, DI Yogyakarta, Bali, NTB, NTT, Pulau Kalimantan",     "lat": -7.2575, "lng": 112.7521, "headcount": 84,  "projects": 22, "score": 105.20, "status": "Baik",      "fieldTeams": { "elektromekanik": 18, "sipil": 15, "jaringan": 12, "admKontrak": 8 } },
-      { "code": "UPMK3", "label": "3",  "name": "UPMK III",               "short": "UPMK III",     "wilayah": "Lampung, Bengkulu, Sumatera Selatan, Bangka-Belitung",            "lat": -2.9909, "lng": 104.7567, "headcount": 52,  "projects": 14, "score": 96.40,  "status": "Hati-hati", "fieldTeams": { "elektromekanik": 10, "sipil": 8,  "jaringan": 7,  "admKontrak": 5 } },
-      { "code": "UPMK4", "label": "4",  "name": "UPMK IV",                "short": "UPMK IV",      "wilayah": "Jambi, Riau, Sumatera Barat, Sumatera Utara, Aceh",               "lat": 3.5952,  "lng": 98.6722,  "headcount": 61,  "projects": 16, "score": 99.80,  "status": "Hati-hati", "fieldTeams": { "elektromekanik": 12, "sipil": 10, "jaringan": 8,  "admKontrak": 6 } },
-      { "code": "UPMK5", "label": "5",  "name": "UPMK V",                 "short": "UPMK V",       "wilayah": "Pulau Sulawesi, Maluku, Maluku Utara, Pulau Papua",               "lat": -5.1477, "lng": 119.4327, "headcount": 71,  "projects": 19, "score": 102.50, "status": "Baik",      "fieldTeams": { "elektromekanik": 15, "sipil": 12, "jaringan": 10, "admKontrak": 7 } }
+      {
+        "code": "KP",
+        "label": "KP",
+        "name": "Kantor Induk PUSMANPRO",
+        "short": "Kantor Induk",
+        "wilayah": "Semarang, Jawa Tengah",
+        "lat": -6.9667,
+        "lng": 110.4167,
+        "headcount": 145,
+        "projects": 76,
+        "score": 103.87,
+        "status": "Baik",
+        "fieldTeams": {
+          "elektromekanik": 24,
+          "sipil": 18,
+          "jaringan": 15,
+          "admKontrak": 12
+        }
+      },
+      {
+        "code": "UPMK1",
+        "label": "1",
+        "name": "UPMK I",
+        "short": "UPMK I",
+        "wilayah": "Banten, DKI Jakarta, Jawa Tengah",
+        "lat": -6.2293,
+        "lng": 106.877,
+        "headcount": 68,
+        "projects": 18,
+        "score": 101.3,
+        "status": "Baik",
+        "fieldTeams": {
+          "elektromekanik": 14,
+          "sipil": 11,
+          "jaringan": 9,
+          "admKontrak": 6
+        }
+      },
+      {
+        "code": "UPMK2",
+        "label": "2",
+        "name": "UPMK II",
+        "short": "UPMK II",
+        "wilayah": "Jawa Timur, DI Yogyakarta, Bali, NTB, NTT, Pulau Kalimantan",
+        "lat": -7.2575,
+        "lng": 112.7521,
+        "headcount": 84,
+        "projects": 22,
+        "score": 105.2,
+        "status": "Baik",
+        "fieldTeams": {
+          "elektromekanik": 18,
+          "sipil": 15,
+          "jaringan": 12,
+          "admKontrak": 8
+        }
+      },
+      {
+        "code": "UPMK3",
+        "label": "3",
+        "name": "UPMK III",
+        "short": "UPMK III",
+        "wilayah": "Lampung, Bengkulu, Sumatera Selatan, Bangka-Belitung",
+        "lat": -2.9909,
+        "lng": 104.7567,
+        "headcount": 52,
+        "projects": 14,
+        "score": 96.4,
+        "status": "Hati-hati",
+        "fieldTeams": {
+          "elektromekanik": 10,
+          "sipil": 8,
+          "jaringan": 7,
+          "admKontrak": 5
+        }
+      },
+      {
+        "code": "UPMK4",
+        "label": "4",
+        "name": "UPMK IV",
+        "short": "UPMK IV",
+        "wilayah": "Jambi, Riau, Sumatera Barat, Sumatera Utara, Aceh",
+        "lat": 3.5952,
+        "lng": 98.6722,
+        "headcount": 61,
+        "projects": 16,
+        "score": 99.8,
+        "status": "Hati-hati",
+        "fieldTeams": {
+          "elektromekanik": 12,
+          "sipil": 10,
+          "jaringan": 8,
+          "admKontrak": 6
+        }
+      },
+      {
+        "code": "UPMK5",
+        "label": "5",
+        "name": "UPMK V",
+        "short": "UPMK V",
+        "wilayah": "Pulau Sulawesi, Maluku, Maluku Utara, Pulau Papua",
+        "lat": -5.1477,
+        "lng": 119.4327,
+        "headcount": 71,
+        "projects": 19,
+        "score": 102.5,
+        "status": "Baik",
+        "fieldTeams": {
+          "elektromekanik": 15,
+          "sipil": 12,
+          "jaringan": 10,
+          "admKontrak": 7
+        }
+      }
     ]
   },
   "roleVariants": [
-    { "code": "staff_general",             "label": "Staff Officer (Generic)",                    "tier": "staff",     "scope": "Semua Bidang" },
-    { "code": "tl_pengadaan_kp",           "label": "TL Pengadaan Kantor Induk",                  "tier": "staff",     "scope": "Bidang Pengadaan" },
-    { "code": "tl_k3l_kp",                 "label": "TL K3L Kantor Induk",                        "tier": "staff",     "scope": "ASMAN K3L" },
-    { "code": "tl_pengadaan_upmk",         "label": "TL Pengadaan UPMK",                          "tier": "staff",     "scope": "5 UPMK" },
-    { "code": "tl_k3l_upmk",               "label": "TL K3L UPMK",                                "tier": "staff",     "scope": "5 UPMK" },
-    { "code": "asman_generic",             "label": "ASMAN (Generic)",                            "tier": "asman",     "scope": "Bidang Operasional" },
-    { "code": "asman_k3l",                 "label": "ASMAN K3L",                                  "tier": "asman",     "scope": "Bidang QA/QC" },
-    { "code": "asman_risiko",              "label": "ASMAN Manajemen Risiko & Kepatuhan",         "tier": "asman",     "scope": "Langsung di bawah GM" },
-    { "code": "asman_konstruksi_pembangkit", "label": "ASMAN Manajemen Konstruksi Pembangkit (UPMK)", "tier": "asman", "scope": "5 UPMK" },
-    { "code": "asman_konstruksi_jaringan", "label": "ASMAN Manajemen Konstruksi Jaringan (UPMK)", "tier": "asman",     "scope": "5 UPMK" },
-    { "code": "asman_keuangan_upmk",       "label": "ASMAN Keuangan UPMK",                        "tier": "asman",     "scope": "5 UPMK" },
-    { "code": "man_project_control",       "label": "MAN Project Control",                        "tier": "manajer",   "scope": "SM Perencanaan & PC" },
-    { "code": "man_perencanaan",           "label": "MAN Perencanaan",                            "tier": "manajer",   "scope": "SM Perencanaan & PC" },
-    { "code": "man_operasi_pembangkit",    "label": "MAN Operasi Pembangkit",                     "tier": "manajer",   "scope": "SM OMP" },
-    { "code": "man_operasi_jaringan",      "label": "MAN Operasi Jaringan",                       "tier": "manajer",   "scope": "SM OMP" },
-    { "code": "man_qaqc_pembangkit",       "label": "MAN QA/QC Pembangkit",                       "tier": "manajer",   "scope": "SM QA/QC" },
-    { "code": "man_qaqc_jaringan",         "label": "MAN QA/QC Jaringan",                         "tier": "manajer",   "scope": "SM QA/QC" },
-    { "code": "man_keuangan",              "label": "MAN Keuangan",                               "tier": "manajer",   "scope": "SM Keu/Kom/Umum" },
-    { "code": "man_akuntansi",             "label": "MAN Akuntansi",                              "tier": "manajer",   "scope": "SM Keu/Kom/Umum" },
-    { "code": "man_aset_properti",         "label": "MAN Aset & Properti",                        "tier": "manajer",   "scope": "SM Keu/Kom/Umum" },
-    { "code": "man_pengadaan",             "label": "MAN Perencana/Pelaksana Pengadaan",          "tier": "manajer",   "scope": "Langsung di bawah GM" },
-    { "code": "mup_upmk1",                 "label": "MUP UPMK I - Banten/DKI/Jateng",             "tier": "manajer",   "scope": "Manager Unit Pelaksana" },
-    { "code": "mup_upmk2",                 "label": "MUP UPMK II - Jatim/DIY/Bali/Nusra/Kalimantan", "tier": "manajer", "scope": "Manager Unit Pelaksana" },
-    { "code": "mup_upmk3",                 "label": "MUP UPMK III - Sumsel/Lampung/Babel/Bengkulu", "tier": "manajer", "scope": "Manager Unit Pelaksana" },
-    { "code": "mup_upmk4",                 "label": "MUP UPMK IV - Sumut/Aceh/Riau/Sumbar/Jambi", "tier": "manajer",   "scope": "Manager Unit Pelaksana" },
-    { "code": "mup_upmk5",                 "label": "MUP UPMK V - Sulawesi/Maluku/Papua",         "tier": "manajer",   "scope": "Manager Unit Pelaksana" },
-    { "code": "sm_pc",                     "label": "SM Perencanaan & Project Control",           "tier": "srmanajer", "scope": "4 Bidang Utama" },
-    { "code": "sm_omp",                    "label": "SM Operasi Manajemen Proyek (OMP)",          "tier": "srmanajer", "scope": "4 Bidang Utama" },
-    { "code": "sm_qaqc",                   "label": "SM QA/QC",                                   "tier": "srmanajer", "scope": "4 Bidang Utama" },
-    { "code": "sm_kku",                    "label": "SM Keuangan, Komunikasi & Umum",             "tier": "srmanajer", "scope": "4 Bidang Utama" },
-    { "code": "gm_pusmanpro",              "label": "General Manager PUSMANPRO",                  "tier": "gm",        "scope": "Pimpinan Tertinggi" }
+    {
+      "code": "staff_general",
+      "label": "Staff Officer (Generic)",
+      "tier": "staff",
+      "scope": "Semua Bidang"
+    },
+    {
+      "code": "tl_pengadaan_kp",
+      "label": "TL Pengadaan Kantor Induk",
+      "tier": "staff",
+      "scope": "Bidang Pengadaan"
+    },
+    {
+      "code": "tl_k3l_kp",
+      "label": "TL K3L Kantor Induk",
+      "tier": "staff",
+      "scope": "ASMAN K3L"
+    },
+    {
+      "code": "tl_pengadaan_upmk",
+      "label": "TL Pengadaan UPMK",
+      "tier": "staff",
+      "scope": "5 UPMK"
+    },
+    {
+      "code": "tl_k3l_upmk",
+      "label": "TL K3L UPMK",
+      "tier": "staff",
+      "scope": "5 UPMK"
+    },
+    {
+      "code": "asman_generic",
+      "label": "ASMAN (Generic)",
+      "tier": "asman",
+      "scope": "Bidang Operasional"
+    },
+    {
+      "code": "asman_k3l",
+      "label": "ASMAN K3L",
+      "tier": "asman",
+      "scope": "Bidang QA/QC"
+    },
+    {
+      "code": "asman_risiko",
+      "label": "ASMAN Manajemen Risiko & Kepatuhan",
+      "tier": "asman",
+      "scope": "Langsung di bawah GM"
+    },
+    {
+      "code": "asman_konstruksi_pembangkit",
+      "label": "ASMAN Manajemen Konstruksi Pembangkit (UPMK)",
+      "tier": "asman",
+      "scope": "5 UPMK"
+    },
+    {
+      "code": "asman_konstruksi_jaringan",
+      "label": "ASMAN Manajemen Konstruksi Jaringan (UPMK)",
+      "tier": "asman",
+      "scope": "5 UPMK"
+    },
+    {
+      "code": "asman_keuangan_upmk",
+      "label": "ASMAN Keuangan UPMK",
+      "tier": "asman",
+      "scope": "5 UPMK"
+    },
+    {
+      "code": "man_project_control",
+      "label": "MAN Project Control",
+      "tier": "manajer",
+      "scope": "SM Perencanaan & PC"
+    },
+    {
+      "code": "man_perencanaan",
+      "label": "MAN Perencanaan",
+      "tier": "manajer",
+      "scope": "SM Perencanaan & PC"
+    },
+    {
+      "code": "man_operasi_pembangkit",
+      "label": "MAN Operasi Pembangkit",
+      "tier": "manajer",
+      "scope": "SM OMP"
+    },
+    {
+      "code": "man_operasi_jaringan",
+      "label": "MAN Operasi Jaringan",
+      "tier": "manajer",
+      "scope": "SM OMP"
+    },
+    {
+      "code": "man_qaqc_pembangkit",
+      "label": "MAN QA/QC Pembangkit",
+      "tier": "manajer",
+      "scope": "SM QA/QC"
+    },
+    {
+      "code": "man_qaqc_jaringan",
+      "label": "MAN QA/QC Jaringan",
+      "tier": "manajer",
+      "scope": "SM QA/QC"
+    },
+    {
+      "code": "man_keuangan",
+      "label": "MAN Keuangan",
+      "tier": "manajer",
+      "scope": "SM Keu/Kom/Umum"
+    },
+    {
+      "code": "man_akuntansi",
+      "label": "MAN Akuntansi",
+      "tier": "manajer",
+      "scope": "SM Keu/Kom/Umum"
+    },
+    {
+      "code": "man_aset_properti",
+      "label": "MAN Aset & Properti",
+      "tier": "manajer",
+      "scope": "SM Keu/Kom/Umum"
+    },
+    {
+      "code": "man_pengadaan",
+      "label": "MAN Perencana/Pelaksana Pengadaan",
+      "tier": "manajer",
+      "scope": "Langsung di bawah GM"
+    },
+    {
+      "code": "mup_upmk1",
+      "label": "MUP UPMK I - Banten/DKI/Jateng",
+      "tier": "manajer",
+      "scope": "Manager Unit Pelaksana"
+    },
+    {
+      "code": "mup_upmk2",
+      "label": "MUP UPMK II - Jatim/DIY/Bali/Nusra/Kalimantan",
+      "tier": "manajer",
+      "scope": "Manager Unit Pelaksana"
+    },
+    {
+      "code": "mup_upmk3",
+      "label": "MUP UPMK III - Sumsel/Lampung/Babel/Bengkulu",
+      "tier": "manajer",
+      "scope": "Manager Unit Pelaksana"
+    },
+    {
+      "code": "mup_upmk4",
+      "label": "MUP UPMK IV - Sumut/Aceh/Riau/Sumbar/Jambi",
+      "tier": "manajer",
+      "scope": "Manager Unit Pelaksana"
+    },
+    {
+      "code": "mup_upmk5",
+      "label": "MUP UPMK V - Sulawesi/Maluku/Papua",
+      "tier": "manajer",
+      "scope": "Manager Unit Pelaksana"
+    },
+    {
+      "code": "sm_pc",
+      "label": "SM Perencanaan & Project Control",
+      "tier": "srmanajer",
+      "scope": "4 Bidang Utama"
+    },
+    {
+      "code": "sm_omp",
+      "label": "SM Operasi Manajemen Proyek (OMP)",
+      "tier": "srmanajer",
+      "scope": "4 Bidang Utama"
+    },
+    {
+      "code": "sm_qaqc",
+      "label": "SM QA/QC",
+      "tier": "srmanajer",
+      "scope": "4 Bidang Utama"
+    },
+    {
+      "code": "sm_kku",
+      "label": "SM Keuangan, Komunikasi & Umum",
+      "tier": "srmanajer",
+      "scope": "4 Bidang Utama"
+    },
+    {
+      "code": "gm_pusmanpro",
+      "label": "General Manager PUSMANPRO",
+      "tier": "gm",
+      "scope": "Pimpinan Tertinggi"
+    },
+    {
+      "code": "asman_elektromekanik",
+      "label": "ASMAN Elektromekanik",
+      "tier": "asman",
+      "scope": "Bidang OMP"
+    },
+    {
+      "code": "asman_jaringan",
+      "label": "ASMAN Jaringan",
+      "tier": "asman",
+      "scope": "Bidang OMP"
+    }
   ]
 }

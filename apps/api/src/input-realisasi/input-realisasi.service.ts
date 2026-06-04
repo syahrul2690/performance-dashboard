@@ -3,7 +3,7 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { PrismaService } from '../prisma/prisma.service';
 import { Role, User } from '@prisma/client';
-import { Step, buildSteps, stepMatches, slaRemainingDays, uname } from '../common/workflow-steps';
+import { Step, buildSteps, stepMatches, stepRecipientWhere, slaRemainingDays, uname } from '../common/workflow-steps';
 import * as fs from 'fs';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
@@ -83,13 +83,7 @@ export class InputRealisasiService {
   private async notifyStep(realisasiId: string, steps: Step[], stepIndex: number, unitCode: string, bidang: string, actorName: string) {
     const step = steps[stepIndex];
     if (!step) return;
-    const recipients = await this.prisma.user.findMany({
-      where: {
-        role: step.role, isActive: true,
-        ...(step.bidang ? { bidang: step.bidang } : {}),
-        ...(step.unit ? { unit: step.unit } : {}),
-      },
-    });
+    const recipients = await this.prisma.user.findMany({ where: stepRecipientWhere(step) });
     if (recipients.length === 0) return;
     await this.prisma.notification.createMany({
       data: recipients.map((u) => ({
