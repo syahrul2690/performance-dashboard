@@ -232,10 +232,15 @@ export function InputKontrakPage() {
 
   if (error && kontrakList.length === 0 && !showForm) return <ErrorState title="Gagal memuat data" message={error} />;
 
-  const draftCount = kontrakList.filter((k) => k.status === 'draft').length;
-  const submittedCount = kontrakList.filter((k) => k.status === 'submitted').length;
   // Hanya Kantor Induk yang boleh membuat KM (termasuk KM untuk UPMK). UPMK hanya mengisi realisasi.
   const canCreateKm = user?.unit === 'KP';
+  // Tampilkan KM sesuai bidang user saja (GM / tanpa bidang = semua bidang).
+  const myBidang = user?.bidang ?? null;
+  const scopeAllBidang = user?.role === 'GM' || !myBidang;
+  const visibleKontrak = scopeAllBidang ? kontrakList : kontrakList.filter((k) => k.bidang === myBidang);
+  const visibleApproved = scopeAllBidang ? approvedList : approvedList.filter((k) => k.bidang === myBidang);
+  const draftCount = visibleKontrak.filter((k) => k.status === 'draft').length;
+  const submittedCount = visibleKontrak.filter((k) => k.status === 'submitted').length;
 
   return (
     <div className="page input-kontrak-page">
@@ -259,7 +264,7 @@ export function InputKontrakPage() {
                   <option key={u.code} value={u.code}>{u.name} ({u.code})</option>
                 ))}
               </select>
-              <span>· {kontrakList.length} kontrak · Draft: {draftCount} · Terkirim: {submittedCount}</span>
+              <span>· {visibleKontrak.length} kontrak · Draft: {draftCount} · Terkirim: {submittedCount}</span>
             </div>
           </div>
           <input
@@ -415,13 +420,13 @@ export function InputKontrakPage() {
       )}
 
       {/* Kontrak List */}
-      {kontrakList.length === 0 ? (
+      {visibleKontrak.length === 0 ? (
         <EmptyState title="Belum ada kontrak" message="Klik 'Tambah Kontrak' atau 'Upload Excel' untuk membuat kontrak manajemen baru." />
       ) : (
         <div className="card p-0">
           <div className="card-header compact">
             <div className="card-title"><FileText size={14} />Daftar Kontrak Manajemen</div>
-            <span className="card-meta">{kontrakList.length} kontrak</span>
+            <span className="card-meta">{visibleKontrak.length} kontrak</span>
           </div>
           <div className="table-wrap">
             <table className="data-table compact">
@@ -436,7 +441,7 @@ export function InputKontrakPage() {
                 </tr>
               </thead>
               <tbody>
-                {kontrakList.map((k) => (
+                {visibleKontrak.map((k) => (
                   <tr key={k.id}>
                     <td style={{ fontWeight: 600 }}>{k.bidang}</td>
                     <td>{k.holder}</td>
@@ -488,9 +493,9 @@ export function InputKontrakPage() {
       <div className="card p-0" style={{ marginTop: 'var(--space-6)' }}>
         <div className="card-header compact">
           <div className="card-title"><FileCheck2 size={14} />Kontrak Manajemen Disetujui (Sah)</div>
-          <span className="card-meta">{approvedList.length} kontrak · disahkan GM · read-only</span>
+          <span className="card-meta">{visibleApproved.length} kontrak · disahkan GM · read-only</span>
         </div>
-        {approvedList.length === 0 ? (
+        {visibleApproved.length === 0 ? (
           <div className="card-body">
             <EmptyState title="Belum ada KM disetujui" message="Belum ada Kontrak Manajemen yang disahkan penuh hingga General Manager." />
           </div>
@@ -508,7 +513,7 @@ export function InputKontrakPage() {
                 </tr>
               </thead>
               <tbody>
-                {approvedList.map((k) => (
+                {visibleApproved.map((k) => (
                   <Fragment key={k.id}>
                     <tr>
                       <td style={{ fontWeight: 600 }}>{UNIT_NAMES[k.unitCode] ?? k.unitCode}</td>
