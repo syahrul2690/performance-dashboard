@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, Fragment } from 'react';
 import { inputKontrak } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
-import { FileText, Plus, Trash2, Send, CheckCircle, Edit2, X, Upload, AlertCircle, Download } from 'lucide-react';
+import { FileText, Plus, Trash2, Send, CheckCircle, Edit2, X, Upload, AlertCircle, Download, FileCheck2, ChevronDown } from 'lucide-react';
 import { SkeletonTable, EmptyState, ErrorState } from '../components/LoadState';
 import type { KontrakManajemen } from '../lib/types';
 
@@ -34,6 +34,7 @@ const UNIT_OPTIONS = [
   { code: 'UPMK4', name: 'UPMK IV' },
   { code: 'UPMK5', name: 'UPMK V' },
 ];
+const UNIT_NAMES: Record<string, string> = Object.fromEntries(UNIT_OPTIONS.map((u) => [u.code, u.name]));
 
 const STATUS_LABEL: Record<string, string> = {
   draft: 'Draft', submitted: 'Menunggu Review', approved: 'Disetujui', rejected: 'Dikembalikan',
@@ -62,6 +63,9 @@ export function InputKontrakPage() {
   const [bidang, setBidang] = useState('');
   const [holder, setHolder] = useState('');
   const [kpiItems, setKpiItems] = useState<KpiItem[]>([emptyRow()]);
+  // Registri KM yang sudah disahkan (digabung dari halaman "Kontrak Manajemen Disetujui")
+  const [approvedList, setApprovedList] = useState<KontrakManajemen[]>([]);
+  const [approvedExpanded, setApprovedExpanded] = useState<string | null>(null);
 
   // Default unit mengikuti unit user (bila ada)
   useEffect(() => { if (user?.unit) setSelectedUnit(user.unit); }, [user?.unit]);
@@ -70,6 +74,11 @@ export function InputKontrakPage() {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedUnit]);
+
+  // Registri KM disahkan (lintas unit) — dimuat sekali.
+  useEffect(() => {
+    inputKontrak.approved().then((d) => setApprovedList(d as KontrakManajemen[])).catch(() => {});
+  }, [submitted]);
 
   const loadData = async () => {
     try {
@@ -235,7 +244,7 @@ export function InputKontrakPage() {
             <FileText size={24} color="var(--color-accent)" />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 700 }}>Input Kontrak Manajemen (Tahun Berjalan {CURRENT_YEAR})</div>
+            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 700 }}>Input Kontrak Manajemen Tahun {CURRENT_YEAR}</div>
             <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
               <span>Unit:</span>
               <select
@@ -461,6 +470,81 @@ export function InputKontrakPage() {
           </div>
         </div>
       )}
+
+      {/* Registri Kontrak Manajemen yang sudah disahkan (digabung dari halaman terpisah) */}
+      <div className="card p-0" style={{ marginTop: 'var(--space-6)' }}>
+        <div className="card-header compact">
+          <div className="card-title"><FileCheck2 size={14} />Kontrak Manajemen Disetujui (Sah)</div>
+          <span className="card-meta">{approvedList.length} kontrak · disahkan GM · read-only</span>
+        </div>
+        {approvedList.length === 0 ? (
+          <div className="card-body">
+            <EmptyState title="Belum ada KM disetujui" message="Belum ada Kontrak Manajemen yang disahkan penuh hingga General Manager." />
+          </div>
+        ) : (
+          <div className="table-wrap">
+            <table className="data-table compact">
+              <thead>
+                <tr>
+                  <th>Unit</th>
+                  <th>Bidang</th>
+                  <th>Penanggung Jawab</th>
+                  <th>KPI</th>
+                  <th>Disahkan oleh</th>
+                  <th>Tanggal</th>
+                </tr>
+              </thead>
+              <tbody>
+                {approvedList.map((k) => (
+                  <Fragment key={k.id}>
+                    <tr>
+                      <td style={{ fontWeight: 600 }}>{UNIT_NAMES[k.unitCode] ?? k.unitCode}</td>
+                      <td>{k.bidang}</td>
+                      <td style={{ color: 'var(--color-text-muted)' }}>{k.holder}</td>
+                      <td>
+                        <button className="btn btn-ghost btn-sm" onClick={() => setApprovedExpanded(approvedExpanded === k.id ? null : k.id)}>
+                          {k.kpiItems.length} indikator <ChevronDown size={12} style={{ transform: approvedExpanded === k.id ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />
+                        </button>
+                      </td>
+                      <td><span className="status-pill completed" style={{ fontSize: 10 }}>{k.reviewer ?? 'GM'}</span></td>
+                      <td style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
+                        {k.reviewedAt ? new Date(k.reviewedAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                      </td>
+                    </tr>
+                    {approvedExpanded === k.id && (
+                      <tr>
+                        <td colSpan={6} style={{ background: 'var(--color-surface-2)', padding: 0 }}>
+                          <table className="data-table compact" style={{ margin: 0 }}>
+                            <thead>
+                              <tr>
+                                <th>No</th><th>Indikator Kinerja</th><th>Formula</th><th>Satuan</th>
+                                <th className="num">Bobot</th><th>Target Sem I</th><th>Target Tahun {CURRENT_YEAR}</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(k.kpiItems as Record<string, string>[]).map((it, idx) => (
+                                <tr key={idx}>
+                                  <td>{idx + 1}</td>
+                                  <td>{it.indikator}</td>
+                                  <td>{it.formula}</td>
+                                  <td>{it.satuan}</td>
+                                  <td className="num">{it.bobot}</td>
+                                  <td>{it.target}</td>
+                                  <td>{it.target2}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

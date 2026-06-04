@@ -130,6 +130,8 @@ export const inputRealisasi = {
     api.get('/input-realisasi/review/list').then((r) => r.data),
   review: (id: string, action: 'approve' | 'reject', note?: string, returnTo?: 'konseptor' | 'previous') =>
     api.post(`/input-realisasi/${id}/review`, { action, note, returnTo }).then((r) => r.data),
+  updateValues: (id: string, values: Record<string, unknown>) =>
+    api.patch(`/input-realisasi/${id}/values`, { values }).then((r) => r.data),
   delete: (id: string) =>
     api.delete(`/input-realisasi/${id}`).then((r) => r.data),
 };

@@ -17,7 +17,6 @@ import { WorkflowKmUsulanPage } from './pages/WorkflowKmUsulanPage';
 import { WorkflowKmRealisasiPage } from './pages/WorkflowKmRealisasiPage';
 import { InputRealisasiPage } from './pages/InputRealisasiPage';
 import { InputKontrakPage } from './pages/InputKontrakPage';
-import { KontrakDisetujuiPage } from './pages/KontrakDisetujuiPage';
 import { SettingsPage } from './pages/SettingsPage';
 
 export default function App() {
@@ -46,7 +45,6 @@ export default function App() {
         <Route path="workflow-km/realisasi" element={<WorkflowKmRealisasiPage />} />
         <Route path="input-realisasi" element={<InputRealisasiPage />} />
         <Route path="input-kontrak" element={<InputKontrakPage />} />
-        <Route path="kontrak-disetujui" element={<KontrakDisetujuiPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { operational, kinerja } from '../lib/api';
-import { Target, BarChart2, ShieldAlert, ClipboardCheck } from 'lucide-react';
+import { Target, ShieldAlert, ClipboardCheck } from 'lucide-react';
 import { SkeletonTable, EmptyState, ErrorState } from '../components/LoadState';
 
 interface RekapKpi { indikator: string; satuan: string; bobot: number; target: number; realisasi: number; capaian: number; nilai: number; }
@@ -88,6 +88,15 @@ export function OperationalPage() {
 
   const kpiRows = kpis.filter(k => !k.id?.startsWith('pi'));
   const piRows = pis.length > 0 ? pis : kpis.filter(k => k.id?.startsWith('pi'));
+  // KPI digabung jadi satu (sebelumnya KPI bobot 40 + KPI bobot 60).
+  const allKpiRows = [...kpiRows, ...piRows];
+  const kpiNilai = (sm.kpiNilai ?? 0) + (sm.piNilai ?? 0);
+  const kpiBobot = (sm.kpiBobot ?? 0) + (sm.piBobot ?? 0);
+  const penalty = sm.kepatuhanPenalty ?? 0;
+  // Total Nilai Kinerja = Σ nilai KPI + pengurang kepatuhan (penalty ≤ 0) — sinkron dgn kartu di atas.
+  const totalNilai = kpiNilai + penalty;
+  const totalBobot = kpiBobot;
+  const totalStatus = totalNilai >= 100 ? 'Baik' : totalNilai >= 95 ? 'Hati-hati' : 'Perhatian';
 
   function KpiTable({ rows }: { rows: Kpi[] }) {
     if (!rows.length) return <EmptyState title="Tidak ada data" />;
@@ -187,38 +196,33 @@ export function OperationalPage() {
         </div>
       )}
 
-      {/* 4 Hero Cards */}
-      <div className="four-col-grid">
+      {/* 3 Hero Cards — KPI digabung jadi satu */}
+      <div className="three-col-grid">
         <div className="summary-hero-card kpi">
           <div className="summary-hero-label">Key Performance Indicator (KPI)</div>
-          <div className="summary-hero-value">{fmt(sm.kpiNilai)}<span className="of">/ {sm.kpiBobot}</span></div>
-          <div className="summary-hero-meta delta-positive">{pct((sm.kpiNilai / (sm.kpiBobot || 1)) * 100)} pencapaian</div>
-        </div>
-        <div className="summary-hero-card pi">
-          <div className="summary-hero-label">Key Performance Indicator (KPI)</div>
-          <div className="summary-hero-value">{fmt(sm.piNilai)}<span className="of">/ {sm.piBobot}</span></div>
-          <div className="summary-hero-meta delta-positive">{pct((sm.piNilai / (sm.piBobot || 1)) * 100)} pencapaian</div>
+          <div className="summary-hero-value">{fmt(kpiNilai)}<span className="of">/ {kpiBobot}</span></div>
+          <div className="summary-hero-meta delta-positive">{pct((kpiNilai / (kpiBobot || 1)) * 100)} pencapaian</div>
         </div>
         <div className="summary-hero-card pen">
           <div className="summary-hero-label">Pengurang Kepatuhan</div>
-          <div className="summary-hero-value">{sm.kepatuhanPenalty}<span className="of">(max -30)</span></div>
+          <div className="summary-hero-value">{penalty}<span className="of">(max -30)</span></div>
           <div className="summary-hero-meta delta-positive">
-            {(sm.kepatuhanPenalty ?? 0) === 0 ? 'Tidak ada pengurang' : `${sm.kepatuhanPenalty} poin`}
+            {penalty === 0 ? 'Tidak ada pengurang' : `${penalty} poin`}
           </div>
         </div>
         <div className="summary-hero-card total">
           <div className="summary-hero-label" style={{ color: 'var(--color-accent)' }}>TOTAL NILAI KINERJA</div>
-          <div className="summary-hero-value">{fmt(sm.totalNilai)}<span className="of">/ {sm.totalBobot}</span></div>
+          <div className="summary-hero-value">{fmt(totalNilai)}<span className="of">/ {totalBobot}</span></div>
           <div className="summary-hero-meta">
-            <span className={`status-pill ${(sm.totalNilai ?? 0) >= 100 ? 'completed' : (sm.totalNilai ?? 0) >= 95 ? 'at-risk' : 'delayed'}`}>
-              {sm.status ?? '—'}
+            <span className={`status-pill ${totalNilai >= 100 ? 'completed' : totalNilai >= 95 ? 'at-risk' : 'delayed'}`}>
+              {totalStatus}
             </span>
           </div>
         </div>
       </div>
 
-      {/* KPI (bobot 40) + KPI (bobot 60) side by side */}
-      <div className="two-col-grid" style={{ alignItems: 'start', marginBottom: 'var(--space-6)' }}>
+      {/* KPI — satu kartu gabungan (sebelumnya 2 kartu KPI) */}
+      <div style={{ marginBottom: 'var(--space-6)' }}>
         <div className="card p-0">
           <div className="card-header compact" style={{ borderBottom: '3px solid var(--color-accent)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flex: 1 }}>
@@ -226,33 +230,15 @@ export function OperationalPage() {
                 <Target size={16} color="var(--color-accent)" />
               </div>
               <div>
-                <div className="card-title" style={{ color: 'var(--color-accent)', fontSize: 'var(--text-sm)' }}>KPI</div>
-                <div style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-muted)' }}>{kpiRows.length} indikator · Bobot 40</div>
+                <div className="card-title" style={{ color: 'var(--color-accent)', fontSize: 'var(--text-sm)' }}>Key Performance Indicator (KPI)</div>
+                <div style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-muted)' }}>{allKpiRows.length} indikator · Bobot {kpiBobot}</div>
               </div>
             </div>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 'var(--text-lg)', fontWeight: 800, color: 'var(--color-accent)' }}>{fmt(sm.kpiNilai)}<span style={{ fontSize: 'var(--text-xs)', fontWeight: 400, color: 'var(--color-text-muted)' }}> / {sm.kpiBobot}</span></div>
+              <div style={{ fontSize: 'var(--text-lg)', fontWeight: 800, color: 'var(--color-accent)' }}>{fmt(kpiNilai)}<span style={{ fontSize: 'var(--text-xs)', fontWeight: 400, color: 'var(--color-text-muted)' }}> / {kpiBobot}</span></div>
             </div>
           </div>
-          <KpiTable rows={kpiRows} />
-        </div>
-
-        <div className="card p-0">
-          <div className="card-header compact" style={{ borderBottom: '3px solid var(--color-info)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flex: 1 }}>
-              <div style={{ width: 32, height: 32, borderRadius: 'var(--radius-md)', background: 'rgba(3,162,184,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <BarChart2 size={16} color="var(--color-info)" />
-              </div>
-              <div>
-                <div className="card-title" style={{ color: 'var(--color-info)', fontSize: 'var(--text-sm)' }}>KPI</div>
-                <div style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-muted)' }}>{piRows.length} indikator · Bobot 60</div>
-              </div>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 'var(--text-lg)', fontWeight: 800, color: 'var(--color-info)' }}>{fmt(sm.piNilai)}<span style={{ fontSize: 'var(--text-xs)', fontWeight: 400, color: 'var(--color-text-muted)' }}> / {sm.piBobot}</span></div>
-            </div>
-          </div>
-          <KpiTable rows={piRows} />
+          <KpiTable rows={allKpiRows} />
         </div>
       </div>
 

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { InputRealisasiService } from './input-realisasi.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -16,6 +16,10 @@ class ReviewDto {
   @IsIn(['approve', 'reject']) action: 'approve' | 'reject';
   @IsOptional() @IsString() note?: string;
   @IsOptional() @IsIn(['konseptor', 'previous']) returnTo?: 'konseptor' | 'previous';
+}
+
+class UpdateValuesDto {
+  @IsObject() values: Record<string, unknown>;
 }
 
 @UseGuards(JwtAuthGuard)
@@ -36,6 +40,11 @@ export class InputRealisasiController {
   @Put('submit')
   submit(@CurrentUser() user: User, @Body() dto: SubmitDto) {
     return this.svc.submit(user, dto.unitCode, dto.bidang, dto.values, dto.periodId);
+  }
+
+  @Patch(':id/values')
+  updateValues(@CurrentUser() user: User, @Param('id') id: string, @Body() dto: UpdateValuesDto) {
+    return this.svc.updateValues(user, id, dto.values);
   }
 
   @Post(':id/review')

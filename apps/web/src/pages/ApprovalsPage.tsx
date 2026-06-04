@@ -4,7 +4,7 @@ import { approvals as approvalsApi, inputKontrak, inputRealisasi, meta as metaAp
 import { useAuth } from '../context/AuthContext';
 import { useNotif } from '../context/NotifContext';
 import type { Report, KontrakManajemen, RealisasiKinerja } from '../lib/types';
-import { CheckCircle, XCircle, Clock, CalendarClock, FileText, UsersRound, FileSignature, ChevronDown, ClipboardCheck, Timer, MessageSquare } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, CalendarClock, FileText, UsersRound, FileSignature, ChevronDown, ClipboardCheck, Timer, MessageSquare, Pencil } from 'lucide-react';
 import { SkeletonTable, EmptyState, ErrorState } from '../components/LoadState';
 
 // Badge SLA approval (Task 6): hari tersisa hingga deadline tahap berjalan.
@@ -129,6 +129,9 @@ export function ApprovalsPage() {
   const [realTarget, setRealTarget] = useState<string | null>(null);
   const [realExpanded, setRealExpanded] = useState<string | null>(null);
   const [realBusy, setRealBusy] = useState(false);
+  // B2-5: edit nilai realisasi saat review (per layer)
+  const [realEditId, setRealEditId] = useState<string | null>(null);
+  const [editValues, setEditValues] = useState<Record<string, string>>({});
 
   // Semua dokumen yang diinput manual (KM + Realisasi) — untuk kartu ringkasan & registri
   const [allKm, setAllKm] = useState<KontrakManajemen[]>([]);
@@ -210,6 +213,33 @@ export function ApprovalsPage() {
     }
   };
 
+  const startEditReal = (rl: RealisasiKinerja) => {
+    const ev: Record<string, string> = {};
+    Object.entries(rl.values ?? {}).forEach(([key, v]) => {
+      ev[key] = String((v as { realisasi?: unknown })?.realisasi ?? '');
+    });
+    setEditValues(ev);
+    setRealEditId(rl.id);
+    setRealExpanded(rl.id);
+  };
+
+  const saveEditReal = async (rl: RealisasiKinerja) => {
+    const merged: Record<string, unknown> = {};
+    Object.entries(rl.values ?? {}).forEach(([key, v]) => {
+      merged[key] = { ...(v as object), realisasi: editValues[key] ?? (v as { realisasi?: unknown })?.realisasi };
+    });
+    setRealBusy(true);
+    try {
+      await inputRealisasi.updateValues(rl.id, merged);
+      setRealEditId(null);
+      loadReal();
+    } catch (e) {
+      alert((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Gagal menyimpan perubahan');
+    } finally {
+      setRealBusy(false);
+    }
+  };
+
   const handleKmReview = async (id: string, action: 'approve' | 'reject', returnTo?: 'konseptor' | 'previous') => {
     // Task 3: komentar wajib untuk setiap keputusan (setujui maupun kembalikan).
     if (!kmNote.trim()) { alert('Catatan/komentar wajib diisi saat menyetujui atau mengembalikan usulan'); return; }
@@ -245,8 +275,15 @@ export function ApprovalsPage() {
 
   if (error) return <ErrorState title="Gagal memuat laporan" message={error} />;
 
+  // B2-4: dokumen di-scope ke bidang user (GM / tanpa bidang = lintas-bidang).
+  const isGM = user?.role === 'GM';
+  const myBidang = user?.bidang ?? null;
+  const scopeByBidang = isGM || !myBidang;
+  const scopeKm = scopeByBidang ? allKm : allKm.filter((k) => k.bidang === myBidang);
+  const scopeReal = scopeByBidang ? allReal : allReal.filter((r) => (r as RealisasiKinerja & { bidang?: string }).bidang === myBidang);
+
   // Ringkasan dari dokumen yang DIINPUT manual ke sistem (Kontrak Manajemen + Realisasi Kinerja)
-  const docs: Array<{ status: string }> = [...allKm, ...allReal];
+  const docs: Array<{ status: string }> = [...scopeKm, ...scopeReal];
   const totalDoc = docs.length;
   const approvedDoc = docs.filter((d) => d.status === 'approved').length;
   const pendingDoc = docs.filter((d) => d.status === 'submitted').length;
@@ -254,8 +291,8 @@ export function ApprovalsPage() {
 
   // Registri semua dokumen persetujuan nyata (KM + Realisasi) lintas unit
   const docRows = [
-    ...allKm.map((k) => ({ id: k.id, jenis: 'Kontrak Manajemen', detail: k.bidang, unitCode: k.unitCode, periodId: k.periodId, status: k.status, currentStage: k.currentStage, reviewer: k.reviewer, history: (k as KontrakManajemen & { history?: unknown }).history })),
-    ...allReal.map((r) => ({ id: r.id, jenis: 'Realisasi Kinerja', detail: (r as RealisasiKinerja & { bidang?: string }).bidang ?? '', unitCode: r.unitCode, periodId: r.periodId, status: r.status, currentStage: r.currentStage, reviewer: r.reviewer, history: (r as RealisasiKinerja & { history?: unknown }).history })),
+    ...scopeKm.map((k) => ({ id: k.id, jenis: 'Kontrak Manajemen', detail: k.bidang, unitCode: k.unitCode, periodId: k.periodId, status: k.status, currentStage: k.currentStage, reviewer: k.reviewer, history: (k as KontrakManajemen & { history?: unknown }).history })),
+    ...scopeReal.map((r) => ({ id: r.id, jenis: 'Realisasi Kinerja', detail: (r as RealisasiKinerja & { bidang?: string }).bidang ?? '', unitCode: r.unitCode, periodId: r.periodId, status: r.status, currentStage: r.currentStage, reviewer: r.reviewer, history: (r as RealisasiKinerja & { history?: unknown }).history })),
   ];
   const nextApproverLabel = (status: string, stage: number): string => {
     if (status === 'approved') return '✓ Selesai';
@@ -512,21 +549,51 @@ export function ApprovalsPage() {
                         {realExpanded === rl.id && (
                           <tr>
                             <td colSpan={8} style={{ background: 'var(--color-surface-2)', padding: 0 }}>
+                              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)', padding: 'var(--space-2) var(--space-3)' }}>
+                                {realEditId === rl.id ? (
+                                  <>
+                                    <button className="btn btn-sm" style={{ background: 'var(--color-success)', color: '#fff' }} disabled={realBusy} onClick={() => saveEditReal(rl)}>
+                                      <CheckCircle size={12} /> Simpan Nilai
+                                    </button>
+                                    <button className="btn btn-ghost btn-sm" onClick={() => setRealEditId(null)}>Batal Edit</button>
+                                  </>
+                                ) : (
+                                  <button className="btn btn-secondary btn-sm" onClick={() => startEditReal(rl)} title="Edit nilai realisasi pada tahap Anda">
+                                    <Pencil size={12} /> Edit Nilai
+                                  </button>
+                                )}
+                              </div>
                               <table className="data-table compact" style={{ margin: 0 }}>
                                 <thead>
                                   <tr><th>No</th><th>Indikator</th><th>Satuan</th><th className="num">Bobot</th><th className="num">Target</th><th className="num">Realisasi</th></tr>
                                 </thead>
                                 <tbody>
-                                  {entries.map((it, idx) => (
-                                    <tr key={idx}>
-                                      <td>{idx + 1}</td>
-                                      <td>{it.indikator ?? '—'}</td>
-                                      <td>{it.satuan ?? '—'}</td>
-                                      <td className="num">{it.bobot ?? '—'}</td>
-                                      <td className="num">{it.target ?? '—'}</td>
-                                      <td className="num" style={{ fontWeight: 700 }}>{it.realisasi ?? '—'}</td>
-                                    </tr>
-                                  ))}
+                                  {Object.entries(rl.values ?? {}).map(([key, vRaw], idx) => {
+                                    const it = vRaw as { indikator?: string; satuan?: string; bobot?: unknown; target?: unknown; realisasi?: unknown };
+                                    const editing = realEditId === rl.id;
+                                    return (
+                                      <tr key={key}>
+                                        <td>{idx + 1}</td>
+                                        <td>{it.indikator ?? '—'}</td>
+                                        <td>{it.satuan ?? '—'}</td>
+                                        <td className="num">{String(it.bobot ?? '—')}</td>
+                                        <td className="num">{String(it.target ?? '—')}</td>
+                                        <td className="num" style={{ fontWeight: 700 }}>
+                                          {editing ? (
+                                            <input
+                                              type="text"
+                                              className="form-input form-input-sm"
+                                              style={{ width: 90, textAlign: 'right' }}
+                                              value={editValues[key] ?? ''}
+                                              onChange={(e) => setEditValues((v) => ({ ...v, [key]: e.target.value }))}
+                                            />
+                                          ) : (
+                                            String(it.realisasi ?? '—')
+                                          )}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
                                 </tbody>
                               </table>
                             </td>

@@ -145,6 +145,34 @@ export class InputRealisasiService {
     return items.map((r) => ({ ...r, slaRemainingDays: slaRemainingDays(r) }));
   }
 
+  // B2-5: reviewer pada tahapnya (Asman/Manajer/SRM/GM) dapat mengedit nilai realisasi
+  // sebelum menyetujui. Hanya saat status 'submitted' & tahap milik user & sebidang.
+  async updateValues(user: User, id: string, values: Record<string, unknown>) {
+    if (user.role === Role.STAFF) throw new ForbiddenException('Tidak berwenang mengedit realisasi');
+    const r = await this.prisma.inputRealisasi.findUnique({ where: { id } });
+    if (!r) throw new NotFoundException('Realisasi tidak ditemukan');
+    if (r.status !== 'submitted') throw new ForbiddenException('Hanya realisasi yang sedang direview yang dapat diedit');
+    if (r.currentStage !== ROLE_TO_STAGE[user.role]) {
+      throw new ForbiddenException(`Realisasi ini menunggu review ${STAGE_LABEL[r.currentStage] ?? 'tahap lain'}, bukan tahap Anda`);
+    }
+    if (user.role !== Role.GM && user.bidang && r.bidang !== user.bidang) {
+      throw new ForbiddenException('Anda hanya dapat mengedit realisasi pada bidang Anda');
+    }
+    const baseHistory = Array.isArray(r.history) ? (r.history as object[]) : [];
+    const history = [...baseHistory, { stage: r.currentStage, actor: user.name, role: user.role, action: 'edited', ts: new Date().toISOString() }];
+    const result = await this.prisma.inputRealisasi.update({
+      where: { id },
+      data: { values: values as object, history },
+    });
+    await this.prisma.auditLog.create({
+      data: { actor: user.name, userId: user.id, action: 'realisasi.edit', entity: 'InputRealisasi', targetId: id },
+    });
+    await this.cache.del(`realisasi:${r.unitCode}`);
+    await this.cache.del('kinerja:active');
+    await this.cache.del(`kinerja:${r.periodId}`);
+    return result;
+  }
+
   // Review berjenjang (hybrid): approve naik tahap hingga GM; reject ke konseptor / mundur 1 tahap.
   async review(
     user: User,
