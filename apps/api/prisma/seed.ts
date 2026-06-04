@@ -275,91 +275,11 @@ async function main() {
   console.log('  km_documents:', kmDocs);
 
   // Kontrak Manajemen — sample entries for demo
-  const sampleKontrak = [
-    {
-      unitCode: 'KP',
-      bidang: 'Operasi Manajemen Proyek',
-      holder: 'Suryo P.',
-      kpiItems: [
-        { indikator: 'Progress Konstruksi Jaringan', target: '95', satuan: '%', bobot: '30' },
-        { indikator: 'Availability Sistem', target: '99.5', satuan: '%', bobot: '25' },
-        { indikator: 'Rasio Pemeliharaan', target: '1.2', satuan: '%', bobot: '20' },
-      ],
-      // Sudah disetujui final → jadi acuan Input Realisasi untuk bidang OMP.
-      status: 'approved',
-      currentStage: 5,
-      submitter: 'Staff Officer',
-    },
-    {
-      unitCode: 'KP',
-      bidang: 'Keuangan, Komunikasi & Umum',
-      holder: 'Rahmi A.',
-      kpiItems: [
-        { indikator: 'Efisiensi Biaya Operasional', target: '85', satuan: '%', bobot: '35' },
-        { indikator: 'Realisasi Anggaran', target: '90', satuan: '%', bobot: '30' },
-      ],
-      // Draft → PIC KKU bisa men-submit untuk memulai alur jabatan baru.
-      status: 'draft',
-      currentStage: 1,
-      submitter: 'Staff Officer',
-    },
-    {
-      // KM UPMK disusun Kantor Induk, di-tag ke bidang KI terkait (OMP) — acuan realisasi UPMK I.
-      unitCode: 'UPMK1',
-      bidang: 'Operasi Manajemen Proyek',
-      holder: 'MUP UPMK I',
-      kpiItems: [
-        { indikator: 'Kapasitas Pembangkit COD', target: '1200', satuan: 'MW', bobot: '30' },
-        { indikator: 'Transmisi Baru Beroperasi', target: '450', satuan: 'KMS', bobot: '25' },
-        { indikator: 'GI Baru COD', target: '2400', satuan: 'MVA', bobot: '25' },
-        { indikator: '% Konstruksi Tepat Waktu', target: '85', satuan: '%', bobot: '20' },
-      ],
-      status: 'approved',
-      currentStage: 5,
-      submitter: 'Staff Officer',
-    },
-  ];
+  // CATATAN: Tidak ada seeding Kontrak Manajemen / Realisasi / Notifikasi contoh.
+  // Fitur "Aksi Saya" (Input KM, Input Realisasi, Persetujuan) dimulai BERSIH agar
+  // data demo tidak tercampur dengan input riil end-user. Pengguna membuat KM & realisasi sendiri.
 
-  const staffUser = await prisma.user.findFirst({ where: { role: Role.STAFF } });
-  let kmCount = 0;
-  for (const k of sampleKontrak) {
-    // Idempotent: lewati bila kontrak dengan unit+bidang+periode yang sama sudah ada.
-    const existing = await prisma.kontrakManajemen.findFirst({
-      where: { periodId: period.id, unitCode: k.unitCode, bidang: k.bidang },
-    });
-    if (existing) continue;
-    await prisma.kontrakManajemen.create({
-      data: {
-        periodId: period.id,
-        unitCode: k.unitCode,
-        bidang: k.bidang,
-        holder: k.holder,
-        kpiItems: k.kpiItems as object,
-        status: k.status,
-        currentStage: k.currentStage,
-        submitter: k.submitter,
-        submitterId: staffUser?.id ?? null,
-      },
-    });
-    kmCount++;
-  }
-  console.log('  kontrak_manajemen:', kmCount);
-
-  // Seed a few global notifications
-  const gmUser = await prisma.user.findFirst({ where: { role: Role.GM } });
-  if (gmUser) {
-    const existing = await prisma.notification.count({ where: { userId: gmUser.id } });
-    if (existing === 0) {
-      await prisma.notification.createMany({
-        data: [
-          { userId: gmUser.id, type: 'approval', title: 'Laporan Siap Review', msg: 'UPMK I menunggu persetujuan GM', route: '/approvals', unread: true },
-          { userId: gmUser.id, type: 'alert', title: 'KPI Di Bawah Target', msg: 'Progress konstruksi UPMK III 88.4%', route: '/operational', unread: true },
-        ],
-      });
-    }
-  }
-
-  console.log('Seed complete.');
+  console.log('Seed complete (Aksi Saya bersih — tanpa data transaksional contoh).');
 }
 
 main()
