@@ -61,6 +61,10 @@ export class InputKontrakService {
   ) {
     // Hanya Kantor Induk yang membuat KM (termasuk KM untuk UPMK). UPMK hanya mengisi realisasi.
     if (user.unit !== 'KP') throw new ForbiddenException('Kontrak Manajemen hanya dapat dibuat oleh Kantor Induk');
+    // PIC/Staff hanya boleh menyusun KM pada bidangnya sendiri (role lintas-bidang RPC/GM tidak menyusun KM bidang lain).
+    if (user.role !== Role.GM && user.bidang && bidang !== user.bidang) {
+      throw new ForbiddenException('Anda hanya dapat menyusun Kontrak Manajemen pada bidang Anda');
+    }
     const period = await this.prisma.period.findFirst({ where: { isActive: true } });
     if (!period) throw new BadRequestException('Tidak ada periode aktif');
 

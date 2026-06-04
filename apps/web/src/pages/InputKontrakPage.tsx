@@ -92,7 +92,8 @@ export function InputKontrakPage() {
   };
 
   const resetForm = () => {
-    setBidang('');
+    // Default bidang ke bidang user (PIC) agar tidak salah pilih; GM tanpa bidang dibebaskan.
+    setBidang(user?.bidang ?? '');
     setHolder('');
     setKpiItems([emptyRow()]);
     setShowForm(false);
@@ -241,6 +242,9 @@ export function InputKontrakPage() {
   const isRpcKonsolidasi = vc === 'man_perencanaan' || vc === 'sm_pc'
     || (user?.role === 'STAFF' && myBidang === 'Perencanaan & Project Control');
   const scopeAllBidang = user?.role === 'GM' || isRpcKonsolidasi || !myBidang;
+  // Hanya PIC/Staff Kinerja bidang ybs (Kantor Induk) yang boleh edit/hapus/kirim KM bidang itu.
+  // Role lintas-bidang (RPC konsolidasi/GM) hanya melihat KM bidang lain (read-only).
+  const canActOnRow = (k: KontrakManajemen) => user?.role === 'STAFF' && user?.unit === 'KP' && (user?.bidang ?? null) === k.bidang;
   const visibleKontrak = scopeAllBidang ? kontrakList : kontrakList.filter((k) => k.bidang === myBidang);
   const visibleApproved = scopeAllBidang ? approvedList : approvedList.filter((k) => k.bidang === myBidang);
   const draftCount = visibleKontrak.filter((k) => k.status === 'draft').length;
@@ -342,11 +346,11 @@ export function InputKontrakPage() {
                   style={formError && !bidang.trim() ? { borderColor: 'var(--color-danger)' } : undefined}
                 >
                   <option value="">— Pilih Bidang —</option>
-                  {BIDANG_OPTIONS.map((b) => (
+                  {/* PIC bidang hanya boleh menyusun KM bidangnya sendiri; GM (tanpa bidang) bebas. */}
+                  {(user?.bidang ? [user.bidang] : BIDANG_OPTIONS).map((b) => (
                     <option key={b} value={b}>{b}</option>
                   ))}
-                  {/* Pertahankan nilai lama (mis. dari data lama) bila di luar 4 bidang */}
-                  {bidang && !BIDANG_OPTIONS.includes(bidang) && (
+                  {bidang && !BIDANG_OPTIONS.includes(bidang) && bidang !== user?.bidang && (
                     <option value={bidang}>{bidang}</option>
                   )}
                 </select>
@@ -470,19 +474,21 @@ export function InputKontrakPage() {
                     </td>
                     <td>
                       <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                        {(k.status === 'draft' || k.status === 'rejected') && (
-                          <>
-                            <button className="btn btn-ghost btn-sm" onClick={() => handleEdit(k)} title="Edit"><Edit2 size={14} /></button>
-                            <button className="btn btn-ghost btn-sm" onClick={() => handleDelete(k.id)} title="Hapus" style={{ color: 'var(--color-danger)' }}><Trash2 size={14} /></button>
-                            <button className="btn btn-primary btn-sm" onClick={() => handleSubmit(k.id)} disabled={submitting}><Send size={14} /> Kirim</button>
-                          </>
-                        )}
-                        {k.status === 'submitted' && (
+                        {(k.status === 'draft' || k.status === 'rejected') ? (
+                          canActOnRow(k) ? (
+                            <>
+                              <button className="btn btn-ghost btn-sm" onClick={() => handleEdit(k)} title="Edit"><Edit2 size={14} /></button>
+                              <button className="btn btn-ghost btn-sm" onClick={() => handleDelete(k.id)} title="Hapus" style={{ color: 'var(--color-danger)' }}><Trash2 size={14} /></button>
+                              <button className="btn btn-primary btn-sm" onClick={() => handleSubmit(k.id)} disabled={submitting}><Send size={14} /> Kirim</button>
+                            </>
+                          ) : (
+                            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-subtle)' }}>Bidang lain — lihat saja</span>
+                          )
+                        ) : k.status === 'submitted' ? (
                           <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>Menunggu review</span>
-                        )}
-                        {k.status === 'approved' && (
+                        ) : k.status === 'approved' ? (
                           <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-success)' }}>✓ Disetujui {k.reviewer ? `· ${k.reviewer}` : ''}</span>
-                        )}
+                        ) : null}
                       </div>
                     </td>
                   </tr>
