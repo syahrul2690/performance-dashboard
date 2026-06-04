@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
 import { NotifProvider } from './context/NotifContext';
+import { PeriodProvider } from './context/PeriodContext';
 import App from './App';
 import './lib/charts';
 import './styles/prototype.css';
@@ -15,7 +16,9 @@ createRoot(document.getElementById('root')!).render(
       <ThemeProvider>
         <AuthProvider>
           <NotifProvider>
-            <App />
+            <PeriodProvider>
+              <App />
+            </PeriodProvider>
           </NotifProvider>
         </AuthProvider>
       </ThemeProvider>

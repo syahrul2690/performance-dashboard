@@ -11,4 +11,10 @@ export class KinerjaController {
   rekap(@Query('periodId') periodId?: string) {
     return this.svc.getRekap(periodId);
   }
+
+  // Periode terbaru yang memiliki realisasi DISETUJUI — untuk default tampilan dashboard.
+  @Get('latest-period')
+  latestPeriod() {
+    return this.svc.getLatestPeriodWithData();
+  }
 }

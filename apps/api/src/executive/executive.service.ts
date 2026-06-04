@@ -21,9 +21,17 @@ export class ExecutiveService {
 
     if (!period) return null;
 
-    const snap = await this.prisma.executiveSnapshot.findUnique({
+    let snap = await this.prisma.executiveSnapshot.findUnique({
       where: { periodId: period.id },
     });
+    // Fallback: bila periode terpilih belum punya snapshot naratif, pakai snapshot periode aktif
+    // sebagai baseline. Angka kinerja LIVE tetap mengikuti realisasi periode terpilih (via /kinerja/rekap).
+    if (!snap) {
+      const active = await this.prisma.period.findFirst({ where: { isActive: true } });
+      if (active && active.id !== period.id) {
+        snap = await this.prisma.executiveSnapshot.findUnique({ where: { periodId: active.id } });
+      }
+    }
     const result = { period, data: snap?.data ?? null };
     await this.cache.set(cacheKey, result);
     return result;

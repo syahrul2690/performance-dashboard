@@ -43,6 +43,22 @@ export class KinerjaService {
     @Inject(CACHE_MANAGER) private cache: Cache,
   ) {}
 
+  // Periode terbaru (by yearMonth) yang memiliki realisasi DISETUJUI.
+  // Dipakai dashboard sebagai default agar realisasi terbaru langsung terlihat.
+  async getLatestPeriodWithData() {
+    const approved = await this.prisma.inputRealisasi.findMany({
+      where: { status: 'approved' },
+      select: { periodId: true },
+    });
+    if (approved.length === 0) return null;
+    const ids = [...new Set(approved.map((a) => a.periodId))];
+    const periods = await this.prisma.period.findMany({
+      where: { id: { in: ids } },
+      orderBy: { yearMonth: 'desc' },
+    });
+    return periods[0] ?? null;
+  }
+
   // Rekap kinerja dari REALISASI yang sudah DISETUJUI final (status approved).
   async getRekap(periodId?: string) {
     const cacheKey = `kinerja:${periodId || 'active'}`;

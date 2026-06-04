@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { operational, kinerja } from '../lib/api';
+import { usePeriod } from '../context/PeriodContext';
 import { Target, ShieldAlert, ClipboardCheck } from 'lucide-react';
 import { SkeletonTable, EmptyState, ErrorState } from '../components/LoadState';
 
@@ -46,15 +47,18 @@ export function OperationalPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const { periodId } = usePeriod();
+
   useEffect(() => {
-    Promise.allSettled([operational.get(), kinerja.rekap()])
+    setLoading(true);
+    Promise.allSettled([operational.get(periodId || undefined), kinerja.rekap(periodId || undefined)])
       .then(([op, rk]) => {
         if (op.status === 'fulfilled') setData(op.value);
         else setError((op.reason as Error)?.message ?? 'Gagal memuat data');
         if (rk.status === 'fulfilled') setRekap(rk.value as Rekap);
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [periodId]);
 
   if (loading) {
     return (

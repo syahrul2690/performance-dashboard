@@ -3,6 +3,7 @@ import { NavLink, useNavigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useNotif } from '../context/NotifContext';
+import { usePeriod } from '../context/PeriodContext';
 import {
   LayoutDashboard, TrendingUp, Settings, Activity, Target,
   Users, CheckSquare, AlertTriangle, FileText, ClipboardEdit,
@@ -68,6 +69,7 @@ const ROUTE_NAMES: Record<string, string> = {
 
 export function AppShell() {
   const { user, logout, viewAs, setViewAs } = useAuth();
+  const { periods, periodId, setPeriodId } = usePeriod();
   const { theme, toggle: toggleTheme } = useTheme();
   const { items: notifs, unreadCount, markAllRead } = useNotif();
   const navigate = useNavigate();
@@ -191,6 +193,21 @@ export function AppShell() {
               </button>
             ))}
           </div>
+          {/* Pemilih periode dashboard — dashboard mengikuti periode terpilih */}
+          {periods.length > 0 && (
+            <select
+              className="form-input form-input-sm"
+              value={periodId}
+              onChange={(e) => setPeriodId(e.target.value)}
+              style={{ width: 'auto', minWidth: 130, marginLeft: 8, fontWeight: 700 }}
+              title="Periode data dashboard"
+              aria-label="Periode dashboard"
+            >
+              {periods.map((p) => (
+                <option key={p.id} value={p.id}>{p.label}</option>
+              ))}
+            </select>
+          )}
         </div>
 
         <div className="topbar-right">

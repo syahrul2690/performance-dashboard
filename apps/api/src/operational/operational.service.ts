@@ -21,7 +21,14 @@ export class OperationalService {
 
     if (!period) return null;
 
-    const snap = await this.prisma.operationalSnapshot.findUnique({ where: { periodId: period.id } });
+    let snap = await this.prisma.operationalSnapshot.findUnique({ where: { periodId: period.id } });
+    // Fallback baseline ke snapshot periode aktif bila periode terpilih belum punya snapshot.
+    if (!snap) {
+      const active = await this.prisma.period.findFirst({ where: { isActive: true } });
+      if (active && active.id !== period.id) {
+        snap = await this.prisma.operationalSnapshot.findUnique({ where: { periodId: active.id } });
+      }
+    }
     const result = { period, data: snap?.data ?? null };
     await this.cache.set(cacheKey, result);
     return result;

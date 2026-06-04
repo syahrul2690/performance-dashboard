@@ -1,5 +1,6 @@
 import { useEffect, useState, type CSSProperties, type ComponentType } from 'react';
 import { executive, kinerja } from '../lib/api';
+import { usePeriod } from '../context/PeriodContext';
 import {
   BarChart3, LineChart, Trophy, Layers, TrendingUp, TrendingDown, Minus, ShieldCheck,
   Compass, Cpu, Leaf, Users, GitBranch, ClipboardList, HardHat, CheckCircle2,
@@ -62,15 +63,18 @@ export function ExecutivePage() {
   const [error, setError] = useState<string | null>(null);
   const [activeKpi, setActiveKpi] = useState(0);
 
+  const { periodId } = usePeriod();
+
   useEffect(() => {
-    Promise.allSettled([executive.summary(), kinerja.rekap()])
+    setLoading(true);
+    Promise.allSettled([executive.summary(periodId || undefined), kinerja.rekap(periodId || undefined)])
       .then(([sum, rk]) => {
         if (sum.status === 'fulfilled') setData(sum.value);
         else setError((sum.reason as Error)?.message ?? 'Gagal memuat data');
         if (rk.status === 'fulfilled') setRekap(rk.value as Rekap);
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [periodId]);
 
   if (loading) {
     return (

@@ -186,6 +186,8 @@ export const kpi = {
 export const kinerja = {
   rekap: (periodId?: string) =>
     api.get('/kinerja/rekap', { params: { periodId } }).then((r) => r.data),
+  latestPeriod: () =>
+    api.get('/kinerja/latest-period').then((r) => r.data),
 };
 
 export default api;
