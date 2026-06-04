@@ -5,15 +5,59 @@ import {
   Mail, Lock, Eye, EyeOff, LogIn, KeyRound, ChevronDown, AlertCircle,
 } from 'lucide-react';
 
-const DEMO_ACCOUNTS = [
-  { role: 'General Manager', email: 'gm@pusmanpro.pln.co.id' },
-  { role: 'Senior Manajer', email: 'srmanajer@pusmanpro.pln.co.id' },
-  { role: 'Manajer Bidang', email: 'manajer@pusmanpro.pln.co.id' },
-  { role: 'Asisten Manajer', email: 'asman@pusmanpro.pln.co.id' },
-  { role: 'Staff Officer', email: 'staff.officer@pusmanpro.pln.co.id' },
-];
-
 const DEMO_PASSWORD = 'Pusmanpro@2026';
+
+// Akun demo per role yang telah di-seed (Kantor Induk per bidang + UPMK + GM).
+const DEMO_GROUPS: Array<{ label: string; accounts: Array<{ role: string; email: string }> }> = [
+  {
+    label: 'Manajemen Puncak',
+    accounts: [{ role: 'General Manager', email: 'gm@pusmanpro.pln.co.id' }],
+  },
+  {
+    label: 'KI — Operasi Manajemen Proyek (OMP)',
+    accounts: [
+      { role: 'Staff Officer', email: 'staff.officer@pusmanpro.pln.co.id' },
+      { role: 'ASMAN', email: 'asman@pusmanpro.pln.co.id' },
+      { role: 'Manajer', email: 'manajer@pusmanpro.pln.co.id' },
+      { role: 'Senior Manajer', email: 'srmanajer@pusmanpro.pln.co.id' },
+    ],
+  },
+  {
+    label: 'KI — QA/QC',
+    accounts: [
+      { role: 'Staff Officer', email: 'staff.qaqc@pusmanpro.pln.co.id' },
+      { role: 'ASMAN', email: 'asman.qaqc@pusmanpro.pln.co.id' },
+      { role: 'Manajer', email: 'manajer.qaqc@pusmanpro.pln.co.id' },
+      { role: 'Senior Manajer', email: 'srmanajer.qaqc@pusmanpro.pln.co.id' },
+    ],
+  },
+  {
+    label: 'KI — Perencanaan & Project Control (RPC)',
+    accounts: [
+      { role: 'Staff Officer', email: 'staff.rpc@pusmanpro.pln.co.id' },
+      { role: 'ASMAN', email: 'asman.rpc@pusmanpro.pln.co.id' },
+      { role: 'Manajer', email: 'manajer.rpc@pusmanpro.pln.co.id' },
+      { role: 'Senior Manajer', email: 'srmanajer.rpc@pusmanpro.pln.co.id' },
+    ],
+  },
+  {
+    label: 'KI — Keuangan, Komunikasi & Umum (KKU)',
+    accounts: [
+      { role: 'Staff Officer', email: 'staff.kku@pusmanpro.pln.co.id' },
+      { role: 'ASMAN', email: 'asman.kku@pusmanpro.pln.co.id' },
+      { role: 'Manajer', email: 'manajer.kku@pusmanpro.pln.co.id' },
+      { role: 'Senior Manajer', email: 'srmanajer.kku@pusmanpro.pln.co.id' },
+    ],
+  },
+  ...(['1', '2', '3', '4', '5'].map((n) => ({
+    label: `UPMK ${['I', 'II', 'III', 'IV', 'V'][Number(n) - 1]}`,
+    accounts: [
+      { role: 'Staff Kinerja', email: `staff.upmk${n}@pusmanpro.pln.co.id` },
+      { role: 'ASMAN UPMK', email: `asman.upmk${n}@pusmanpro.pln.co.id` },
+      { role: 'Manajer (MUP)', email: `manajer.upmk${n}@pusmanpro.pln.co.id` },
+    ],
+  }))),
+];
 
 export function LoginPage() {
   const { login } = useAuth();
@@ -173,28 +217,25 @@ export function LoginPage() {
                 />
               </button>
               <div className={`login-hint-body${hintOpen ? ' open' : ''}`}>
-                <table className="login-cred-table" aria-label="Daftar akun demo">
-                  <thead>
-                    <tr>
-                      <th>Email</th>
-                      <th>Password</th>
-                      <th>Peran</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {DEMO_ACCOUNTS.map((a) => (
-                      <tr
-                        key={a.email}
-                        onClick={() => fillDemo(a.email)}
-                        style={{ cursor: 'pointer' }}
-                      >
-                        <td>{a.email.split('@')[0]}</td>
-                        <td><code>{DEMO_PASSWORD}</code></td>
-                        <td className="login-cred-role">{a.role}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <select
+                  className="login-input"
+                  aria-label="Pilih akun demo"
+                  value={email}
+                  onChange={(e) => { if (e.target.value) fillDemo(e.target.value); }}
+                  style={{ width: '100%', padding: '10px 12px' }}
+                >
+                  <option value="">— Pilih akun demo (isi otomatis) —</option>
+                  {DEMO_GROUPS.map((g) => (
+                    <optgroup key={g.label} label={g.label}>
+                      {g.accounts.map((a) => (
+                        <option key={a.email} value={a.email}>{a.role} · {a.email.split('@')[0]}</option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+                <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 8 }}>
+                  Password semua akun demo: <code>{DEMO_PASSWORD}</code>
+                </div>
               </div>
             </div>
 
