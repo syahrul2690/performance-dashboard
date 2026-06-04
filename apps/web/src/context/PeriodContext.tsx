@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { meta, kinerja } from '../lib/api';
+import { useAuth } from './AuthContext';
 import type { Period } from '../lib/types';
 
 export type PeriodMode = 'Bulan' | 'Semester' | 'Tahun';
@@ -21,25 +22,31 @@ const PeriodCtx = createContext<PeriodCtxValue>({
 export const usePeriod = () => useContext(PeriodCtx);
 
 export function PeriodProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
   const [periods, setPeriods] = useState<Period[]>([]);
   const [periodId, setPeriodId] = useState('');
   const [mode, setMode] = useState<PeriodMode>('Bulan');
 
+  // Muat periode setelah user terautentikasi (endpoint /meta/periods butuh auth).
+  // Re-fetch saat user berganti (mis. selesai login) agar dropdown langsung tampil tanpa refresh.
   useEffect(() => {
+    if (!user) { setPeriods([]); setPeriodId(''); return; }
+    let cancelled = false;
     (async () => {
       try {
         const list = ((await meta.periods()) as Period[]) ?? [];
+        if (cancelled) return;
         setPeriods(list);
-        // Default cerdas: periode terbaru yang punya realisasi DISETUJUI; fallback ke periode aktif.
         let def = list.find((p) => p.isActive)?.id ?? list[0]?.id ?? '';
         try {
           const latest = (await kinerja.latestPeriod()) as Period | null;
-          if (latest?.id) def = latest.id;
+          if (latest?.id && !cancelled) def = latest.id;
         } catch { /* abaikan — pakai fallback */ }
-        setPeriodId(def);
+        if (!cancelled) setPeriodId(def);
       } catch { /* abaikan */ }
     })();
-  }, []);
+    return () => { cancelled = true; };
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const label = periods.find((p) => p.id === periodId)?.label ?? '';
 
