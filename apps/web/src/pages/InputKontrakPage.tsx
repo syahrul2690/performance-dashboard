@@ -17,14 +17,6 @@ type KpiItem = {
 const CURRENT_YEAR = new Date().getFullYear();
 const emptyRow = (): KpiItem => ({ indikator: '', formula: '', satuan: '', bobot: '', target: '', target2: '' });
 
-// 4 Bidang Utama PUSMANPRO (sesuai struktur organisasi)
-const BIDANG_OPTIONS = [
-  'Operasi Manajemen Proyek',
-  'QA/QC',
-  'Perencanaan & Project Control',
-  'Keuangan, Komunikasi & Umum',
-];
-
 // Unit yang dapat mengajukan Kontrak Manajemen: Kantor Induk + 5 UPMK
 const UNIT_OPTIONS = [
   { code: 'KP', name: 'Kantor Induk' },
@@ -35,6 +27,7 @@ const UNIT_OPTIONS = [
   { code: 'UPMK5', name: 'UPMK V' },
 ];
 const UNIT_NAMES: Record<string, string> = Object.fromEntries(UNIT_OPTIONS.map((u) => [u.code, u.name]));
+const RPC_BIDANG = 'Perencanaan & Project Control';
 
 const STATUS_LABEL: Record<string, string> = {
   draft: 'Draft', submitted: 'Menunggu Review', approved: 'Disetujui', rejected: 'Dikembalikan',
@@ -61,6 +54,8 @@ export function InputKontrakPage() {
 
   const [selectedUnit, setSelectedUnit] = useState('KP');
   const [bidang, setBidang] = useState('');
+  // Unit sasaran KM pada form (KP / UPMK1-5). PIC RPC dapat membuat KM untuk UPMK (ditag bidang RPC).
+  const [formUnit, setFormUnit] = useState('KP');
   const [holder, setHolder] = useState('');
   const [kpiItems, setKpiItems] = useState<KpiItem[]>([emptyRow()]);
   // Registri KM yang sudah disahkan (digabung dari halaman "Kontrak Manajemen Disetujui")
@@ -94,6 +89,7 @@ export function InputKontrakPage() {
   const resetForm = () => {
     // Default bidang ke bidang user (PIC) agar tidak salah pilih; GM tanpa bidang dibebaskan.
     setBidang(user?.bidang ?? '');
+    setFormUnit('KP');
     setHolder('');
     setKpiItems([emptyRow()]);
     setShowForm(false);
@@ -104,6 +100,7 @@ export function InputKontrakPage() {
 
   const handleEdit = (kontrak: KontrakManajemen) => {
     setBidang(kontrak.bidang);
+    setFormUnit(kontrak.unitCode);
     setHolder(kontrak.holder);
     setKpiItems(
       (kontrak.kpiItems as Partial<KpiItem>[]).map((it) => ({
@@ -135,11 +132,12 @@ export function InputKontrakPage() {
     setSubmitting(true);
     try {
       await inputKontrak.save(
-        selectedUnit, bidang.trim(), holder.trim(),
+        formUnit, bidang.trim(), holder.trim(),
         kpiItems as unknown as Record<string, unknown>[],
         editingId ?? undefined,
       );
       setSubmitted(true);
+      setSelectedUnit(formUnit); // tampilkan unit yang baru dibuat di daftar
       resetForm();
       await loadData();
       setTimeout(() => setSubmitted(false), 3000);
@@ -245,6 +243,15 @@ export function InputKontrakPage() {
   // Hanya PIC/Staff Kinerja bidang ybs (Kantor Induk) yang boleh edit/hapus/kirim KM bidang itu.
   // Role lintas-bidang (RPC konsolidasi/GM) hanya melihat KM bidang lain (read-only).
   const canActOnRow = (k: KontrakManajemen) => user?.role === 'STAFF' && user?.unit === 'KP' && (user?.bidang ?? null) === k.bidang;
+  // Opsi sasaran KM pada form. PIC RPC (konsolidator) boleh menyusun KM untuk UPMK I-V (ditag bidang RPC).
+  const formTargetOptions: Array<{ unit: string; label: string }> = !myBidang
+    ? []
+    : myBidang === RPC_BIDANG
+      ? [
+          { unit: 'KP', label: `${myBidang} (Kantor Induk)` },
+          ...UNIT_OPTIONS.filter((u) => u.code !== 'KP').map((u) => ({ unit: u.code, label: `${u.name} — ${myBidang}` })),
+        ]
+      : [{ unit: 'KP', label: `${myBidang} (Kantor Induk)` }];
   const visibleKontrak = scopeAllBidang ? kontrakList : kontrakList.filter((k) => k.bidang === myBidang);
   const visibleApproved = scopeAllBidang ? approvedList : approvedList.filter((k) => k.bidang === myBidang);
   const draftCount = visibleKontrak.filter((k) => k.status === 'draft').length;
@@ -338,21 +345,18 @@ export function InputKontrakPage() {
             )}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
               <div>
-                <label className="form-label">Bidang <span style={{ color: 'var(--color-danger)' }}>*</span></label>
+                <label className="form-label">Bidang / Unit Sasaran <span style={{ color: 'var(--color-danger)' }}>*</span></label>
                 <select
                   className="form-input"
-                  value={bidang}
-                  onChange={(e) => { setBidang(e.target.value); if (formError) setFormError(null); }}
+                  value={formUnit}
+                  onChange={(e) => { setFormUnit(e.target.value); setBidang(user?.bidang ?? ''); if (formError) setFormError(null); }}
                   style={formError && !bidang.trim() ? { borderColor: 'var(--color-danger)' } : undefined}
                 >
-                  <option value="">— Pilih Bidang —</option>
-                  {/* PIC bidang hanya boleh menyusun KM bidangnya sendiri; GM (tanpa bidang) bebas. */}
-                  {(user?.bidang ? [user.bidang] : BIDANG_OPTIONS).map((b) => (
-                    <option key={b} value={b}>{b}</option>
+                  {/* PIC bidang KM bidangnya sendiri. PIC RPC (konsolidator) juga bisa untuk UPMK I-V (ditag RPC). */}
+                  {formTargetOptions.length === 0 && <option value="">— Tidak tersedia —</option>}
+                  {formTargetOptions.map((o) => (
+                    <option key={o.unit} value={o.unit}>{o.label}</option>
                   ))}
-                  {bidang && !BIDANG_OPTIONS.includes(bidang) && bidang !== user?.bidang && (
-                    <option value={bidang}>{bidang}</option>
-                  )}
                 </select>
               </div>
               <div>
