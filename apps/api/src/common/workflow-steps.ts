@@ -63,7 +63,11 @@ const RPC_TAIL: Step[] = [
 //   mode 'km': KM disusun Kantor Induk → selalu rantai bidang KI.
 export function buildSteps(unitCode: string, bidang: string, mode: 'realisasi' | 'km' = 'realisasi'): Step[] {
   const isUPMK = mode === 'realisasi' && unitCode !== 'KP';
-  const chain = (KI_CHAIN[bidang] ?? []).map((s) => ({ ...s, bidang, unit: 'KP' }));
+  let chain = (KI_CHAIN[bidang] ?? []).map((s) => ({ ...s, bidang, unit: 'KP' }));
+  // Dokumen UPMK ber-bidang RPC: cukup Manajer Perencanaan (lewati Manajer Project Control).
+  if (bidang === RPC_BIDANG && unitCode !== 'KP') {
+    chain = chain.filter((s) => s.variant !== 'man_project_control');
+  }
   const steps: Step[] = [];
 
   if (isUPMK) {
