@@ -62,6 +62,13 @@ export function InputKontrakPage() {
   // Default unit mengikuti unit user (bila ada)
   useEffect(() => { if (user?.unit) setSelectedUnit(user.unit); }, [user?.unit]);
 
+  // Konsolidator RPC & GM boleh pilih unit bebas untuk monitoring
+  const vc0 = user?.roleVariant?.code;
+  const isRpcKonsolidasi = vc0 === 'man_perencanaan' || vc0 === 'sm_pc'
+    || (user?.role === 'STAFF' && (user?.bidang ?? null) === RPC_BIDANG);
+  const canSelectUnit = user?.role === 'GM' || isRpcKonsolidasi;
+  const lockedUnit = user?.unit ?? 'KP';
+
   useEffect(() => {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -234,17 +241,18 @@ export function InputKontrakPage() {
 
   // Hanya Kantor Induk yang boleh membuat KM (termasuk KM untuk UPMK). UPMK hanya mengisi realisasi.
   const canCreateKm = user?.unit === 'KP';
-  // Tampilkan KM sesuai bidang user saja (GM / tanpa bidang = semua bidang).
-  // Role konsolidasi RPC (SO RPC, Manajer Perencanaan, SM RPC) boleh melihat KM lintas bidang & UPMK.
+  // Scoping daftar KM:
+  // - GM + Konsolidator RPC → lintas unit & bidang
+  // - User lain → filter per UNIT, lalu KP staff tambah filter per BIDANG
   const myBidang = user?.bidang ?? null;
+  const myUnit = user?.unit ?? null;
   const vc = user?.roleVariant?.code;
-  const isRpcKonsolidasi = vc === 'man_perencanaan' || vc === 'sm_pc'
+  const isRpcKonsolidasi0 = vc === 'man_perencanaan' || vc === 'sm_pc'
     || (user?.role === 'STAFF' && myBidang === 'Perencanaan & Project Control');
-  const scopeAllBidang = user?.role === 'GM' || isRpcKonsolidasi || !myBidang;
+  const canSeeAllKm = user?.role === 'GM' || isRpcKonsolidasi0;
   // Hanya PIC/Staff Kinerja bidang ybs (Kantor Induk) yang boleh edit/hapus/kirim KM bidang itu.
-  // Role lintas-bidang (RPC konsolidasi/GM) hanya melihat KM bidang lain (read-only).
   const canActOnRow = (k: KontrakManajemen) => user?.role === 'STAFF' && user?.unit === 'KP' && (user?.bidang ?? null) === k.bidang;
-  // Opsi sasaran KM pada form. PIC RPC (konsolidator) boleh menyusun KM untuk UPMK I-V (ditag bidang RPC).
+  // Opsi sasaran KM pada form.
   const formTargetOptions: Array<{ unit: string; label: string }> = !myBidang
     ? []
     : myBidang === RPC_BIDANG
@@ -253,8 +261,19 @@ export function InputKontrakPage() {
           ...UNIT_OPTIONS.filter((u) => u.code !== 'KP').map((u) => ({ unit: u.code, label: u.name })),
         ]
       : [{ unit: 'KP', label: `${myBidang} (Kantor Induk)` }];
-  const visibleKontrak = scopeAllBidang ? kontrakList : kontrakList.filter((k) => k.bidang === myBidang);
-  const visibleApproved = scopeAllBidang ? approvedList : approvedList.filter((k) => k.bidang === myBidang);
+
+  const filterKm = (list: KontrakManajemen[]) => {
+    if (canSeeAllKm) return list;
+    return list.filter((k) => {
+      // Filter utama: unit harus cocok
+      if (myUnit && k.unitCode !== myUnit) return false;
+      // KP dengan bidang: filter tambahan agar tidak melihat KM bidang lain
+      if (myUnit === 'KP' && myBidang) return k.bidang === myBidang;
+      return true;
+    });
+  };
+  const visibleKontrak = filterKm(kontrakList);
+  const visibleApproved = filterKm(approvedList);
   const draftCount = visibleKontrak.filter((k) => k.status === 'draft').length;
   const submittedCount = visibleKontrak.filter((k) => k.status === 'submitted').length;
 
@@ -270,16 +289,23 @@ export function InputKontrakPage() {
             <div style={{ fontSize: 'var(--text-lg)', fontWeight: 700 }}>Input Kontrak Manajemen Tahun {CURRENT_YEAR}</div>
             <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
               <span>Unit:</span>
-              <select
-                className="form-input form-input-sm"
-                value={selectedUnit}
-                onChange={(e) => setSelectedUnit(e.target.value)}
-                style={{ width: 'auto', minWidth: 140, fontWeight: 700 }}
-              >
-                {UNIT_OPTIONS.map((u) => (
-                  <option key={u.code} value={u.code}>{u.name} ({u.code})</option>
-                ))}
-              </select>
+              {canSelectUnit ? (
+                <select
+                  className="form-input form-input-sm"
+                  value={selectedUnit}
+                  onChange={(e) => setSelectedUnit(e.target.value)}
+                  style={{ width: 'auto', minWidth: 140, fontWeight: 700 }}
+                >
+                  {UNIT_OPTIONS.map((u) => (
+                    <option key={u.code} value={u.code}>{u.name} ({u.code})</option>
+                  ))}
+                </select>
+              ) : (
+                <span style={{ fontWeight: 700, color: 'var(--color-accent)' }}>
+                  {UNIT_NAMES[lockedUnit] ?? lockedUnit}
+                  <span style={{ fontSize: 9, color: 'var(--color-text-subtle)', marginLeft: 4 }}>(dikunci ke unit Anda)</span>
+                </span>
+              )}
               <span>· {visibleKontrak.length} kontrak · Draft: {draftCount} · Terkirim: {submittedCount}</span>
             </div>
           </div>
