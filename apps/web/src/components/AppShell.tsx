@@ -16,7 +16,7 @@ import {
 const NAV_ITEMS = [
   { section: 'Aksi Saya', items: [
     { to: '/approvals', label: 'Persetujuan', icon: CheckSquare },
-    { to: '/input-kontrak', label: 'Input Kontrak Manajemen', icon: FileText },
+    { to: '/input-kontrak', label: 'Input Kontrak Manajemen', icon: FileText, hideForUpmk: true },
     { to: '/input-realisasi', label: 'Input Realisasi Bulanan', icon: ClipboardEdit },
   ]},
   { section: 'Dashboard', items: [
@@ -125,24 +125,32 @@ export function AppShell() {
         </div>
 
         <nav className="sidebar-nav" aria-label="Halaman">
-          {NAV_ITEMS.map((section) => (
-            <div key={section.section}>
-              <div className="nav-section-label">{section.section}</div>
-              {section.items.map(({ to, label, icon: Icon, end }) => (
-                <NavLink
-                  key={to}
-                  to={to}
-                  end={end}
-                  className="nav-item"
-                  aria-current={location.pathname === to || (!end && location.pathname.startsWith(to) && to !== '/') ? 'page' : undefined}
-                  title={collapsed ? label : undefined}
-                >
-                  <Icon size={18} className="nav-icon" />
-                  <span className="nav-label">{label}</span>
-                </NavLink>
-              ))}
-            </div>
-          ))}
+          {NAV_ITEMS.map((section) => {
+            // Sembunyikan item yang hideForUpmk=true untuk user unit UPMK (non-KP)
+            const isUpmkUser = user?.unit && user.unit !== 'KP';
+            const visibleItems = section.items.filter(
+              (it) => !(isUpmkUser && (it as { hideForUpmk?: boolean }).hideForUpmk),
+            );
+            if (visibleItems.length === 0) return null;
+            return (
+              <div key={section.section}>
+                <div className="nav-section-label">{section.section}</div>
+                {visibleItems.map(({ to, label, icon: Icon, end }) => (
+                  <NavLink
+                    key={to}
+                    to={to}
+                    end={end}
+                    className="nav-item"
+                    aria-current={location.pathname === to || (!end && location.pathname.startsWith(to) && to !== '/') ? 'page' : undefined}
+                    title={collapsed ? label : undefined}
+                  >
+                    <Icon size={18} className="nav-icon" />
+                    <span className="nav-label">{label}</span>
+                  </NavLink>
+                ))}
+              </div>
+            );
+          })}
         </nav>
 
         <div className="sidebar-footer">
