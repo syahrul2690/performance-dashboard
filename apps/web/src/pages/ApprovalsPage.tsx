@@ -417,16 +417,37 @@ export function ApprovalsPage() {
 
   if (error) return <ErrorState title="Gagal memuat laporan" message={error} />;
 
-  // B2-4: dokumen di-scope ke bidang user (GM / tanpa bidang = lintas-bidang).
-  // Role konsolidasi RPC (SO RPC, Manajer Perencanaan, SM RPC) boleh melihat lintas bidang & UPMK.
+  // Scoping "Semua Dokumen Persetujuan":
+  // - GM + Konsolidator RPC (Staff Kinerja RPC, Manajer Perencanaan, SM RPC) → lintas unit & bidang
+  // - User lain → filter utama per UNIT (UPMK1/UPMK2/.../KP), lalu KP staff tambah filter per BIDANG
   const isGM = user?.role === 'GM';
   const myBidang = user?.bidang ?? null;
+  const myUnit = user?.unit ?? null;
   const vc = user?.roleVariant?.code;
   const isRpcKonsolidasi = vc === 'man_perencanaan' || vc === 'sm_pc'
     || (user?.role === 'STAFF' && myBidang === 'Perencanaan & Project Control');
-  const scopeByBidang = isGM || isRpcKonsolidasi || !myBidang;
-  const scopeKm = scopeByBidang ? allKm : allKm.filter((k) => k.bidang === myBidang);
-  const scopeReal = scopeByBidang ? allReal : allReal.filter((r) => (r as RealisasiKinerja & { bidang?: string }).bidang === myBidang);
+  const canSeeAllDocs = isGM || isRpcKonsolidasi;
+
+  const scopeKm = canSeeAllDocs
+    ? allKm
+    : allKm.filter((k) => {
+        // Filter utama: unit harus cocok
+        if (myUnit && k.unitCode !== myUnit) return false;
+        // KP dengan bidang: filter tambahan per bidang agar tidak melihat semua KM KP
+        if (myUnit === 'KP' && myBidang) return k.bidang === myBidang;
+        return true;
+      });
+
+  const scopeReal = canSeeAllDocs
+    ? allReal
+    : allReal.filter((r) => {
+        const realBidang = (r as RealisasiKinerja & { bidang?: string }).bidang ?? null;
+        // Filter utama: unit harus cocok
+        if (myUnit && r.unitCode !== myUnit) return false;
+        // KP dengan bidang: filter tambahan per bidang
+        if (myUnit === 'KP' && myBidang) return realBidang === myBidang;
+        return true;
+      });
 
   // Ringkasan dari dokumen yang DIINPUT manual ke sistem (Kontrak Manajemen + Realisasi Kinerja)
   const docs: Array<{ status: string }> = [...scopeKm, ...scopeReal];
