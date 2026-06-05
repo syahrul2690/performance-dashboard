@@ -143,7 +143,7 @@ export function ApprovalsPage() {
   const [searchParams] = useSearchParams();
   const focusType = searchParams.get('type');
   const focusId = searchParams.get('focus');
-  const [highlight, setHighlight] = useState<'real' | 'km' | null>(null);
+  const [highlight, setHighlight] = useState<'real' | 'km' | 'kmbundle' | 'realbundle' | null>(null);
   // Task 4: ekspansi riwayat komentar pada kartu "Semua Dokumen Persetujuan".
   const [docExpanded, setDocExpanded] = useState<string | null>(null);
 
@@ -238,16 +238,19 @@ export function ApprovalsPage() {
   // Prioritas: Realisasi Kinerja Bulanan; fallback ke Usulan KM yang menunggu.
   useEffect(() => {
     if (loading || (!focusType && !focusId)) return;
-    const inReal = focusType === 'realisasi' || realList.some((r) => r.id === focusId);
-    const inKm = focusType === 'km' || kmList.some((k) => k.id === focusId);
-    const target: 'real' | 'km' | null = inReal
-      ? 'real'
-      : inKm
-        ? 'km'
-        : realList.length > 0 ? 'real' : kmList.length > 0 ? 'km' : null;
+    // Notifikasi GM "siap bundle" mengarah langsung ke kartu konsolidasi.
+    const target: 'real' | 'km' | 'kmbundle' | 'realbundle' | null =
+      focusType === 'km-bundle' ? 'kmbundle'
+      : focusType === 'realisasi-bundle' ? 'realbundle'
+      : focusType === 'realisasi' || realList.some((r) => r.id === focusId) ? 'real'
+      : focusType === 'km' || kmList.some((k) => k.id === focusId) ? 'km'
+      : realList.length > 0 ? 'real'
+      : kmList.length > 0 ? 'km'
+      : null;
     if (!target) return;
     setHighlight(target);
-    const el = document.getElementById(target === 'real' ? 'card-realisasi' : 'card-km');
+    const idMap = { real: 'card-realisasi', km: 'card-km', kmbundle: 'card-km-bundle', realbundle: 'card-real-bundle' } as const;
+    const el = document.getElementById(idMap[target]);
     el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     const t = setTimeout(() => setHighlight(null), 4000);
     return () => clearTimeout(t);
@@ -522,6 +525,8 @@ export function ApprovalsPage() {
       {/* Bundle Konsolidasi KM Tahunan — persetujuan akhir GM */}
       {canReview && kmBundle && (
         <FoldCard
+          id="card-km-bundle"
+          highlight={highlight === 'kmbundle'}
           accent="var(--color-accent)"
           icon={<Layers size={14} />}
           title={`Konsolidasi Kontrak Manajemen Tahunan${kmBundle.year ? ' — ' + kmBundle.year : ''}`}
@@ -767,6 +772,8 @@ export function ApprovalsPage() {
       {/* Bundle Konsolidasi Realisasi — persetujuan akhir GM (sekali untuk seluruh periode) */}
       {canReview && bundle && (
         <FoldCard
+          id="card-real-bundle"
+          highlight={highlight === 'realbundle'}
           accent="var(--color-brand, #125D72)"
           icon={<Layers size={14} />}
           title={`Konsolidasi Realisasi Periode${bundle.period?.label ? ' — ' + bundle.period.label : ''}`}

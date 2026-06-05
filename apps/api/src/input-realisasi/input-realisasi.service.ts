@@ -278,7 +278,7 @@ export class InputRealisasiService {
           data: gms.map((g) => ({
             userId: g.id, type: 'approval', title: 'Realisasi Siap Masuk Bundle',
             msg: `Realisasi ${uname(r.unitCode)} — ${r.bidang} telah lolos hingga SM Perencanaan & PC dan siap dikonsolidasi periode.`,
-            route: '/approvals?type=realisasi', targetId: id, unread: true,
+            route: '/approvals?type=realisasi-bundle', targetId: id, unread: true,
           })),
         });
       }

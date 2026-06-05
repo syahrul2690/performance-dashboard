@@ -244,7 +244,7 @@ export class InputKontrakService {
           data: gms.map((g) => ({
             userId: g.id, type: 'approval', title: 'KM Siap Masuk Bundle Tahunan',
             msg: `KM ${uname(k.unitCode)} — ${k.bidang} lolos hingga SM Perencanaan & PC, siap dikonsolidasi tahunan.`,
-            route: '/approvals?type=km', targetId: id, unread: true,
+            route: '/approvals?type=km-bundle', targetId: id, unread: true,
           })),
         });
       }
