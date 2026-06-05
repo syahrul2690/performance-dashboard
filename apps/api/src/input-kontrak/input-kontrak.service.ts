@@ -232,6 +232,12 @@ export class InputKontrakService {
       },
     });
     if (chainDone) {
+      // Bila bundle tahun ini sebelumnya 'rejected', buka kembali agar GM bisa meninjau ulang.
+      const period = await this.prisma.period.findUnique({ where: { id: k.periodId }, select: { yearMonth: true } });
+      const yr = period?.yearMonth.slice(0, 4);
+      if (yr) {
+        await this.prisma.kMBundle.updateMany({ where: { year: yr, status: 'rejected' }, data: { status: 'open' } });
+      }
       const gms = await this.prisma.user.findMany({ where: { role: Role.GM, isActive: true } });
       if (gms.length) {
         await this.prisma.notification.createMany({
@@ -297,23 +303,52 @@ export class InputKontrakService {
       if (!components.every((c) => c.status === 'ready')) throw new ForbiddenException('Masih ada KM yang belum lolos sampai SM Perencanaan & PC');
       await this.prisma.kontrakManajemen.updateMany({ where: { periodId: { in: pids }, status: 'ready' }, data: { status: 'approved', reviewer: user.name, reviewedAt: new Date() } });
     } else {
-      await this.prisma.kontrakManajemen.updateMany({ where: { periodId: { in: pids }, status: 'ready' }, data: { status: 'rejected', currentStepIndex: 0, currentStage: 0, reviewer: user.name, reviewNote: note, reviewedAt: new Date() } });
+      // GM tolak bundle → kembalikan tiap komponen 'ready' ke langkah Manajer Perencanaan
+      // (bukan ke konseptor). Manajer Perencanaan yang memilah; jika perlu, baru escalate ke konseptor.
+      for (const c of components.filter((x) => x.status === 'ready')) {
+        const cSteps = (c.steps as unknown as Step[]) ?? [];
+        let idx = cSteps.findIndex((s) => s.variant === 'man_perencanaan');
+        if (idx < 0) idx = Math.max(0, cSteps.length - 2); // fallback: 1 langkah sebelum SM
+        const baseHist = Array.isArray(c.history) ? (c.history as object[]) : [];
+        const history = [...baseHist, {
+          stepIndex: cSteps.length, actor: user.name, role: user.role,
+          action: 'bundle_returned', toStepIndex: idx, label: cSteps[idx]?.label ?? 'Manajer Perencanaan',
+          note, ts: new Date().toISOString(),
+        }];
+        await this.prisma.kontrakManajemen.update({
+          where: { id: c.id },
+          data: { status: 'submitted', currentStepIndex: idx, currentStage: idx, history, reviewer: user.name, reviewNote: note, reviewedAt: new Date() },
+        });
+      }
     }
     const bundle = await this.prisma.kMBundle.upsert({
       where: { year: yr },
       update: { status: action === 'approve' ? 'approved' : 'rejected', reviewer: user.name, reviewNote: note, reviewedAt: new Date() },
       create: { year: yr, status: action === 'approve' ? 'approved' : 'rejected', reviewer: user.name, reviewNote: note, reviewedAt: new Date() },
     });
-    const submitterIds = [...new Set(components.map((c) => c.submitterId).filter(Boolean))] as string[];
-    if (submitterIds.length) {
-      await this.prisma.notification.createMany({
-        data: submitterIds.map((sid) => ({
-          userId: sid, type: action === 'approve' ? 'success' : 'alert',
-          title: action === 'approve' ? 'Bundle KM Disetujui GM' : 'Bundle KM Dikembalikan GM',
-          msg: action === 'approve' ? `Kontrak Manajemen tahun ${yr} disahkan penuh oleh ${user.name}.` : `Bundle KM tahun ${yr} dikembalikan oleh ${user.name}: ${note}`,
-          route: '/input-kontrak', unread: true,
-        })),
-      });
+    if (action === 'approve') {
+      const submitterIds = [...new Set(components.map((c) => c.submitterId).filter(Boolean))] as string[];
+      if (submitterIds.length) {
+        await this.prisma.notification.createMany({
+          data: submitterIds.map((sid) => ({
+            userId: sid, type: 'success', title: 'Bundle KM Disetujui GM',
+            msg: `Kontrak Manajemen tahun ${yr} disahkan penuh oleh ${user.name}.`,
+            route: '/input-kontrak', unread: true,
+          })),
+        });
+      }
+    } else {
+      // Notifikasi ke Manajer Perencanaan (penerima limpahan tolakan bundle GM).
+      const manPer = await this.prisma.user.findMany({ where: { isActive: true, roleVariant: { code: 'man_perencanaan' } } });
+      if (manPer.length) {
+        await this.prisma.notification.createMany({
+          data: manPer.map((u) => ({
+            userId: u.id, type: 'alert', title: 'Bundle KM Dikembalikan GM',
+            msg: `${user.name} menolak bundle KM tahun ${yr}. Komponen dikembalikan ke Manajer Perencanaan untuk ditinjau: ${note}`,
+            route: '/approvals?type=km', unread: true,
+          })),
+        });
+      }
     }
     await this.prisma.auditLog.create({ data: { actor: user.name, userId: user.id, action: `kontrak.bundle.${action}`, entity: 'KMBundle', targetId: bundle.id, note } });
     for (const c of components) await this.cache.del(`kontrak:${c.unitCode}`);
