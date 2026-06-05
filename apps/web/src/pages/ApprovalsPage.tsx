@@ -489,7 +489,7 @@ export function ApprovalsPage() {
                               <thead>
                                 <tr>
                                   <th>No</th><th>Indikator Kinerja</th><th>Formula</th><th>Satuan</th>
-                                  <th className="num">Bobot</th><th>Target Sem I</th><th>Target Tahun</th>
+                                  <th className="num">Bobot</th><th>Target Sem I</th>{`Target Tahun ${new Date().getFullYear()}`}
                                 </tr>
                               </thead>
                               <tbody>
@@ -559,7 +559,7 @@ export function ApprovalsPage() {
                           Penanggung Jawab: <strong style={{ color: 'var(--color-text)' }}>{c.holder ?? '—'}</strong>
                         </div>
                         <table className="data-table compact" style={{ margin: 0 }}>
-                          <thead><tr><th>No</th><th>Indikator Kinerja</th><th>Formula</th><th>Satuan</th><th className="num">Bobot</th><th>Target Sem I</th><th>Target Tahun</th></tr></thead>
+                          <thead><tr><th>No</th><th>Indikator Kinerja</th><th>Formula</th><th>Satuan</th><th className="num">Bobot</th><th>Target Sem I</th>{`Target Tahun ${new Date().getFullYear()}`}</tr></thead>
                           <tbody>
                             {(c.kpiItems ?? []).map((it, idx) => (
                               <tr key={idx}>
