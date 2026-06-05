@@ -569,8 +569,6 @@ export function ApprovalsPage() {
                             ))}
                           </tbody>
                         </table>
-                        <div style={{ fontSize: 11, fontWeight: 600, padding: 'var(--space-2) var(--space-3) 0' }}>Riwayat Persetujuan & Komentar</div>
-                        <ApprovalTimeline history={c.history} />
                       </td>
                     </tr>
                   )}
