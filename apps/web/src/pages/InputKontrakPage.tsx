@@ -187,8 +187,12 @@ export function InputKontrakPage() {
       }
       setShowForm(true);
       setEditingId(null);
+      setBidang(user?.bidang ?? '');   // bidang KM = bidang PIC (terisi otomatis)
+      setFormUnit('KP');               // default unit Kantor Induk; PIC RPC bisa ganti ke UPMK
+      setHolder('');
+      setFormError(null);
       setKpiItems(rows.map((r) => ({ ...emptyRow(), ...r })));
-      setNotice(`${rows.length} indikator berhasil diimpor dari Excel. Lengkapi Bidang & Penanggung Jawab lalu simpan.`);
+      setNotice(`${rows.length} indikator berhasil diimpor dari Excel. Lengkapi Penanggung Jawab lalu simpan.`);
     } catch (err) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
         ?? (err as Error)?.message ?? 'Gagal mengunggah file';
