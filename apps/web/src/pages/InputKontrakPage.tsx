@@ -253,7 +253,7 @@ export function InputKontrakPage() {
     : myBidang === RPC_BIDANG
       ? [
           { unit: 'KP', label: `${myBidang} (Kantor Induk)` },
-          ...UNIT_OPTIONS.filter((u) => u.code !== 'KP').map((u) => ({ unit: u.code, label: `${u.name} — ${myBidang}` })),
+          ...UNIT_OPTIONS.filter((u) => u.code !== 'KP').map((u) => ({ unit: u.code, label: u.name })),
         ]
       : [{ unit: 'KP', label: `${myBidang} (Kantor Induk)` }];
   const visibleKontrak = scopeAllBidang ? kontrakList : kontrakList.filter((k) => k.bidang === myBidang);
