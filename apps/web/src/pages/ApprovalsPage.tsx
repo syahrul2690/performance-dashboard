@@ -86,6 +86,89 @@ function FoldCard({
 const STAGES = ['', 'Staff', 'Asman', 'Manajer', 'Sr. Manajer', 'GM'];
 // Jenjang persetujuan usulan Kontrak Manajemen: Staff → Asman → Manajer → Sr. Manajer → GM (final)
 
+// ===== RACI DINAMIS =====
+const RPC_BIDANG_RACI = 'Perencanaan & Project Control';
+
+type RaciColKey = 'pic_staff' | 'upmk_internal' | 'ki_chain' | 'rpc' | 'gm';
+
+const RACI_COLS: { key: RaciColKey; label: string; sublabel: string }[] = [
+  { key: 'pic_staff',       label: 'PIC / Staff',            sublabel: 'Penyusun & Submitter (semua unit)' },
+  { key: 'upmk_internal',  label: 'ASMAN / MUP',            sublabel: 'Review internal UPMK I–V' },
+  { key: 'ki_chain',       label: 'Manajer / SM Bidang',    sublabel: 'Rantai review Kantor Induk' },
+  { key: 'rpc',            label: 'Konsolidator RPC',       sublabel: 'Staff / Man / SM Perencanaan & PC' },
+  { key: 'gm',             label: 'General Manager',        sublabel: 'Approval bundle final' },
+];
+
+const RACI_ROWS: { activity: string; scope: string; values: Record<RaciColKey, string> }[] = [
+  {
+    activity: 'Input & Submit Dokumen (Realisasi / KM)',
+    scope: 'Semua unit',
+    values: { pic_staff: 'R', upmk_internal: 'I', ki_chain: 'I', rpc: 'I', gm: 'I' },
+  },
+  {
+    activity: 'Review Internal UPMK (ASMAN + MUP)',
+    scope: 'UPMK I–V',
+    values: { pic_staff: 'C', upmk_internal: 'R/A', ki_chain: '—', rpc: 'I', gm: 'I' },
+  },
+  {
+    activity: 'Review Rantai Bidang (Kantor Induk)',
+    scope: 'KI Chain',
+    values: { pic_staff: 'I', upmk_internal: 'C', ki_chain: 'R/A', rpc: 'I', gm: 'I' },
+  },
+  {
+    activity: 'Konsolidasi & Review RPC',
+    scope: 'Bidang non-RPC',
+    values: { pic_staff: 'I', upmk_internal: 'I', ki_chain: 'C', rpc: 'R/A', gm: 'I' },
+  },
+  {
+    activity: 'Approval Bundle Final (KM Tahunan / Realisasi Bulanan)',
+    scope: 'Semua unit',
+    values: { pic_staff: 'I', upmk_internal: 'I', ki_chain: 'C', rpc: 'C', gm: 'R/A' },
+  },
+  {
+    activity: 'Monitoring & Audit Lintas Unit',
+    scope: 'Konsolidator & GM',
+    values: { pic_staff: '—', upmk_internal: '—', ki_chain: 'I', rpc: 'R', gm: 'A' },
+  },
+];
+
+function getUserRaciCol(u: { role: string; unit?: string | null; bidang?: string | null; roleVariant?: { code: string } | null } | null): RaciColKey | null {
+  if (!u) return null;
+  if (u.role === 'GM') return 'gm';
+  const vc = u.roleVariant?.code;
+  const isRpc = vc === 'sm_pc' || vc === 'man_perencanaan' ||
+    (u.role === 'STAFF' && u.bidang === RPC_BIDANG_RACI);
+  if (isRpc) return 'rpc';
+  const isUpmk = u.unit && u.unit !== 'KP';
+  if (u.role === 'STAFF') return 'pic_staff';
+  if (isUpmk && (u.role === 'ASMAN' || u.role === 'MANAJER')) return 'upmk_internal';
+  return 'ki_chain'; // ASMAN/Manajer/SM di KP
+}
+
+const RACI_COL_LABEL: Record<RaciColKey, string> = {
+  pic_staff:      'PIC / Staff Penyusun',
+  upmk_internal:  'Reviewer Internal UPMK (ASMAN / MUP)',
+  ki_chain:       'Reviewer Bidang — Kantor Induk (Manajer / SM Bidang)',
+  rpc:            'Konsolidator RPC (Staff / Manajer / SM Perencanaan & PC)',
+  gm:             'General Manager',
+};
+
+const RACI_COL_TANGGUNG: Record<RaciColKey, string> = {
+  pic_staff:     'Menyusun, mengisi nilai realisasi, dan men-submit dokumen ke jenjang review.',
+  upmk_internal: 'Memverifikasi kelengkapan data internal UPMK sebelum diteruskan ke rantai Kantor Induk.',
+  ki_chain:      'Mereview keakuratan data di dalam rantai bidang Kantor Induk hingga SM Bidang.',
+  rpc:           'Mengkonsolidasikan seluruh dokumen lintas bidang/unit dan memastikan kualitas sebelum bundle GM.',
+  gm:            'Menyahkan seluruh bundle KM tahunan dan bundle realisasi periode dengan satu keputusan final.',
+};
+
+const RACI_VALUE_STYLE = (v: string): React.CSSProperties => {
+  if (v === '—') return { background: 'var(--color-surface-2)', color: 'var(--color-text-subtle)' };
+  if (v.startsWith('R')) return { background: 'var(--color-accent-tint)', color: 'var(--color-accent)' };
+  if (v === 'A') return { background: 'rgba(16,185,129,0.12)', color: 'var(--color-success)' };
+  if (v === 'C') return { background: 'rgba(59,130,246,0.12)', color: 'var(--color-info)' };
+  return { background: 'var(--color-surface-2)', color: 'var(--color-text-subtle)' };
+};
+
 const DOC_STATUS_LABEL: Record<string, string> = {
   draft: 'Draft', submitted: 'Menunggu Review', ready: 'Siap Konsolidasi', approved: 'Disetujui', rejected: 'Dikembalikan',
 };
@@ -948,53 +1031,122 @@ export function ApprovalsPage() {
         </div>
       </FoldCard>
 
-      {/* RACI Matrix */}
-      <FoldCard
-        icon={<UsersRound size={14} />}
-        title="Matriks RACI"
-        right={<span className="card-meta">R=Responsible · A=Accountable · C=Consulted · I=Informed</span>}
-        defaultOpen={false}
-      >
-        <div className="table-wrap">
-          <table className="data-table compact">
-            <thead>
-              <tr>
-                <th>Aktivitas</th>
-                <th style={{ textAlign: 'center' }}>Staff</th>
-                <th style={{ textAlign: 'center' }}>Asman</th>
-                <th style={{ textAlign: 'center' }}>Manajer</th>
-                <th style={{ textAlign: 'center' }}>Sr. Manajer</th>
-                <th style={{ textAlign: 'center' }}>GM</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                { activity: 'Input Data Realisasi', values: ['R', 'I', 'I', 'I', 'I'] },
-                { activity: 'Review Kelengkapan Data', values: ['C', 'R/A', 'I', 'I', 'I'] },
-                { activity: 'Approval Laporan Bidang', values: ['I', 'C', 'R/A', 'I', 'I'] },
-                { activity: 'Review Konsolidasi', values: ['I', 'I', 'C', 'R/A', 'I'] },
-                { activity: 'Final Approval & Publikasi', values: ['I', 'I', 'I', 'C', 'R/A'] },
-                { activity: 'Audit & Monitoring', values: ['I', 'I', 'C', 'C', 'A'] },
-              ].map((row, i) => (
-                <tr key={i}>
-                  <td style={{ fontWeight: 500 }}>{row.activity}</td>
-                  {row.values.map((v, vi) => (
-                    <td key={vi} style={{ textAlign: 'center' }}>
-                      <span style={{
-                        display: 'inline-block', width: 28, height: 20, borderRadius: 4, lineHeight: '20px', textAlign: 'center', fontSize: 'var(--text-xs)', fontWeight: 700,
-                        background: v.startsWith('R') ? 'var(--color-accent-tint)' : v === 'A' ? 'rgba(16,185,129,0.12)' : v === 'C' ? 'rgba(59,130,246,0.12)' : 'var(--color-surface-2)',
-                        color: v.startsWith('R') ? 'var(--color-accent)' : v === 'A' ? 'var(--color-success)' : v === 'C' ? 'var(--color-info)' : 'var(--color-text-subtle)',
-                      }}>
-                        {v}
-                      </span>
-                    </td>
-                  ))}
-                </tr>
+      {/* RACI Matrix — dinamis per role */}
+      {(() => {
+        const myCol = getUserRaciCol(user);
+        return (
+          <FoldCard
+            icon={<UsersRound size={14} />}
+            title="Matriks RACI"
+            right={<span className="card-meta">R=Responsible · A=Accountable · C=Consulted · I=Informed</span>}
+            defaultOpen={false}
+          >
+            {/* Banner: Peran Anda */}
+            {myCol && (
+              <div style={{
+                margin: 'var(--space-4) var(--space-4) 0',
+                padding: 'var(--space-3) var(--space-4)',
+                borderRadius: 'var(--radius-md)',
+                background: 'var(--color-accent-tint)',
+                borderLeft: '4px solid var(--color-accent)',
+                display: 'flex', flexDirection: 'column', gap: 4,
+              }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-accent)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Peran Anda dalam Workflow</div>
+                <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700 }}>{RACI_COL_LABEL[myCol]}</div>
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>{RACI_COL_TANGGUNG[myCol]}</div>
+                <div style={{ fontSize: 10, color: 'var(--color-text-subtle)', marginTop: 2 }}>Kolom yang disorot (🔵) pada tabel di bawah menunjukkan posisi Anda dalam matriks.</div>
+              </div>
+            )}
+
+            {/* Legend */}
+            <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap', padding: 'var(--space-3) var(--space-4)', fontSize: 10 }}>
+              {[['R', 'var(--color-accent-tint)', 'var(--color-accent)', 'Responsible — pelaksana utama'],
+                ['A', 'rgba(16,185,129,0.12)', 'var(--color-success)', 'Accountable — pemegang tanggung jawab akhir'],
+                ['C', 'rgba(59,130,246,0.12)', 'var(--color-info)', 'Consulted — diminta masukan/persetujuan'],
+                ['I', 'var(--color-surface-2)', 'var(--color-text-subtle)', 'Informed — diinformasikan'],
+                ['—', 'var(--color-surface-2)', 'var(--color-text-subtle)', 'Tidak terlibat pada alur ini'],
+              ].map(([lbl, bg, clr, desc]) => (
+                <div key={lbl} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ display: 'inline-block', width: 22, height: 18, borderRadius: 3, lineHeight: '18px', textAlign: 'center', fontWeight: 700, background: bg as string, color: clr as string, fontSize: 10 }}>{lbl}</span>
+                  <span style={{ color: 'var(--color-text-muted)' }}>{desc}</span>
+                </div>
               ))}
-            </tbody>
-          </table>
-        </div>
-      </FoldCard>
+            </div>
+
+            <div className="table-wrap">
+              <table className="data-table compact">
+                <thead>
+                  <tr>
+                    <th style={{ minWidth: 220 }}>Aktivitas</th>
+                    <th style={{ fontSize: 9, color: 'var(--color-text-muted)', fontWeight: 500, whiteSpace: 'nowrap', textAlign: 'center' }}>Ruang Lingkup</th>
+                    {RACI_COLS.map((col) => (
+                      <th
+                        key={col.key}
+                        style={{
+                          textAlign: 'center', minWidth: 110,
+                          background: myCol === col.key ? 'var(--color-accent-tint)' : undefined,
+                          color: myCol === col.key ? 'var(--color-accent)' : undefined,
+                          borderBottom: myCol === col.key ? '2px solid var(--color-accent)' : undefined,
+                        }}
+                      >
+                        <div style={{ fontWeight: 700, fontSize: 11 }}>
+                          {myCol === col.key ? '🔵 ' : ''}{col.label}
+                        </div>
+                        <div style={{ fontSize: 9, fontWeight: 400, color: myCol === col.key ? 'var(--color-accent)' : 'var(--color-text-subtle)', marginTop: 2, whiteSpace: 'normal', lineHeight: 1.3 }}>
+                          {col.sublabel}
+                        </div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {RACI_ROWS.map((row, i) => (
+                    <tr key={i}>
+                      <td style={{ fontWeight: 500, fontSize: 'var(--text-xs)' }}>{row.activity}</td>
+                      <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontSize: 9, background: 'var(--color-surface-2)', color: 'var(--color-text-muted)', padding: '1px 6px', borderRadius: 8 }}>{row.scope}</span>
+                      </td>
+                      {RACI_COLS.map((col) => {
+                        const v = row.values[col.key];
+                        const isMyCol = myCol === col.key;
+                        return (
+                          <td
+                            key={col.key}
+                            style={{
+                              textAlign: 'center',
+                              background: isMyCol ? 'rgba(var(--color-accent-rgb, 14,116,144),0.04)' : undefined,
+                            }}
+                          >
+                            <span style={{
+                              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                              minWidth: 32, height: 22, borderRadius: 4,
+                              fontSize: 'var(--text-xs)', fontWeight: 700,
+                              outline: isMyCol && v !== '—' ? '2px solid var(--color-accent)' : undefined,
+                              outlineOffset: 1,
+                              ...RACI_VALUE_STYLE(v),
+                            }}>
+                              {v}
+                            </span>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Catatan konteks */}
+            <div style={{ padding: 'var(--space-3) var(--space-4)', fontSize: 10, color: 'var(--color-text-subtle)', borderTop: '1px solid var(--color-border)', lineHeight: 1.7 }}>
+              <strong style={{ color: 'var(--color-text-muted)' }}>Catatan alur:</strong>{' '}
+              Dokumen dari <strong>UPMK</strong> melewati review internal (ASMAN + MUP) sebelum masuk rantai Kantor Induk.{' '}
+              Dokumen dari <strong>Kantor Induk</strong> langsung ke rantai bidang KI.{' '}
+              Semua dokumen (kecuali bidang RPC sendiri) wajib melalui <strong>konsolidasi RPC</strong> sebelum masuk bundle GM.{' '}
+              GM menyetujui <strong>sekali untuk seluruh dokumen</strong> dalam satu bundle (KM: tahunan; Realisasi: per periode).
+            </div>
+          </FoldCard>
+        );
+      })()}
     </div>
   );
 }

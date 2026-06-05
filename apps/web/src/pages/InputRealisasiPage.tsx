@@ -6,6 +6,7 @@ import { SkeletonTable, EmptyState, ErrorState } from '../components/LoadState';
 import type { KontrakManajemen, Period } from '../lib/types';
 
 const CURRENT_YEAR = new Date().getFullYear();
+const RPC_BIDANG = 'Perencanaan & Project Control';
 
 type KpiItem = {
   no?: number; indikator?: string; formula?: string; satuan?: string;
@@ -33,7 +34,16 @@ const UNIT_OPTIONS = [
 export function InputRealisasiPage() {
   const { user } = useAuth();
   const isStaff = user?.role === 'STAFF';
-  const [selectedUnit, setSelectedUnit] = useState<string>('KP');
+  // Konsolidator RPC (Staff Kinerja RPC, Manajer Perencanaan, SM Perencanaan & PC)
+  // mendapat akses lintas-unit untuk monitoring — sama dengan GM (kecuali tidak bisa submit milik unit lain).
+  const vc = user?.roleVariant?.code;
+  const isRpcKonsolidasi =
+    (isStaff && user?.bidang === RPC_BIDANG) ||
+    vc === 'man_perencanaan' ||
+    vc === 'sm_pc';
+  const canSelectUnit = user?.role === 'GM' || isRpcKonsolidasi;
+  const lockedUnit = user?.unit ?? 'KP';
+  const [selectedUnit, setSelectedUnit] = useState<string>(lockedUnit);
   const [periods, setPeriods] = useState<Period[]>([]);
   const [selectedPeriodId, setSelectedPeriodId] = useState<string>('');
   const [history, setHistory] = useState<unknown[]>([]);
@@ -72,8 +82,10 @@ export function InputRealisasiPage() {
   };
   const fmtSize = (b: number) => (b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB');
 
-  // Default unit mengikuti unit user (bila ada)
-  useEffect(() => { if (user?.unit) setSelectedUnit(user.unit); }, [user?.unit]);
+  // Default unit mengikuti unit user (bila ada). Bila tidak bisa pilih bebas, unit dikunci.
+  useEffect(() => {
+    if (user?.unit) setSelectedUnit(user.unit);
+  }, [user?.unit]);
 
   // Muat daftar periode (Jan–Des) sekali; default ke periode aktif.
   useEffect(() => {
@@ -103,8 +115,10 @@ export function InputRealisasiPage() {
           let merged: KpiItem[] = kontrak.flatMap((k) =>
             (k.kpiItems as KpiItem[]).map((it) => ({ ...it, bidang: k.bidang })),
           );
-          // Task 7: staff hanya boleh mengisi KPI bidangnya sendiri.
-          if (isStaff && user?.bidang) {
+          // Staff bidang hanya melihat KPI bidangnya sendiri.
+          // Konsolidator RPC (Staff Kinerja RPC, Manajer Perencanaan, SM RPC) TIDAK difilter
+          // sehingga bisa memonitor KPI semua bidang pada unit yang dipilih.
+          if (isStaff && user?.bidang && !isRpcKonsolidasi) {
             merged = merged.filter((it) => it.bidang === user.bidang);
           }
           setKpiList(merged);
@@ -198,16 +212,23 @@ export function InputRealisasiPage() {
               </select>
               <span>·</span>
               <span>Unit:</span>
-              <select
-                className="form-input form-input-sm"
-                value={selectedUnit}
-                onChange={(e) => setSelectedUnit(e.target.value)}
-                style={{ width: 'auto', minWidth: 140, fontWeight: 700 }}
-              >
-                {UNIT_OPTIONS.map((u) => (
-                  <option key={u.code} value={u.code}>{u.name} ({u.code})</option>
-                ))}
-              </select>
+              {canSelectUnit ? (
+                <select
+                  className="form-input form-input-sm"
+                  value={selectedUnit}
+                  onChange={(e) => setSelectedUnit(e.target.value)}
+                  style={{ width: 'auto', minWidth: 140, fontWeight: 700 }}
+                >
+                  {UNIT_OPTIONS.map((u) => (
+                    <option key={u.code} value={u.code}>{u.name} ({u.code})</option>
+                  ))}
+                </select>
+              ) : (
+                <span style={{ fontWeight: 700, color: 'var(--color-accent)' }}>
+                  {UNIT_OPTIONS.find((u) => u.code === lockedUnit)?.name ?? lockedUnit}
+                  <span style={{ fontSize: 9, color: 'var(--color-text-subtle)', marginLeft: 4 }}>(dikunci ke unit Anda)</span>
+                </span>
+              )}
               <span>· {kpiList.length} indikator KM{isStaff && user?.bidang ? ` · Bidang: ${user.bidang}` : ''} · Deadline: Tanggal 3 setiap bulan</span>
             </div>
           </div>
