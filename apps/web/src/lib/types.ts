@@ -185,7 +185,7 @@ export interface RealisasiKinerja {
   submitter: string;
   submitterId?: string | null;
   values: Record<string, { indikator?: string; target?: string | number; realisasi?: string | number; satuan?: string; bobot?: string | number }>;
-  status: 'draft' | 'submitted' | 'approved' | 'rejected';
+  status: 'draft' | 'submitted' | 'ready' | 'approved' | 'rejected';
   currentStage: number;
   reviewer?: string | null;
   reviewNote?: string | null;
@@ -201,7 +201,7 @@ export interface KontrakManajemen {
   bidang: string;
   holder: string;
   kpiItems: Record<string, unknown>[];
-  status: 'draft' | 'submitted' | 'approved' | 'rejected';
+  status: 'draft' | 'submitted' | 'ready' | 'approved' | 'rejected';
   currentStage: number;
   history?: Array<Record<string, unknown>>;
   submitter: string;

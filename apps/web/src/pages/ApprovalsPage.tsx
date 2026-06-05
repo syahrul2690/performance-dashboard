@@ -85,13 +85,12 @@ function FoldCard({
 
 const STAGES = ['', 'Staff', 'Asman', 'Manajer', 'Sr. Manajer', 'GM'];
 // Jenjang persetujuan usulan Kontrak Manajemen: Staff → Asman → Manajer → Sr. Manajer → GM (final)
-const KM_STAGES = ['Staff', 'Asman', 'Manajer', 'Sr. Manajer', 'GM'];
 
 const DOC_STATUS_LABEL: Record<string, string> = {
-  draft: 'Draft', submitted: 'Menunggu Review', approved: 'Disetujui', rejected: 'Dikembalikan',
+  draft: 'Draft', submitted: 'Menunggu Review', ready: 'Siap Konsolidasi', approved: 'Disetujui', rejected: 'Dikembalikan',
 };
 const DOC_STATUS_PILL: Record<string, string> = {
-  draft: 'in-review', submitted: 'needs-revision', approved: 'completed', rejected: 'delayed',
+  draft: 'in-review', submitted: 'needs-revision', ready: 'at-risk', approved: 'completed', rejected: 'delayed',
 };
 const UNIT_NAMES: Record<string, string> = {
   KP: 'Kantor Induk', UPMK1: 'UPMK I', UPMK2: 'UPMK II',
@@ -347,14 +346,20 @@ export function ApprovalsPage() {
   const myTasks = kmList.length + realList.length;
 
   // Registri semua dokumen persetujuan nyata (KM + Realisasi) lintas unit
+  const stepInfo = (rec: { steps?: unknown; currentStepIndex?: number }) => {
+    const steps = (rec.steps as { label: string }[] | undefined) ?? [];
+    const idx = rec.currentStepIndex ?? 0;
+    return { stepLabel: steps[idx]?.label ?? '—', stepIndex: idx, stepCount: steps.length };
+  };
   const docRows = [
-    ...scopeKm.map((k) => ({ id: k.id, jenis: 'Kontrak Manajemen', detail: k.bidang, unitCode: k.unitCode, periodId: k.periodId, status: k.status, currentStage: k.currentStage, reviewer: k.reviewer, history: (k as KontrakManajemen & { history?: unknown }).history })),
-    ...scopeReal.map((r) => ({ id: r.id, jenis: 'Realisasi Kinerja', detail: (r as RealisasiKinerja & { bidang?: string }).bidang ?? '', unitCode: r.unitCode, periodId: r.periodId, status: r.status, currentStage: r.currentStage, reviewer: r.reviewer, history: (r as RealisasiKinerja & { history?: unknown }).history })),
+    ...scopeKm.map((k) => ({ id: k.id, jenis: 'Kontrak Manajemen', detail: k.bidang, unitCode: k.unitCode, periodId: k.periodId, status: k.status, reviewer: k.reviewer, history: (k as KontrakManajemen & { history?: unknown }).history, ...stepInfo(k as KontrakManajemen & { steps?: unknown; currentStepIndex?: number }) })),
+    ...scopeReal.map((r) => ({ id: r.id, jenis: 'Realisasi Kinerja', detail: (r as RealisasiKinerja & { bidang?: string }).bidang ?? '', unitCode: r.unitCode, periodId: r.periodId, status: r.status, reviewer: r.reviewer, history: (r as RealisasiKinerja & { history?: unknown }).history, ...stepInfo(r as RealisasiKinerja & { steps?: unknown; currentStepIndex?: number }) })),
   ];
-  const nextApproverLabel = (status: string, stage: number): string => {
-    if (status === 'approved') return '✓ Selesai';
+  const nextApproverLabel = (status: string, stepLabel: string): string => {
+    if (status === 'approved') return '✓ Disahkan GM';
+    if (status === 'ready') return 'Menunggu konsolidasi & GM';
     if (status === 'rejected') return 'Dikembalikan ke konseptor';
-    if (status === 'submitted') return KM_STAGES[stage - 1] ?? '—';
+    if (status === 'submitted') return stepLabel || '—';
     return '—';
   };
 
@@ -861,30 +866,24 @@ export function ApprovalsPage() {
                     {d.detail ? <span style={{ color: 'var(--color-text-muted)' }}> · {d.detail}</span> : null}
                   </td>
                   <td style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>{periodMap[d.periodId] ?? '—'}</td>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                      {KM_STAGES.map((label, idx) => {
-                        const s = idx + 1;
-                        const done = d.status === 'approved' || s < d.currentStage;
-                        const current = d.status === 'submitted' && s === d.currentStage;
-                        return (
-                          <div key={s} title={label} style={{
-                            width: 20, height: 20, borderRadius: '50%', fontSize: 9, fontWeight: 700,
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            background: done ? 'var(--color-success)' : current ? 'var(--color-accent)' : 'var(--color-surface-2)',
-                            color: done || current ? '#fff' : 'var(--color-text-muted)',
-                          }}>{done ? '✓' : s}</div>
-                        );
-                      })}
-                    </div>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    {d.status === 'approved' ? (
+                      <span style={{ fontSize: 10, color: 'var(--color-success)', fontWeight: 600 }}>✓ Selesai ({d.stepCount}/{d.stepCount})</span>
+                    ) : d.status === 'ready' ? (
+                      <span style={{ fontSize: 10, color: 'var(--color-warning)', fontWeight: 600 }}>Lolos rantai → bundle</span>
+                    ) : d.status === 'rejected' ? (
+                      <span style={{ fontSize: 10, color: 'var(--color-danger)' }}>Dikembalikan</span>
+                    ) : (
+                      <span style={{ fontSize: 10, color: 'var(--color-accent)', fontWeight: 600 }}>Langkah {d.stepIndex}/{Math.max(0, d.stepCount - 1)}</span>
+                    )}
                   </td>
                   <td>
                     <span className={`status-pill ${DOC_STATUS_PILL[d.status] ?? 'in-review'}`} style={{ fontSize: 10 }}>
                       {DOC_STATUS_LABEL[d.status] ?? d.status}
                     </span>
                   </td>
-                  <td style={{ color: d.status === 'approved' ? 'var(--color-success)' : 'var(--color-text-muted)' }}>
-                    {nextApproverLabel(d.status, d.currentStage)}
+                  <td style={{ color: d.status === 'approved' ? 'var(--color-success)' : 'var(--color-text-muted)', fontSize: 11 }}>
+                    {nextApproverLabel(d.status, d.stepLabel)}
                   </td>
                   <td>
                     <button className="btn btn-ghost btn-sm" onClick={() => setDocExpanded(docExpanded === d.id ? null : d.id)} title="Lihat riwayat persetujuan & komentar">
