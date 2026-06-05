@@ -115,7 +115,9 @@ export function ApprovalsPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Review usulan Kontrak Manajemen (untuk Asman ke atas)
-  const canReview = !!user && user.role !== 'STAFF';
+  // Reviewer = bukan Staff penyusun. PENGECUALIAN: Staff Kinerja Perencanaan (RPC) adalah
+  // konsolidator pada workflow (langkah Staff RPC), sehingga butuh fungsi review/teruskan.
+  const canReview = !!user && (user.role !== 'STAFF' || user.bidang === 'Perencanaan & Project Control');
   const [kmList, setKmList] = useState<KontrakManajemen[]>([]);
   const [kmNote, setKmNote] = useState('');
   const [kmTarget, setKmTarget] = useState<string | null>(null);
