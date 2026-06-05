@@ -277,7 +277,11 @@ export class InputKontrakService {
       year: yr, status: bundle?.status ?? 'open', reviewer: bundle?.reviewer ?? null,
       reviewNote: bundle?.reviewNote ?? null, reviewedAt: bundle?.reviewedAt ?? null,
       total: components.length, readyCount, canApprove,
-      components: components.map((c) => ({ id: c.id, unitCode: c.unitCode, bidang: c.bidang, status: c.status, submitter: c.submitter })),
+      // Sertakan detail KPI + riwayat agar GM dapat me-review tiap dokumen di kartu konsolidasi.
+      components: components.map((c) => ({
+        id: c.id, unitCode: c.unitCode, bidang: c.bidang, status: c.status,
+        submitter: c.submitter, holder: c.holder, kpiItems: c.kpiItems, history: c.history,
+      })),
     };
   }
 

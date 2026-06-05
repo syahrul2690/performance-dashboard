@@ -160,13 +160,15 @@ export function ApprovalsPage() {
     inputRealisasi.bundle(periodId || undefined).then((d) => setBundle(d as BundleData)).catch(() => {});
   };
   // Bundle KM tahunan (GM)
+  type KmBundleComp = { id: string; unitCode: string; bidang: string; status: string; submitter: string; holder?: string; kpiItems?: Record<string, string>[]; history?: unknown };
   type KmBundleData = {
     year?: string; status: string; total: number; readyCount: number; canApprove: boolean;
-    components: Array<{ id: string; unitCode: string; bidang: string; status: string; submitter: string }>;
+    components: KmBundleComp[];
   };
   const [kmBundle, setKmBundle] = useState<KmBundleData | null>(null);
   const [kmBundleNote, setKmBundleNote] = useState('');
   const [kmBundleBusy, setKmBundleBusy] = useState(false);
+  const [kmBundleExpanded, setKmBundleExpanded] = useState<string | null>(null);
   const loadKmBundle = () => {
     inputKontrak.bundle().then((d) => setKmBundle(d as KmBundleData)).catch(() => {});
   };
@@ -527,13 +529,14 @@ export function ApprovalsPage() {
         >
           <div className="table-wrap">
             <table className="data-table compact">
-              <thead><tr><th>Unit</th><th>Bidang</th><th>Penyusun</th><th>Status</th></tr></thead>
+              <thead><tr><th>Unit</th><th>Bidang</th><th>Penyusun</th><th>Status</th><th>Review</th></tr></thead>
               <tbody>
                 {kmBundle.components.length === 0 && (
-                  <tr><td colSpan={4}><EmptyState title="Belum ada KM" message="Belum ada KM yang masuk konsolidasi tahun ini." /></td></tr>
+                  <tr><td colSpan={5}><EmptyState title="Belum ada KM" message="Belum ada KM yang masuk konsolidasi tahun ini." /></td></tr>
                 )}
                 {kmBundle.components.map((c) => (
-                  <tr key={c.id}>
+                  <Fragment key={c.id}>
+                  <tr>
                     <td style={{ fontWeight: 600 }}>{UNIT_NAMES[c.unitCode] ?? c.unitCode}</td>
                     <td style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{c.bidang}</td>
                     <td style={{ color: 'var(--color-text-muted)' }}>{c.submitter}</td>
@@ -542,7 +545,36 @@ export function ApprovalsPage() {
                         {c.status === 'ready' ? 'Siap (lolos SM RPC)' : c.status === 'approved' ? 'Disahkan GM' : c.status === 'submitted' ? 'Dalam proses review' : c.status}
                       </span>
                     </td>
+                    <td>
+                      <button className="btn btn-ghost btn-sm" onClick={() => setKmBundleExpanded(kmBundleExpanded === c.id ? null : c.id)} title="Tinjau detail KPI & riwayat">
+                        <ClipboardCheck size={12} /> {(c.kpiItems?.length ?? 0)} KPI
+                        <ChevronDown size={12} style={{ transform: kmBundleExpanded === c.id ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />
+                      </button>
+                    </td>
                   </tr>
+                  {kmBundleExpanded === c.id && (
+                    <tr>
+                      <td colSpan={5} style={{ background: 'var(--color-surface-2)', padding: 0 }}>
+                        <div style={{ padding: 'var(--space-2) var(--space-3)', fontSize: 11, color: 'var(--color-text-muted)' }}>
+                          Penanggung Jawab: <strong style={{ color: 'var(--color-text)' }}>{c.holder ?? '—'}</strong>
+                        </div>
+                        <table className="data-table compact" style={{ margin: 0 }}>
+                          <thead><tr><th>No</th><th>Indikator Kinerja</th><th>Formula</th><th>Satuan</th><th className="num">Bobot</th><th>Target Sem I</th><th>Target Tahun</th></tr></thead>
+                          <tbody>
+                            {(c.kpiItems ?? []).map((it, idx) => (
+                              <tr key={idx}>
+                                <td>{idx + 1}</td><td>{it.indikator}</td><td>{it.formula}</td><td>{it.satuan}</td>
+                                <td className="num">{it.bobot}</td><td>{it.target}</td><td>{it.target2}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        <div style={{ fontSize: 11, fontWeight: 600, padding: 'var(--space-2) var(--space-3) 0' }}>Riwayat Persetujuan & Komentar</div>
+                        <ApprovalTimeline history={c.history} />
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 ))}
               </tbody>
             </table>
