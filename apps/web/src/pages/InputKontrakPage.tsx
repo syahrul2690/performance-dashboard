@@ -30,13 +30,10 @@ const UNIT_NAMES: Record<string, string> = Object.fromEntries(UNIT_OPTIONS.map((
 const RPC_BIDANG = 'Perencanaan & Project Control';
 
 const STATUS_LABEL: Record<string, string> = {
-  draft: 'Draft', submitted: 'Menunggu Review', approved: 'Disetujui', rejected: 'Dikembalikan',
-};
-const KM_STAGE_LABEL: Record<number, string> = {
-  2: 'Asisten Manajer', 3: 'Manajer Bidang', 4: 'Senior Manajer', 5: 'General Manager',
+  draft: 'Draft', submitted: 'Menunggu Review', ready: 'Siap Konsolidasi', approved: 'Disetujui', rejected: 'Dikembalikan',
 };
 const STATUS_PILL: Record<string, string> = {
-  draft: 'in-review', submitted: 'needs-revision', approved: 'completed', rejected: 'delayed',
+  draft: 'in-review', submitted: 'needs-revision', ready: 'at-risk', approved: 'completed', rejected: 'delayed',
 };
 
 export function InputKontrakPage() {
@@ -466,10 +463,13 @@ export function InputKontrakPage() {
                       <span className={`status-pill ${STATUS_PILL[k.status] ?? 'in-review'}`}>
                         {STATUS_LABEL[k.status] ?? k.status}
                       </span>
-                      {k.status === 'submitted' && (
-                        <div style={{ fontSize: 10, color: 'var(--color-text-muted)', marginTop: 2 }}>
-                          di {KM_STAGE_LABEL[k.currentStage] ?? 'tahap review'}
-                        </div>
+                      {k.status === 'submitted' && (() => {
+                        const kk = k as KontrakManajemen & { steps?: { label: string }[]; currentStepIndex?: number };
+                        const lbl = (kk.steps ?? [])[kk.currentStepIndex ?? 0]?.label ?? 'tahap review';
+                        return <div style={{ fontSize: 10, color: 'var(--color-text-muted)', marginTop: 2 }}>di {lbl}</div>;
+                      })()}
+                      {k.status === 'ready' && (
+                        <div style={{ fontSize: 10, color: 'var(--color-warning)', marginTop: 2 }}>lolos rantai → menunggu bundle GM</div>
                       )}
                       {k.status === 'rejected' && k.reviewNote && (
                         <div style={{ fontSize: 10, color: 'var(--color-danger)', marginTop: 2, maxWidth: 220 }}>
