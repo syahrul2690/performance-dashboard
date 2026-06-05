@@ -14,23 +14,27 @@ import {
 } from 'lucide-react';
 
 const NAV_ITEMS = [
-  { section: 'Aksi Saya', items: [
-    { to: '/approvals', label: 'Persetujuan', icon: CheckSquare },
-    { to: '/input-kontrak', label: 'Input Kontrak Manajemen', icon: FileText, hideForUpmk: true },
-    { to: '/input-realisasi', label: 'Input Realisasi Bulanan', icon: ClipboardEdit },
-  ]},
-  { section: 'Dashboard', items: [
-    { to: '/', label: 'Executive Summary', icon: LayoutDashboard, end: true },
-    { to: '/financial', label: 'Cost & Capex', icon: TrendingUp },
-    { to: '/operational', label: 'Operational KPIs', icon: Activity },
-    { to: '/proses-bisnis', label: 'Proses Bisnis L2', icon: Workflow },
-    { to: '/struktur-organisasi', label: 'Struktur Organisasi', icon: Network },
-    { to: '/gcg-esg', label: 'GCG & ESG', icon: Leaf },
-    { to: '/strategic', label: 'Strategic Targets', icon: Target },
-    { to: '/human-capital', label: 'Human Capital', icon: Users },
-    { to: '/risk', label: 'Manajemen Risiko', icon: AlertTriangle },
-    { to: '/peta', label: 'Peta Geografis UPMK', icon: MapPin },
-  ]},
+  {
+    section: 'Aksi Saya', items: [
+      { to: '/approvals', label: 'Persetujuan', icon: CheckSquare },
+      { to: '/input-kontrak', label: 'Input Kontrak Manajemen', icon: FileText },
+      { to: '/input-realisasi', label: 'Input Realisasi Bulanan', icon: ClipboardEdit },
+    ]
+  },
+  {
+    section: 'Dashboard', items: [
+      { to: '/', label: 'Executive Summary', icon: LayoutDashboard, end: true },
+      { to: '/financial', label: 'Cost & Capex', icon: TrendingUp },
+      { to: '/operational', label: 'Operational KPIs', icon: Activity },
+      { to: '/proses-bisnis', label: 'Proses Bisnis L2', icon: Workflow },
+      { to: '/struktur-organisasi', label: 'Struktur Organisasi', icon: Network },
+      { to: '/gcg-esg', label: 'GCG & ESG', icon: Leaf },
+      { to: '/strategic', label: 'Strategic Targets', icon: Target },
+      { to: '/human-capital', label: 'Human Capital', icon: Users },
+      { to: '/risk', label: 'Manajemen Risiko', icon: AlertTriangle },
+      { to: '/peta', label: 'Peta Geografis UPMK', icon: MapPin },
+    ]
+  },
   // Section "Workflow Kontrak Manajemen" disembunyikan sementara dari sidebar.
   // Halaman & route masih aktif (/workflow-km/usulan, /workflow-km/realisasi);
   // tinggal aktifkan kembali blok di bawah ini bila ingin ditampilkan.
@@ -38,14 +42,17 @@ const NAV_ITEMS = [
   //   { to: '/workflow-km/usulan', label: 'Proses Usulan KM', icon: FilePlus },
   //   { to: '/workflow-km/realisasi', label: 'Proses Realisasi KM', icon: LineChart },
   // ]},
-  { section: 'Pengaturan', items: [
-    { to: '/settings', label: 'Settings', icon: Settings },
-  ]},
+  {
+    section: 'Pengaturan', items: [
+      { to: '/settings', label: 'Settings', icon: Settings },
+    ]
+  },
 ];
 
 const ROLE_LABELS: Record<string, string> = {
   STAFF: 'Staff', ASMAN: 'Asman', MANAJER: 'Manajer',
   SRMANAJER: 'Sr. Manajer', GM: 'General Manager',
+  SUPERADMIN: 'Super Admin', DEVELOPER: 'Developer',
 };
 
 const ROUTE_NAMES: Record<string, string> = {
@@ -115,7 +122,7 @@ export function AppShell() {
             className="logo sidebar-brand-img"
             src="/brand/Logo_PLN.png"
             alt="PLN"
-            style={{width:52,height:52,objectFit:'contain',flexShrink:0,borderRadius:10,background:'var(--color-surface)',padding:4,border:'1px solid var(--color-border)'}}
+            style={{ width: 52, height: 52, objectFit: 'contain', flexShrink: 0, borderRadius: 10, background: 'var(--color-surface)', padding: 4, border: '1px solid var(--color-border)' }}
             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
           />
           <div className="sidebar-brand-text">
@@ -126,11 +133,16 @@ export function AppShell() {
 
         <nav className="sidebar-nav" aria-label="Halaman">
           {NAV_ITEMS.map((section) => {
-            // Sembunyikan item yang hideForUpmk=true untuk user unit UPMK (non-KP)
+            // hideForUpmk: sembunyikan dari user unit UPMK (non-KP)
             const isUpmkUser = user?.unit && user.unit !== 'KP';
-            const visibleItems = section.items.filter(
-              (it) => !(isUpmkUser && (it as { hideForUpmk?: boolean }).hideForUpmk),
-            );
+            // devOnly: hanya tampil untuk SUPERADMIN dan DEVELOPER
+            const isPrivileged = user?.role === 'SUPERADMIN' || user?.role === 'DEVELOPER';
+            const visibleItems = section.items.filter((it) => {
+              const nav = it as { hideForUpmk?: boolean; devOnly?: boolean };
+              if (isUpmkUser && nav.hideForUpmk) return false;
+              if (nav.devOnly && !isPrivileged) return false;
+              return true;
+            });
             if (visibleItems.length === 0) return null;
             return (
               <div key={section.section}>
@@ -166,7 +178,7 @@ export function AppShell() {
             aria-label="Ciutkan atau perluas sidebar"
             onClick={() => setCollapsed((v) => !v)}
           >
-            <ChevronsLeft size={16} style={{transition:'transform 0.2s', transform: collapsed ? 'rotate(180deg)' : 'none'}} />
+            <ChevronsLeft size={16} style={{ transition: 'transform 0.2s', transform: collapsed ? 'rotate(180deg)' : 'none' }} />
             <span className="sidebar-collapse-label">Ciutkan</span>
           </button>
         </div>
@@ -229,7 +241,7 @@ export function AppShell() {
             >
               <span className="dot" />
               <span>Mode: <strong>{ROLE_LABELS[effectiveRole] ?? effectiveRole}</strong></span>
-              <ChevronDown size={12} style={{opacity:0.6}} />
+              <ChevronDown size={12} style={{ opacity: 0.6 }} />
             </button>
             <div className="dropdown-menu" data-open={String(roleMenuOpen)} role="menu">
               <div className="role-switcher-section">
@@ -275,7 +287,7 @@ export function AppShell() {
               </div>
               <div className="notif-list">
                 {notifs.length === 0 && (
-                  <div style={{padding:'24px',textAlign:'center',color:'var(--color-text-muted)',fontSize:'var(--text-xs)'}}>
+                  <div style={{ padding: '24px', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)' }}>
                     Tidak ada notifikasi
                   </div>
                 )}
@@ -396,14 +408,14 @@ export function AppShell() {
         <div className="warroom-overlay">
           <button
             className="warroom-close"
-            style={{position:'absolute',top:20,right:20,color:'rgba(255,255,255,0.7)',background:'none',border:'none',cursor:'pointer'}}
+            style={{ position: 'absolute', top: 20, right: 20, color: 'rgba(255,255,255,0.7)', background: 'none', border: 'none', cursor: 'pointer' }}
             onClick={() => setWarRoomActive(false)}
           >
             ✕
           </button>
-          <div style={{textAlign:'center',opacity:0.4}}>
+          <div style={{ textAlign: 'center', opacity: 0.4 }}>
             <Tv2 size={48} color="#fff" />
-            <p style={{color:'#fff',marginTop:12,fontSize:16}}>War Room — Coming in next build</p>
+            <p style={{ color: '#fff', marginTop: 12, fontSize: 16 }}>War Room — Coming in next build</p>
           </div>
         </div>
       )}

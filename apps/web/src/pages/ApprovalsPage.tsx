@@ -25,6 +25,30 @@ function SlaBadge({ days }: { days?: number | null }) {
 
 // Timeline komentar/persetujuan dari history JSON (Task 4 — traceability).
 type HistEntry = { stage?: number; actor?: string; role?: string; action?: string; note?: string; ts?: string; toStage?: number };
+type RaciColKey = 'pic_staff' | 'upmk_internal' | 'ki_chain' | 'rpc' | 'gm';
+const RACI_COLS: { key: RaciColKey; label: string; sublabel: string }[] = [
+  { key: 'pic_staff',     label: 'PIC / Staff',                sublabel: 'Penyusun & Submitter (semua unit)' },
+  { key: 'upmk_internal', label: 'ASMAN / MUP',                sublabel: 'Review internal UPMK I–V' },
+  { key: 'ki_chain',      label: 'ASMAN / Manajer / SM Bidang', sublabel: 'ASMAN Elektromekanik & Jaringan (OMP) + Manajer + SM Bidang KI' },
+  { key: 'rpc',           label: 'Konsolidator RPC',           sublabel: 'Staff / Man. / SM Perencanaan & PC' },
+  { key: 'gm',            label: 'General Manager',            sublabel: 'Approval bundle final' },
+];
+
+const RACI_COL_LABEL: Record<RaciColKey, string> = {
+  pic_staff:      'PIC / Staff Kinerja — semua unit',
+  upmk_internal:  'ASMAN & Manajer (MUP) UPMK — review internal',
+  ki_chain:       'ASMAN / Manajer / SM Bidang — Kantor Induk (incl. ASMAN Elektromekanik & Jaringan untuk OMP)',
+  rpc:            'Staff / Man. Perencanaan / SM RPC — konsolidator lintas-unit',
+  gm:             'General Manager — approval bundle final',
+};
+const RACI_COL_TANGGUNG: Record<RaciColKey, string> = {
+  pic_staff:      'Menyusun, mengisi nilai realisasi, dan men-submit dokumen ke jenjang review.',
+  upmk_internal:  'ASMAN UPMK memverifikasi kelengkapan data; Manajer MUP UPMK menyetujui atau mengembalikan sebelum naik ke rantai Kantor Induk.',
+  ki_chain:       'Untuk bidang OMP: ASMAN Elektromekanik → ASMAN Jaringan → Manajer Operasi Pembangkit → Manajer Operasi Jaringan → SM OMP. Bidang lain (QA/QC, KKU): langsung Manajer → SM Bidang. Semua berakhir di SM Bidang sebelum konsolidasi RPC.',
+  rpc:            'Staff RPC merekap lintas-bidang & UPMK; Manajer Perencanaan memvalidasi; SM RPC memberikan final sign-off sebelum bundle GM.',
+  gm:             'GM menyahkan seluruh bundle (all-or-nothing). Satu keputusan berlaku untuk seluruh komponen periode / KM tahunan.',
+};
+
 const ACTION_LABEL: Record<string, string> = {
   submitted: 'Diajukan', approved: 'Disetujui', returned: 'Dikembalikan ke konseptor', returned_step: 'Dikembalikan 1 tahap',
 };
@@ -86,89 +110,6 @@ function FoldCard({
 const STAGES = ['', 'Staff', 'Asman', 'Manajer', 'Sr. Manajer', 'GM'];
 // Jenjang persetujuan usulan Kontrak Manajemen: Staff → Asman → Manajer → Sr. Manajer → GM (final)
 
-// ===== RACI DINAMIS =====
-const RPC_BIDANG_RACI = 'Perencanaan & Project Control';
-
-type RaciColKey = 'pic_staff' | 'upmk_internal' | 'ki_chain' | 'rpc' | 'gm';
-
-const RACI_COLS: { key: RaciColKey; label: string; sublabel: string }[] = [
-  { key: 'pic_staff',       label: 'PIC / Staff',            sublabel: 'Penyusun & Submitter (semua unit)' },
-  { key: 'upmk_internal',  label: 'ASMAN / MUP',            sublabel: 'Review internal UPMK I–V' },
-  { key: 'ki_chain',       label: 'Manajer / SM Bidang',    sublabel: 'Rantai review Kantor Induk' },
-  { key: 'rpc',            label: 'Konsolidator RPC',       sublabel: 'Staff / Man / SM Perencanaan & PC' },
-  { key: 'gm',             label: 'General Manager',        sublabel: 'Approval bundle final' },
-];
-
-const RACI_ROWS: { activity: string; scope: string; values: Record<RaciColKey, string> }[] = [
-  {
-    activity: 'Input & Submit Dokumen (Realisasi / KM)',
-    scope: 'Semua unit',
-    values: { pic_staff: 'R', upmk_internal: 'I', ki_chain: 'I', rpc: 'I', gm: 'I' },
-  },
-  {
-    activity: 'Review Internal UPMK (ASMAN + MUP)',
-    scope: 'UPMK I–V',
-    values: { pic_staff: 'C', upmk_internal: 'R/A', ki_chain: '—', rpc: 'I', gm: 'I' },
-  },
-  {
-    activity: 'Review Rantai Bidang (Kantor Induk)',
-    scope: 'KI Chain',
-    values: { pic_staff: 'I', upmk_internal: 'C', ki_chain: 'R/A', rpc: 'I', gm: 'I' },
-  },
-  {
-    activity: 'Konsolidasi & Review RPC',
-    scope: 'Bidang non-RPC',
-    values: { pic_staff: 'I', upmk_internal: 'I', ki_chain: 'C', rpc: 'R/A', gm: 'I' },
-  },
-  {
-    activity: 'Approval Bundle Final (KM Tahunan / Realisasi Bulanan)',
-    scope: 'Semua unit',
-    values: { pic_staff: 'I', upmk_internal: 'I', ki_chain: 'C', rpc: 'C', gm: 'R/A' },
-  },
-  {
-    activity: 'Monitoring & Audit Lintas Unit',
-    scope: 'Konsolidator & GM',
-    values: { pic_staff: '—', upmk_internal: '—', ki_chain: 'I', rpc: 'R', gm: 'A' },
-  },
-];
-
-function getUserRaciCol(u: { role: string; unit?: string | null; bidang?: string | null; roleVariant?: { code: string } | null } | null): RaciColKey | null {
-  if (!u) return null;
-  if (u.role === 'GM') return 'gm';
-  const vc = u.roleVariant?.code;
-  const isRpc = vc === 'sm_pc' || vc === 'man_perencanaan' ||
-    (u.role === 'STAFF' && u.bidang === RPC_BIDANG_RACI);
-  if (isRpc) return 'rpc';
-  const isUpmk = u.unit && u.unit !== 'KP';
-  if (u.role === 'STAFF') return 'pic_staff';
-  if (isUpmk && (u.role === 'ASMAN' || u.role === 'MANAJER')) return 'upmk_internal';
-  return 'ki_chain'; // ASMAN/Manajer/SM di KP
-}
-
-const RACI_COL_LABEL: Record<RaciColKey, string> = {
-  pic_staff:      'PIC / Staff Penyusun',
-  upmk_internal:  'Reviewer Internal UPMK (ASMAN / MUP)',
-  ki_chain:       'Reviewer Bidang — Kantor Induk (Manajer / SM Bidang)',
-  rpc:            'Konsolidator RPC (Staff / Manajer / SM Perencanaan & PC)',
-  gm:             'General Manager',
-};
-
-const RACI_COL_TANGGUNG: Record<RaciColKey, string> = {
-  pic_staff:     'Menyusun, mengisi nilai realisasi, dan men-submit dokumen ke jenjang review.',
-  upmk_internal: 'Memverifikasi kelengkapan data internal UPMK sebelum diteruskan ke rantai Kantor Induk.',
-  ki_chain:      'Mereview keakuratan data di dalam rantai bidang Kantor Induk hingga SM Bidang.',
-  rpc:           'Mengkonsolidasikan seluruh dokumen lintas bidang/unit dan memastikan kualitas sebelum bundle GM.',
-  gm:            'Menyahkan seluruh bundle KM tahunan dan bundle realisasi periode dengan satu keputusan final.',
-};
-
-const RACI_VALUE_STYLE = (v: string): React.CSSProperties => {
-  if (v === '—') return { background: 'var(--color-surface-2)', color: 'var(--color-text-subtle)' };
-  if (v.startsWith('R')) return { background: 'var(--color-accent-tint)', color: 'var(--color-accent)' };
-  if (v === 'A') return { background: 'rgba(16,185,129,0.12)', color: 'var(--color-success)' };
-  if (v === 'C') return { background: 'rgba(59,130,246,0.12)', color: 'var(--color-info)' };
-  return { background: 'var(--color-surface-2)', color: 'var(--color-text-subtle)' };
-};
-
 const DOC_STATUS_LABEL: Record<string, string> = {
   draft: 'Draft', submitted: 'Menunggu Review', ready: 'Siap Konsolidasi', approved: 'Disetujui', rejected: 'Dikembalikan',
 };
@@ -180,14 +121,52 @@ const UNIT_NAMES: Record<string, string> = {
   UPMK3: 'UPMK III', UPMK4: 'UPMK IV', UPMK5: 'UPMK V',
 };
 
-const FASE_ACCENT =['var(--color-accent)', 'var(--color-info)', 'var(--color-warning)', 'var(--color-success)', 'var(--color-text-muted)'];
+const FASE_ACCENT = [
+  'var(--color-accent)',
+  'var(--color-info)',
+  '#8b5cf6',
+  'var(--color-warning)',
+  '#f59e0b',
+  'var(--color-success)',
+  'var(--color-text-muted)',
+];
 
 const WORKFLOW_STATIC = [
-  { stage: 1, fase: 'Input Data', deadline: 'Tgl 1-3', slaHours: 48, action: 'Staff input realisasi KPI/PI bulanan ke sistem', role: 'STAFF', checklist: ['Isi semua field realisasi', 'Lampirkan dokumen pendukung', 'Submit sebelum deadline'] },
-  { stage: 2, fase: 'Review Asman', deadline: 'Tgl 4', slaHours: 24, action: 'Asisten Manajer verifikasi kelengkapan data', role: 'ASMAN', checklist: ['Cek kesesuaian data dengan dokumen', 'Validasi perhitungan nilai', 'Approve atau kembalikan'] },
-  { stage: 3, fase: 'Approve Manajer', deadline: 'Tgl 5', slaHours: 24, action: 'Manajer Bidang tanda tangan laporan unit', role: 'MANAJER', checklist: ['Review analisis dan narasi', 'Pastikan target vs realisasi akurat', 'Sign off laporan'] },
-  { stage: 4, fase: 'Review Sr. Manajer', deadline: 'Tgl 6', slaHours: 12, action: 'Senior Manajer review laporan konsolidasi', role: 'SRMANAJER', checklist: ['Evaluasi kinerja lintas bidang', 'Berikan rekomendasi perbaikan', 'Eskalasi ke GM'] },
-  { stage: 5, fase: 'Approve GM', deadline: 'Tgl 7', slaHours: 12, action: 'General Manager final approval & publikasi', role: 'GM', checklist: ['Final review eksekutif', 'Tanda tangan digital', 'Publikasi ke dashboard'] },
+  {
+    stage: 1, fase: 'Input Data', deadline: 'Tgl 1–3', slaHours: 48,
+    action: 'Staff/PIC input realisasi KPI bulanan ke sistem',
+    checklist: ['Staff UPMK: isi realisasi unit, submit ke ASMAN UPMK', 'Staff KI: isi realisasi bidang, submit ke rantai KI', 'Lampirkan dokumen pendukung / evidence', 'Submit sebelum deadline Tgl 3'],
+  },
+  {
+    stage: 2, fase: 'Review Internal UPMK', deadline: 'Tgl 4', slaHours: 24,
+    action: 'ASMAN UPMK & Manajer (MUP) UPMK verifikasi data internal',
+    checklist: ['ASMAN UPMK: cek kelengkapan & keakuratan data', 'Manajer MUP UPMK: approve atau kembalikan ke staff', 'Dokumen dari Kantor Induk: melewati fase ini', 'Setelah MUP approve → masuk rantai bidang KI'],
+  },
+  {
+    stage: 3, fase: 'ASMAN Bidang KI', deadline: 'Tgl 5', slaHours: 24,
+    action: 'ASMAN Elektromekanik & ASMAN Jaringan review (bidang OMP)',
+    checklist: ['ASMAN Elektromekanik review komponen pembangkit', 'ASMAN Jaringan review komponen jaringan transmisi', 'Berlaku khusus untuk bidang OMP', 'Bidang lain (QA/QC, KKU, RPC) langsung ke Manajer'],
+  },
+  {
+    stage: 4, fase: 'Manajer Bidang KI', deadline: 'Tgl 6', slaHours: 24,
+    action: 'Manajer Bidang Kantor Induk review & validasi per sub-bidang',
+    checklist: ['Man. Operasi Pembangkit & Man. Operasi Jaringan (OMP)', 'Man. QA/QC Pembangkit & Man. QA/QC Jaringan (QA/QC)', 'Man. Keuangan, Akuntansi & Aset (KKU)', 'Review analisis vs target; approve atau kembalikan'],
+  },
+  {
+    stage: 5, fase: 'SM Bidang KI', deadline: 'Tgl 7', slaHours: 12,
+    action: 'Senior Manajer Bidang: final approval rantai internal',
+    checklist: ['SM OMP / SM QA/QC / SM KKU sesuai bidangnya', 'Evaluasi kinerja lintas sub-bidang', 'Approve → dokumen masuk konsolidasi RPC', 'Kembalikan → kembali ke langkah sebelumnya'],
+  },
+  {
+    stage: 6, fase: 'Konsolidasi RPC', deadline: 'Tgl 8', slaHours: 24,
+    action: 'Staff RPC → Manajer Perencanaan → SM Perencanaan & PC',
+    checklist: ['Staff Kinerja Perencanaan: rekap lintas bidang & UPMK', 'Manajer Perencanaan: validasi konsolidasi', 'SM Perencanaan & PC: final sign-off sebelum GM', 'Lolos SM RPC → status “siap bundle”'],
+  },
+  {
+    stage: 7, fase: 'Approval GM', deadline: 'Tgl 9', slaHours: 12,
+    action: 'General Manager sahkan bundle realisasi periode / KM tahunan',
+    checklist: ['GM review bundle semua komponen (all-or-nothing)', 'Approve → seluruh realisasi periode berstatus “disetujui”', 'Tolak → seluruh komponen kembali ke Manajer Perencanaan', 'Satu keputusan berlaku untuk seluruh bundle'],
+  },
 ];
 
 export function ApprovalsPage() {
@@ -240,7 +219,7 @@ export function ApprovalsPage() {
   const [bundleNote, setBundleNote] = useState('');
   const [bundleBusy, setBundleBusy] = useState(false);
   const loadBundle = () => {
-    inputRealisasi.bundle(periodId || undefined).then((d) => setBundle(d as BundleData)).catch(() => {});
+    inputRealisasi.bundle(periodId || undefined).then((d) => setBundle(d as BundleData)).catch(() => { });
   };
   // Bundle KM tahunan (GM)
   type KmBundleComp = { id: string; unitCode: string; bidang: string; status: string; submitter: string; holder?: string; kpiItems?: Record<string, string>[]; history?: unknown };
@@ -253,7 +232,7 @@ export function ApprovalsPage() {
   const [kmBundleBusy, setKmBundleBusy] = useState(false);
   const [kmBundleExpanded, setKmBundleExpanded] = useState<string | null>(null);
   const loadKmBundle = () => {
-    inputKontrak.bundle().then((d) => setKmBundle(d as KmBundleData)).catch(() => {});
+    inputKontrak.bundle().then((d) => setKmBundle(d as KmBundleData)).catch(() => { });
   };
 
   const load = () => {
@@ -265,25 +244,25 @@ export function ApprovalsPage() {
 
   const loadKm = () => {
     if (!canReview) return;
-    inputKontrak.reviewList().then((d) => setKmList(d as KontrakManajemen[])).catch(() => {});
+    inputKontrak.reviewList().then((d) => setKmList(d as KontrakManajemen[])).catch(() => { });
   };
 
   const loadReal = () => {
     if (!canReview) return;
-    inputRealisasi.reviewList().then((d) => setRealList(d as RealisasiKinerja[])).catch(() => {});
+    inputRealisasi.reviewList().then((d) => setRealList(d as RealisasiKinerja[])).catch(() => { });
   };
 
   // Semua dokumen KM + Realisasi (lintas unit) untuk kartu ringkasan & registri
   const loadDocs = () => {
-    inputKontrak.list().then((d) => setAllKm(d as KontrakManajemen[])).catch(() => {});
-    inputRealisasi.history().then((d) => setAllReal(d as RealisasiKinerja[])).catch(() => {});
+    inputKontrak.list().then((d) => setAllKm(d as KontrakManajemen[])).catch(() => { });
+    inputRealisasi.history().then((d) => setAllReal(d as RealisasiKinerja[])).catch(() => { });
     metaApi.periods()
       .then((ps) => {
         const map: Record<string, string> = {};
         (ps as Array<{ id: string; label: string }>).forEach((p) => { map[p.id] = p.label; });
         setPeriodMap(map);
       })
-      .catch(() => {});
+      .catch(() => { });
   };
 
   useEffect(() => { load(); loadKm(); loadReal(); loadDocs(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -324,12 +303,12 @@ export function ApprovalsPage() {
     // Notifikasi GM "siap bundle" mengarah langsung ke kartu konsolidasi.
     const target: 'real' | 'km' | 'kmbundle' | 'realbundle' | null =
       focusType === 'km-bundle' ? 'kmbundle'
-      : focusType === 'realisasi-bundle' ? 'realbundle'
-      : focusType === 'realisasi' || realList.some((r) => r.id === focusId) ? 'real'
-      : focusType === 'km' || kmList.some((k) => k.id === focusId) ? 'km'
-      : realList.length > 0 ? 'real'
-      : kmList.length > 0 ? 'km'
-      : null;
+        : focusType === 'realisasi-bundle' ? 'realbundle'
+          : focusType === 'realisasi' || realList.some((r) => r.id === focusId) ? 'real'
+            : focusType === 'km' || kmList.some((k) => k.id === focusId) ? 'km'
+              : realList.length > 0 ? 'real'
+                : kmList.length > 0 ? 'km'
+                  : null;
     if (!target) return;
     setHighlight(target);
     const idMap = { real: 'card-realisasi', km: 'card-km', kmbundle: 'card-km-bundle', realbundle: 'card-real-bundle' } as const;
@@ -417,37 +396,16 @@ export function ApprovalsPage() {
 
   if (error) return <ErrorState title="Gagal memuat laporan" message={error} />;
 
-  // Scoping "Semua Dokumen Persetujuan":
-  // - GM + Konsolidator RPC (Staff Kinerja RPC, Manajer Perencanaan, SM RPC) → lintas unit & bidang
-  // - User lain → filter utama per UNIT (UPMK1/UPMK2/.../KP), lalu KP staff tambah filter per BIDANG
+  // B2-4: dokumen di-scope ke bidang user (GM / tanpa bidang = lintas-bidang).
+  // Role konsolidasi RPC (SO RPC, Manajer Perencanaan, SM RPC) boleh melihat lintas bidang & UPMK.
   const isGM = user?.role === 'GM';
   const myBidang = user?.bidang ?? null;
-  const myUnit = user?.unit ?? null;
   const vc = user?.roleVariant?.code;
   const isRpcKonsolidasi = vc === 'man_perencanaan' || vc === 'sm_pc'
     || (user?.role === 'STAFF' && myBidang === 'Perencanaan & Project Control');
-  const canSeeAllDocs = isGM || isRpcKonsolidasi;
-
-  const scopeKm = canSeeAllDocs
-    ? allKm
-    : allKm.filter((k) => {
-        // Filter utama: unit harus cocok
-        if (myUnit && k.unitCode !== myUnit) return false;
-        // KP dengan bidang: filter tambahan per bidang agar tidak melihat semua KM KP
-        if (myUnit === 'KP' && myBidang) return k.bidang === myBidang;
-        return true;
-      });
-
-  const scopeReal = canSeeAllDocs
-    ? allReal
-    : allReal.filter((r) => {
-        const realBidang = (r as RealisasiKinerja & { bidang?: string }).bidang ?? null;
-        // Filter utama: unit harus cocok
-        if (myUnit && r.unitCode !== myUnit) return false;
-        // KP dengan bidang: filter tambahan per bidang
-        if (myUnit === 'KP' && myBidang) return realBidang === myBidang;
-        return true;
-      });
+  const scopeByBidang = isGM || isRpcKonsolidasi || !myBidang;
+  const scopeKm = scopeByBidang ? allKm : allKm.filter((k) => k.bidang === myBidang);
+  const scopeReal = scopeByBidang ? allReal : allReal.filter((r) => (r as RealisasiKinerja & { bidang?: string }).bidang === myBidang);
 
   // Ringkasan dari dokumen yang DIINPUT manual ke sistem (Kontrak Manajemen + Realisasi Kinerja)
   const docs: Array<{ status: string }> = [...scopeKm, ...scopeReal];
@@ -525,99 +483,99 @@ export function ApprovalsPage() {
                     const kIsLast = kci >= ksteps.length - 1;
                     const kPrev = ksteps[kci - 1]?.label;
                     return (
-                    <Fragment key={k.id}>
-                      <tr>
-                        <td style={{ fontWeight: 600 }}>{UNIT_NAMES[k.unitCode] ?? k.unitCode}</td>
-                        <td>{k.bidang}</td>
-                        <td style={{ color: 'var(--color-text-muted)' }}>{k.submitter}</td>
-                        <td>
-                          <button
-                            className="btn btn-ghost btn-sm"
-                            onClick={() => setKmExpanded(kmExpanded === k.id ? null : k.id)}
-                          >
-                            {k.kpiItems.length} indikator <ChevronDown size={12} style={{ transform: kmExpanded === k.id ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />
-                          </button>
-                        </td>
-                        <td style={{ minWidth: 200 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 3 }}>
-                            {ksteps.map((_, idx) => (
-                              <div key={idx} title={ksteps[idx]?.label} style={{
-                                width: 16, height: 16, borderRadius: '50%', fontSize: 8, fontWeight: 700,
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                background: idx < kci ? 'var(--color-success)' : idx === kci ? 'var(--color-accent)' : 'var(--color-surface-2)',
-                                color: idx <= kci ? '#fff' : 'var(--color-text-muted)',
-                              }}>{idx < kci ? '✓' : idx + 1}</div>
-                            ))}
-                          </div>
-                          <div style={{ fontSize: 10, color: 'var(--color-accent)', fontWeight: 600 }}>
-                            Langkah {kci}/{ksteps.length - 1}: {kk.stepLabel ?? ksteps[kci]?.label ?? '—'}
-                          </div>
-                        </td>
-                        <td><SlaBadge days={(k as KontrakManajemen & { slaRemainingDays?: number }).slaRemainingDays} /></td>
-                        <td style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
-                          {new Date(k.submittedAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })}
-                        </td>
-                        <td>
-                          {kmTarget === k.id ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                              <textarea
-                                className="form-textarea"
-                                style={{ fontSize: 'var(--text-xs)', minHeight: 48 }}
-                                placeholder="Catatan/komentar (wajib untuk setiap keputusan)"
-                                value={kmNote}
-                                onChange={(e) => setKmNote(e.target.value)}
-                              />
-                              <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-                                <button className="btn btn-sm" style={{ background: 'var(--color-success)', color: '#fff' }} disabled={kmBusy} onClick={() => handleKmReview(k.id, 'approve')}>
-                                  <CheckCircle size={12} /> {kIsLast ? 'Setujui (Selesai → Bundle)' : 'Setujui & Teruskan'}
-                                </button>
-                                <button className="btn btn-sm" style={{ background: 'var(--color-danger)', color: '#fff' }} disabled={kmBusy} onClick={() => handleKmReview(k.id, 'reject', 'konseptor')} title="Kembalikan ke konseptor untuk revisi">
-                                  <XCircle size={12} /> Kembalikan ke Konseptor
-                                </button>
-                                {kci >= 2 && (
-                                  <button className="btn btn-sm" style={{ background: 'var(--color-warning)', color: '#fff' }} disabled={kmBusy} onClick={() => handleKmReview(k.id, 'reject', 'previous')}>
-                                    <XCircle size={12} /> Kembalikan ke {kPrev ?? 'langkah sebelumnya'}
-                                  </button>
-                                )}
-                                <button className="btn btn-ghost btn-sm" onClick={() => { setKmTarget(null); setKmNote(''); }}>Batal</button>
-                              </div>
-                            </div>
-                          ) : (
-                            <button className="btn btn-secondary btn-sm" onClick={() => { setKmTarget(k.id); setKmNote(''); }}>
-                              <Clock size={12} /> Tinjau
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                      {kmExpanded === k.id && (
+                      <Fragment key={k.id}>
                         <tr>
-                          <td colSpan={8} style={{ background: 'var(--color-surface-2)', padding: 0 }}>
-                            <table className="data-table compact" style={{ margin: 0 }}>
-                              <thead>
-                                <tr>
-                                  <th>No</th><th>Indikator Kinerja</th><th>Formula</th><th>Satuan</th>
-                                  <th className="num">Bobot</th><th>Target Sem I</th>{`Target Tahun ${new Date().getFullYear()}`}
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {(k.kpiItems as Record<string, string>[]).map((it, idx) => (
-                                  <tr key={idx}>
-                                    <td>{idx + 1}</td>
-                                    <td>{it.indikator}</td>
-                                    <td>{it.formula}</td>
-                                    <td>{it.satuan}</td>
-                                    <td className="num">{it.bobot}</td>
-                                    <td>{it.target}</td>
-                                    <td>{it.target2}</td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
+                          <td style={{ fontWeight: 600 }}>{UNIT_NAMES[k.unitCode] ?? k.unitCode}</td>
+                          <td>{k.bidang}</td>
+                          <td style={{ color: 'var(--color-text-muted)' }}>{k.submitter}</td>
+                          <td>
+                            <button
+                              className="btn btn-ghost btn-sm"
+                              onClick={() => setKmExpanded(kmExpanded === k.id ? null : k.id)}
+                            >
+                              {k.kpiItems.length} indikator <ChevronDown size={12} style={{ transform: kmExpanded === k.id ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />
+                            </button>
+                          </td>
+                          <td style={{ minWidth: 200 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 3 }}>
+                              {ksteps.map((_, idx) => (
+                                <div key={idx} title={ksteps[idx]?.label} style={{
+                                  width: 16, height: 16, borderRadius: '50%', fontSize: 8, fontWeight: 700,
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  background: idx < kci ? 'var(--color-success)' : idx === kci ? 'var(--color-accent)' : 'var(--color-surface-2)',
+                                  color: idx <= kci ? '#fff' : 'var(--color-text-muted)',
+                                }}>{idx < kci ? '✓' : idx + 1}</div>
+                              ))}
+                            </div>
+                            <div style={{ fontSize: 10, color: 'var(--color-accent)', fontWeight: 600 }}>
+                              Langkah {kci}/{ksteps.length - 1}: {kk.stepLabel ?? ksteps[kci]?.label ?? '—'}
+                            </div>
+                          </td>
+                          <td><SlaBadge days={(k as KontrakManajemen & { slaRemainingDays?: number }).slaRemainingDays} /></td>
+                          <td style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
+                            {new Date(k.submittedAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })}
+                          </td>
+                          <td>
+                            {kmTarget === k.id ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                                <textarea
+                                  className="form-textarea"
+                                  style={{ fontSize: 'var(--text-xs)', minHeight: 48 }}
+                                  placeholder="Catatan/komentar (wajib untuk setiap keputusan)"
+                                  value={kmNote}
+                                  onChange={(e) => setKmNote(e.target.value)}
+                                />
+                                <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                                  <button className="btn btn-sm" style={{ background: 'var(--color-success)', color: '#fff' }} disabled={kmBusy} onClick={() => handleKmReview(k.id, 'approve')}>
+                                    <CheckCircle size={12} /> {kIsLast ? 'Setujui (Selesai → Bundle)' : 'Setujui & Teruskan'}
+                                  </button>
+                                  <button className="btn btn-sm" style={{ background: 'var(--color-danger)', color: '#fff' }} disabled={kmBusy} onClick={() => handleKmReview(k.id, 'reject', 'konseptor')} title="Kembalikan ke konseptor untuk revisi">
+                                    <XCircle size={12} /> Kembalikan ke Konseptor
+                                  </button>
+                                  {kci >= 2 && (
+                                    <button className="btn btn-sm" style={{ background: 'var(--color-warning)', color: '#fff' }} disabled={kmBusy} onClick={() => handleKmReview(k.id, 'reject', 'previous')}>
+                                      <XCircle size={12} /> Kembalikan ke {kPrev ?? 'langkah sebelumnya'}
+                                    </button>
+                                  )}
+                                  <button className="btn btn-ghost btn-sm" onClick={() => { setKmTarget(null); setKmNote(''); }}>Batal</button>
+                                </div>
+                              </div>
+                            ) : (
+                              <button className="btn btn-secondary btn-sm" onClick={() => { setKmTarget(k.id); setKmNote(''); }}>
+                                <Clock size={12} /> Tinjau
+                              </button>
+                            )}
                           </td>
                         </tr>
-                      )}
-                    </Fragment>
-                  );
+                        {kmExpanded === k.id && (
+                          <tr>
+                            <td colSpan={8} style={{ background: 'var(--color-surface-2)', padding: 0 }}>
+                              <table className="data-table compact" style={{ margin: 0 }}>
+                                <thead>
+                                  <tr>
+                                    <th>No</th><th>Indikator Kinerja</th><th>Formula</th><th>Satuan</th>
+                                    <th className="num">Bobot</th><th>Target Sem I</th>{`Target Tahun ${new Date().getFullYear()}`}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {(k.kpiItems as Record<string, string>[]).map((it, idx) => (
+                                    <tr key={idx}>
+                                      <td>{idx + 1}</td>
+                                      <td>{it.indikator}</td>
+                                      <td>{it.formula}</td>
+                                      <td>{it.satuan}</td>
+                                      <td className="num">{it.bobot}</td>
+                                      <td>{it.target}</td>
+                                      <td>{it.target2}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    );
                   })}
                 </tbody>
               </table>
@@ -645,42 +603,42 @@ export function ApprovalsPage() {
                 )}
                 {kmBundle.components.map((c) => (
                   <Fragment key={c.id}>
-                  <tr>
-                    <td style={{ fontWeight: 600 }}>{UNIT_NAMES[c.unitCode] ?? c.unitCode}</td>
-                    <td style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{c.bidang}</td>
-                    <td style={{ color: 'var(--color-text-muted)' }}>{c.submitter}</td>
-                    <td>
-                      <span className={`status-pill ${c.status === 'approved' ? 'completed' : c.status === 'ready' ? 'at-risk' : 'in-review'}`} style={{ fontSize: 10 }}>
-                        {c.status === 'ready' ? 'Siap (lolos SM RPC)' : c.status === 'approved' ? 'Disahkan GM' : c.status === 'submitted' ? 'Dalam proses review' : c.status}
-                      </span>
-                    </td>
-                    <td>
-                      <button className="btn btn-ghost btn-sm" onClick={() => setKmBundleExpanded(kmBundleExpanded === c.id ? null : c.id)} title="Tinjau detail KPI & riwayat">
-                        <ClipboardCheck size={12} /> {(c.kpiItems?.length ?? 0)} KPI
-                        <ChevronDown size={12} style={{ transform: kmBundleExpanded === c.id ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />
-                      </button>
-                    </td>
-                  </tr>
-                  {kmBundleExpanded === c.id && (
                     <tr>
-                      <td colSpan={5} style={{ background: 'var(--color-surface-2)', padding: 0 }}>
-                        <div style={{ padding: 'var(--space-2) var(--space-3)', fontSize: 11, color: 'var(--color-text-muted)' }}>
-                          Penanggung Jawab: <strong style={{ color: 'var(--color-text)' }}>{c.holder ?? '—'}</strong>
-                        </div>
-                        <table className="data-table compact" style={{ margin: 0 }}>
-                          <thead><tr><th>No</th><th>Indikator Kinerja</th><th>Formula</th><th>Satuan</th><th className="num">Bobot</th><th>Target Sem I</th><th>{`Target ${new Date().getFullYear()}`}</th></tr></thead>
-                          <tbody>
-                            {(c.kpiItems ?? []).map((it, idx) => (
-                              <tr key={idx}>
-                                <td>{idx + 1}</td><td>{it.indikator}</td><td>{it.formula}</td><td>{it.satuan}</td>
-                                <td className="num">{it.bobot}</td><td>{it.target}</td><td>{it.target2}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                      <td style={{ fontWeight: 600 }}>{UNIT_NAMES[c.unitCode] ?? c.unitCode}</td>
+                      <td style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{c.bidang}</td>
+                      <td style={{ color: 'var(--color-text-muted)' }}>{c.submitter}</td>
+                      <td>
+                        <span className={`status-pill ${c.status === 'approved' ? 'completed' : c.status === 'ready' ? 'at-risk' : 'in-review'}`} style={{ fontSize: 10 }}>
+                          {c.status === 'ready' ? 'Siap (lolos SM RPC)' : c.status === 'approved' ? 'Disahkan GM' : c.status === 'submitted' ? 'Dalam proses review' : c.status}
+                        </span>
+                      </td>
+                      <td>
+                        <button className="btn btn-ghost btn-sm" onClick={() => setKmBundleExpanded(kmBundleExpanded === c.id ? null : c.id)} title="Tinjau detail KPI & riwayat">
+                          <ClipboardCheck size={12} /> {(c.kpiItems?.length ?? 0)} KPI
+                          <ChevronDown size={12} style={{ transform: kmBundleExpanded === c.id ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />
+                        </button>
                       </td>
                     </tr>
-                  )}
+                    {kmBundleExpanded === c.id && (
+                      <tr>
+                        <td colSpan={5} style={{ background: 'var(--color-surface-2)', padding: 0 }}>
+                          <div style={{ padding: 'var(--space-2) var(--space-3)', fontSize: 11, color: 'var(--color-text-muted)' }}>
+                            Penanggung Jawab: <strong style={{ color: 'var(--color-text)' }}>{c.holder ?? '—'}</strong>
+                          </div>
+                          <table className="data-table compact" style={{ margin: 0 }}>
+                            <thead><tr><th>No</th><th>Indikator Kinerja</th><th>Formula</th><th>Satuan</th><th className="num">Bobot</th><th>Target Sem I</th><th>{`Target ${new Date().getFullYear()}`}</th></tr></thead>
+                            <tbody>
+                              {(c.kpiItems ?? []).map((it, idx) => (
+                                <tr key={idx}>
+                                  <td>{idx + 1}</td><td>{it.indikator}</td><td>{it.formula}</td><td>{it.satuan}</td>
+                                  <td className="num">{it.bobot}</td><td>{it.target}</td><td>{it.target2}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                    )}
                   </Fragment>
                 ))}
               </tbody>
@@ -1002,46 +960,46 @@ export function ApprovalsPage() {
             <tbody>
               {docRows.map((d) => (
                 <Fragment key={d.id}>
-                <tr>
-                  <td style={{ fontWeight: 600 }}>{UNIT_NAMES[d.unitCode] ?? d.unitCode}</td>
-                  <td>
-                    {d.jenis}
-                    {d.detail ? <span style={{ color: 'var(--color-text-muted)' }}> · {d.detail}</span> : null}
-                  </td>
-                  <td style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>{periodMap[d.periodId] ?? '—'}</td>
-                  <td style={{ whiteSpace: 'nowrap' }}>
-                    {d.status === 'approved' ? (
-                      <span style={{ fontSize: 10, color: 'var(--color-success)', fontWeight: 600 }}>✓ Selesai ({d.stepCount}/{d.stepCount})</span>
-                    ) : d.status === 'ready' ? (
-                      <span style={{ fontSize: 10, color: 'var(--color-warning)', fontWeight: 600 }}>Lolos rantai → bundle</span>
-                    ) : d.status === 'rejected' ? (
-                      <span style={{ fontSize: 10, color: 'var(--color-danger)' }}>Dikembalikan</span>
-                    ) : (
-                      <span style={{ fontSize: 10, color: 'var(--color-accent)', fontWeight: 600 }}>Langkah {d.stepIndex}/{Math.max(0, d.stepCount - 1)}</span>
-                    )}
-                  </td>
-                  <td>
-                    <span className={`status-pill ${DOC_STATUS_PILL[d.status] ?? 'in-review'}`} style={{ fontSize: 10 }}>
-                      {DOC_STATUS_LABEL[d.status] ?? d.status}
-                    </span>
-                  </td>
-                  <td style={{ color: d.status === 'approved' ? 'var(--color-success)' : 'var(--color-text-muted)', fontSize: 11 }}>
-                    {nextApproverLabel(d.status, d.stepLabel)}
-                  </td>
-                  <td>
-                    <button className="btn btn-ghost btn-sm" onClick={() => setDocExpanded(docExpanded === d.id ? null : d.id)} title="Lihat riwayat persetujuan & komentar">
-                      <MessageSquare size={12} /> {Array.isArray(d.history) ? (d.history as unknown[]).length : 0}
-                      <ChevronDown size={12} style={{ transform: docExpanded === d.id ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />
-                    </button>
-                  </td>
-                </tr>
-                {docExpanded === d.id && (
                   <tr>
-                    <td colSpan={7} style={{ background: 'var(--color-surface-2)', padding: 0 }}>
-                      <ApprovalTimeline history={d.history} />
+                    <td style={{ fontWeight: 600 }}>{UNIT_NAMES[d.unitCode] ?? d.unitCode}</td>
+                    <td>
+                      {d.jenis}
+                      {d.detail ? <span style={{ color: 'var(--color-text-muted)' }}> · {d.detail}</span> : null}
+                    </td>
+                    <td style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>{periodMap[d.periodId] ?? '—'}</td>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      {d.status === 'approved' ? (
+                        <span style={{ fontSize: 10, color: 'var(--color-success)', fontWeight: 600 }}>✓ Selesai ({d.stepCount}/{d.stepCount})</span>
+                      ) : d.status === 'ready' ? (
+                        <span style={{ fontSize: 10, color: 'var(--color-warning)', fontWeight: 600 }}>Lolos rantai → bundle</span>
+                      ) : d.status === 'rejected' ? (
+                        <span style={{ fontSize: 10, color: 'var(--color-danger)' }}>Dikembalikan</span>
+                      ) : (
+                        <span style={{ fontSize: 10, color: 'var(--color-accent)', fontWeight: 600 }}>Langkah {d.stepIndex}/{Math.max(0, d.stepCount - 1)}</span>
+                      )}
+                    </td>
+                    <td>
+                      <span className={`status-pill ${DOC_STATUS_PILL[d.status] ?? 'in-review'}`} style={{ fontSize: 10 }}>
+                        {DOC_STATUS_LABEL[d.status] ?? d.status}
+                      </span>
+                    </td>
+                    <td style={{ color: d.status === 'approved' ? 'var(--color-success)' : 'var(--color-text-muted)', fontSize: 11 }}>
+                      {nextApproverLabel(d.status, d.stepLabel)}
+                    </td>
+                    <td>
+                      <button className="btn btn-ghost btn-sm" onClick={() => setDocExpanded(docExpanded === d.id ? null : d.id)} title="Lihat riwayat persetujuan & komentar">
+                        <MessageSquare size={12} /> {Array.isArray(d.history) ? (d.history as unknown[]).length : 0}
+                        <ChevronDown size={12} style={{ transform: docExpanded === d.id ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />
+                      </button>
                     </td>
                   </tr>
-                )}
+                  {docExpanded === d.id && (
+                    <tr>
+                      <td colSpan={7} style={{ background: 'var(--color-surface-2)', padding: 0 }}>
+                        <ApprovalTimeline history={d.history} />
+                      </td>
+                    </tr>
+                  )}
                 </Fragment>
               ))}
               {docRows.length === 0 && (
@@ -1052,122 +1010,53 @@ export function ApprovalsPage() {
         </div>
       </FoldCard>
 
-      {/* RACI Matrix — dinamis per role */}
-      {(() => {
-        const myCol = getUserRaciCol(user);
-        return (
-          <FoldCard
-            icon={<UsersRound size={14} />}
-            title="Matriks RACI"
-            right={<span className="card-meta">R=Responsible · A=Accountable · C=Consulted · I=Informed</span>}
-            defaultOpen={false}
-          >
-            {/* Banner: Peran Anda */}
-            {myCol && (
-              <div style={{
-                margin: 'var(--space-4) var(--space-4) 0',
-                padding: 'var(--space-3) var(--space-4)',
-                borderRadius: 'var(--radius-md)',
-                background: 'var(--color-accent-tint)',
-                borderLeft: '4px solid var(--color-accent)',
-                display: 'flex', flexDirection: 'column', gap: 4,
-              }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-accent)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Peran Anda dalam Workflow</div>
-                <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700 }}>{RACI_COL_LABEL[myCol]}</div>
-                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>{RACI_COL_TANGGUNG[myCol]}</div>
-                <div style={{ fontSize: 10, color: 'var(--color-text-subtle)', marginTop: 2 }}>Kolom yang disorot (🔵) pada tabel di bawah menunjukkan posisi Anda dalam matriks.</div>
-              </div>
-            )}
-
-            {/* Legend */}
-            <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap', padding: 'var(--space-3) var(--space-4)', fontSize: 10 }}>
-              {[['R', 'var(--color-accent-tint)', 'var(--color-accent)', 'Responsible — pelaksana utama'],
-                ['A', 'rgba(16,185,129,0.12)', 'var(--color-success)', 'Accountable — pemegang tanggung jawab akhir'],
-                ['C', 'rgba(59,130,246,0.12)', 'var(--color-info)', 'Consulted — diminta masukan/persetujuan'],
-                ['I', 'var(--color-surface-2)', 'var(--color-text-subtle)', 'Informed — diinformasikan'],
-                ['—', 'var(--color-surface-2)', 'var(--color-text-subtle)', 'Tidak terlibat pada alur ini'],
-              ].map(([lbl, bg, clr, desc]) => (
-                <div key={lbl} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span style={{ display: 'inline-block', width: 22, height: 18, borderRadius: 3, lineHeight: '18px', textAlign: 'center', fontWeight: 700, background: bg as string, color: clr as string, fontSize: 10 }}>{lbl}</span>
-                  <span style={{ color: 'var(--color-text-muted)' }}>{desc}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="table-wrap">
-              <table className="data-table compact">
-                <thead>
-                  <tr>
-                    <th style={{ minWidth: 220 }}>Aktivitas</th>
-                    <th style={{ fontSize: 9, color: 'var(--color-text-muted)', fontWeight: 500, whiteSpace: 'nowrap', textAlign: 'center' }}>Ruang Lingkup</th>
-                    {RACI_COLS.map((col) => (
-                      <th
-                        key={col.key}
-                        style={{
-                          textAlign: 'center', minWidth: 110,
-                          background: myCol === col.key ? 'var(--color-accent-tint)' : undefined,
-                          color: myCol === col.key ? 'var(--color-accent)' : undefined,
-                          borderBottom: myCol === col.key ? '2px solid var(--color-accent)' : undefined,
-                        }}
-                      >
-                        <div style={{ fontWeight: 700, fontSize: 11 }}>
-                          {myCol === col.key ? '🔵 ' : ''}{col.label}
-                        </div>
-                        <div style={{ fontSize: 9, fontWeight: 400, color: myCol === col.key ? 'var(--color-accent)' : 'var(--color-text-subtle)', marginTop: 2, whiteSpace: 'normal', lineHeight: 1.3 }}>
-                          {col.sublabel}
-                        </div>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {RACI_ROWS.map((row, i) => (
-                    <tr key={i}>
-                      <td style={{ fontWeight: 500, fontSize: 'var(--text-xs)' }}>{row.activity}</td>
-                      <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
-                        <span style={{ fontSize: 9, background: 'var(--color-surface-2)', color: 'var(--color-text-muted)', padding: '1px 6px', borderRadius: 8 }}>{row.scope}</span>
-                      </td>
-                      {RACI_COLS.map((col) => {
-                        const v = row.values[col.key];
-                        const isMyCol = myCol === col.key;
-                        return (
-                          <td
-                            key={col.key}
-                            style={{
-                              textAlign: 'center',
-                              background: isMyCol ? 'rgba(var(--color-accent-rgb, 14,116,144),0.04)' : undefined,
-                            }}
-                          >
-                            <span style={{
-                              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                              minWidth: 32, height: 22, borderRadius: 4,
-                              fontSize: 'var(--text-xs)', fontWeight: 700,
-                              outline: isMyCol && v !== '—' ? '2px solid var(--color-accent)' : undefined,
-                              outlineOffset: 1,
-                              ...RACI_VALUE_STYLE(v),
-                            }}>
-                              {v}
-                            </span>
-                          </td>
-                        );
-                      })}
-                    </tr>
+      {/* RACI Matrix */}
+      <FoldCard
+        icon={<UsersRound size={14} />}
+        title="Matriks RACI"
+        right={<span className="card-meta">R=Responsible · A=Accountable · C=Consulted · I=Informed</span>}
+        defaultOpen={false}
+      >
+        <div className="table-wrap">
+          <table className="data-table compact">
+            <thead>
+              <tr>
+                <th>Aktivitas</th>
+                <th style={{ textAlign: 'center' }}>Staff</th>
+                <th style={{ textAlign: 'center' }}>Asman</th>
+                <th style={{ textAlign: 'center' }}>Manajer</th>
+                <th style={{ textAlign: 'center' }}>Sr. Manajer</th>
+                <th style={{ textAlign: 'center' }}>GM</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                { activity: 'Input Data Realisasi', values: ['R', 'I', 'I', 'I', 'I'] },
+                { activity: 'Review Kelengkapan Data', values: ['C', 'R/A', 'I', 'I', 'I'] },
+                { activity: 'Approval Laporan Bidang', values: ['I', 'C', 'R/A', 'I', 'I'] },
+                { activity: 'Review Konsolidasi', values: ['I', 'I', 'C', 'R/A', 'I'] },
+                { activity: 'Final Approval & Publikasi', values: ['I', 'I', 'I', 'C', 'R/A'] },
+                { activity: 'Audit & Monitoring', values: ['I', 'I', 'C', 'C', 'A'] },
+              ].map((row, i) => (
+                <tr key={i}>
+                  <td style={{ fontWeight: 500 }}>{row.activity}</td>
+                  {row.values.map((v, vi) => (
+                    <td key={vi} style={{ textAlign: 'center' }}>
+                      <span style={{
+                        display: 'inline-block', width: 28, height: 20, borderRadius: 4, lineHeight: '20px', textAlign: 'center', fontSize: 'var(--text-xs)', fontWeight: 700,
+                        background: v.startsWith('R') ? 'var(--color-accent-tint)' : v === 'A' ? 'rgba(16,185,129,0.12)' : v === 'C' ? 'rgba(59,130,246,0.12)' : 'var(--color-surface-2)',
+                        color: v.startsWith('R') ? 'var(--color-accent)' : v === 'A' ? 'var(--color-success)' : v === 'C' ? 'var(--color-info)' : 'var(--color-text-subtle)',
+                      }}>
+                        {v}
+                      </span>
+                    </td>
                   ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Catatan konteks */}
-            <div style={{ padding: 'var(--space-3) var(--space-4)', fontSize: 10, color: 'var(--color-text-subtle)', borderTop: '1px solid var(--color-border)', lineHeight: 1.7 }}>
-              <strong style={{ color: 'var(--color-text-muted)' }}>Catatan alur:</strong>{' '}
-              Dokumen dari <strong>UPMK</strong> melewati review internal (ASMAN + MUP) sebelum masuk rantai Kantor Induk.{' '}
-              Dokumen dari <strong>Kantor Induk</strong> langsung ke rantai bidang KI.{' '}
-              Semua dokumen (kecuali bidang RPC sendiri) wajib melalui <strong>konsolidasi RPC</strong> sebelum masuk bundle GM.{' '}
-              GM menyetujui <strong>sekali untuk seluruh dokumen</strong> dalam satu bundle (KM: tahunan; Realisasi: per periode).
-            </div>
-          </FoldCard>
-        );
-      })()}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </FoldCard>
     </div>
   );
 }

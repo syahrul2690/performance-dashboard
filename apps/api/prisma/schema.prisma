@@ -13,6 +13,8 @@ enum Role {
   MANAJER
   SRMANAJER
   GM
+  SUPERADMIN
+  DEVELOPER
 }
 
 enum ReportStatus {

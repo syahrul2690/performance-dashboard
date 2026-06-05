@@ -1,4 +1,4 @@
-export type Role = 'STAFF' | 'ASMAN' | 'MANAJER' | 'SRMANAJER' | 'GM';
+export type Role = 'STAFF' | 'ASMAN' | 'MANAJER' | 'SRMANAJER' | 'GM' | 'SUPERADMIN' | 'DEVELOPER';
 
 export interface RoleVariant {
   id: string;
