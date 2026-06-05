@@ -16,32 +16,25 @@ import {
 const NAV_ITEMS = [
   {
     section: 'Aksi Saya', items: [
-      { to: '/approvals', label: 'Persetujuan', icon: CheckSquare },
-      { to: '/input-kontrak', label: 'Input Kontrak Manajemen', icon: FileText },
-      { to: '/input-realisasi', label: 'Input Realisasi Bulanan', icon: ClipboardEdit },
+      { to: '/approvals',      label: 'Persetujuan',             icon: CheckSquare },
+      { to: '/input-kontrak',  label: 'Input Kontrak Manajemen', icon: FileText,    hideForUpmk: true },
+      { to: '/input-realisasi',label: 'Input Realisasi Bulanan', icon: ClipboardEdit },
     ]
   },
   {
     section: 'Dashboard', items: [
-      { to: '/', label: 'Executive Summary', icon: LayoutDashboard, end: true },
-      { to: '/financial', label: 'Cost & Capex', icon: TrendingUp },
-      { to: '/operational', label: 'Operational KPIs', icon: Activity },
-      { to: '/proses-bisnis', label: 'Proses Bisnis L2', icon: Workflow },
-      { to: '/struktur-organisasi', label: 'Struktur Organisasi', icon: Network },
-      { to: '/gcg-esg', label: 'GCG & ESG', icon: Leaf },
-      { to: '/strategic', label: 'Strategic Targets', icon: Target },
-      { to: '/human-capital', label: 'Human Capital', icon: Users },
-      { to: '/risk', label: 'Manajemen Risiko', icon: AlertTriangle },
-      { to: '/peta', label: 'Peta Geografis UPMK', icon: MapPin },
+      { to: '/',                  label: 'Executive Summary',      icon: LayoutDashboard, end: true },
+      { to: '/financial',         label: 'Cost & Capex',           icon: TrendingUp,      devOnly: true },
+      { to: '/operational',       label: 'Operational KPIs',       icon: Activity },
+      { to: '/proses-bisnis',     label: 'Proses Bisnis L2',       icon: Workflow,        devOnly: true },
+      { to: '/struktur-organisasi',label:'Struktur Organisasi',    icon: Network,         devOnly: true },
+      { to: '/gcg-esg',           label: 'GCG & ESG',              icon: Leaf,            devOnly: true },
+      { to: '/strategic',         label: 'Strategic Targets',      icon: Target,          devOnly: true },
+      { to: '/human-capital',     label: 'Human Capital',          icon: Users,           devOnly: true },
+      { to: '/risk',              label: 'Manajemen Risiko',       icon: AlertTriangle,   devOnly: true },
+      { to: '/peta',              label: 'Peta Geografis UPMK',   icon: MapPin,          devOnly: true },
     ]
   },
-  // Section "Workflow Kontrak Manajemen" disembunyikan sementara dari sidebar.
-  // Halaman & route masih aktif (/workflow-km/usulan, /workflow-km/realisasi);
-  // tinggal aktifkan kembali blok di bawah ini bila ingin ditampilkan.
-  // { section: 'Workflow Kontrak Manajemen', items: [
-  //   { to: '/workflow-km/usulan', label: 'Proses Usulan KM', icon: FilePlus },
-  //   { to: '/workflow-km/realisasi', label: 'Proses Realisasi KM', icon: LineChart },
-  // ]},
   {
     section: 'Pengaturan', items: [
       { to: '/settings', label: 'Settings', icon: Settings },
