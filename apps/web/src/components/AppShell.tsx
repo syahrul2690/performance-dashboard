@@ -25,7 +25,7 @@ const NAV_ITEMS = [
     section: 'Dashboard', items: [
       { to: '/',                  label: 'Executive Summary',      icon: LayoutDashboard, end: true },
       { to: '/financial',         label: 'Cost & Capex',           icon: TrendingUp,      devOnly: true },
-      { to: '/operational',       label: 'Operational KPIs',       icon: Activity },
+      { to: '/operational',       label: 'Operational KPIs',       icon: Activity,        devOnly: true },
       { to: '/proses-bisnis',     label: 'Proses Bisnis L2',       icon: Workflow,        devOnly: true },
       { to: '/struktur-organisasi',label:'Struktur Organisasi',    icon: Network,         devOnly: true },
       { to: '/gcg-esg',           label: 'GCG & ESG',              icon: Leaf,            devOnly: true },

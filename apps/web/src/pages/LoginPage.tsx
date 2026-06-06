@@ -10,8 +10,12 @@ const DEMO_PASSWORD = 'Pusmanpro@2026';
 // Akun demo per role yang telah di-seed (Kantor Induk per bidang + UPMK + GM).
 const DEMO_GROUPS: Array<{ label: string; accounts: Array<{ role: string; email: string }> }> = [
   {
-    label: 'Manajemen Puncak',
-    accounts: [{ role: 'General Manager', email: 'gm@pusmanpro.pln.co.id' }],
+    label: 'Manajemen Puncak & Sistem',
+    accounts: [
+      { role: 'General Manager',  email: 'gm@pusmanpro.pln.co.id' },
+      { role: 'Super Admin',      email: 'superadmin@pusmanpro.pln.co.id' },
+      { role: 'Developer',        email: 'developer@pusmanpro.pln.co.id' },
+    ],
   },
   {
     label: 'KI — Operasi Manajemen Proyek (OMP)',
