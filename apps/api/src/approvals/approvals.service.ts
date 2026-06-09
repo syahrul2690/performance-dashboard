@@ -10,6 +10,8 @@ const ROLE_TO_STAGE: Record<Role, number> = {
   MANAJER: 3,
   SRMANAJER: 4,
   GM: 5,
+  SUPERADMIN: 0,
+  DEVELOPER: 0,
 };
 
 @Injectable()
