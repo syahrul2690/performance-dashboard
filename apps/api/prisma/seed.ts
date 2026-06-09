@@ -104,8 +104,8 @@ async function main() {
   console.log('  KI users per jabatan:', KI_USERS.length + 1);
 
   // System Admin accounts (Super Admin & Developer)
-  await upsertUser('superadmin', 'Super Administrator', Role.GM, null, 'gm_pusmanpro');
-  await upsertUser('developer', 'Developer Account', Role.GM, null, 'gm_pusmanpro');
+  await upsertUser('superadmin', 'Super Administrator', Role.SUPERADMIN, null, 'gm_pusmanpro');
+  await upsertUser('developer', 'Developer Account', Role.DEVELOPER, null, 'gm_pusmanpro');
   console.log('  system_admin_accounts: 2');
 
   // User UPMK (Staff Kinerja / ASMAN / MUP-Manajer) per UPMK I–V untuk alur realisasi UPMK.
