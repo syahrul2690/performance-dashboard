@@ -62,11 +62,8 @@ export function InputKontrakPage() {
   // Default unit mengikuti unit user (bila ada)
   useEffect(() => { if (user?.unit) setSelectedUnit(user.unit); }, [user?.unit]);
 
-  // Konsolidator RPC & GM boleh pilih unit bebas untuk monitoring
-  const vc0 = user?.roleVariant?.code;
-  const isRpcKonsolidasi = vc0 === 'man_perencanaan' || vc0 === 'sm_pc'
-    || (user?.role === 'STAFF' && (user?.bidang ?? null) === RPC_BIDANG);
-  const canSelectUnit = user?.role === 'GM' || isRpcKonsolidasi;
+  // Hanya GM yang boleh pilih unit bebas untuk monitoring
+  const canSelectUnit = user?.role === 'GM';
   const lockedUnit = user?.unit ?? 'KP';
 
   useEffect(() => {
@@ -246,10 +243,7 @@ export function InputKontrakPage() {
   // - User lain → filter per UNIT, lalu KP staff tambah filter per BIDANG
   const myBidang = user?.bidang ?? null;
   const myUnit = user?.unit ?? null;
-  const vc = user?.roleVariant?.code;
-  const isRpcKonsolidasi0 = vc === 'man_perencanaan' || vc === 'sm_pc'
-    || (user?.role === 'STAFF' && myBidang === 'Perencanaan & Project Control');
-  const canSeeAllKm = user?.role === 'GM' || isRpcKonsolidasi0;
+  const canSeeAllKm = user?.role === 'GM';
   // Hanya PIC/Staff Kinerja bidang ybs (Kantor Induk) yang boleh edit/hapus/kirim KM bidang itu.
   const canActOnRow = (k: KontrakManajemen) => user?.role === 'STAFF' && user?.unit === 'KP' && (user?.bidang ?? null) === k.bidang;
   // Opsi sasaran KM pada form.

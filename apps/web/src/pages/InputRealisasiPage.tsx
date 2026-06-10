@@ -34,14 +34,8 @@ const UNIT_OPTIONS = [
 export function InputRealisasiPage() {
   const { user } = useAuth();
   const isStaff = user?.role === 'STAFF';
-  // Konsolidator RPC (Staff Kinerja RPC, Manajer Perencanaan, SM Perencanaan & PC)
-  // mendapat akses lintas-unit untuk monitoring — sama dengan GM (kecuali tidak bisa submit milik unit lain).
-  const vc = user?.roleVariant?.code;
-  const isRpcKonsolidasi =
-    (isStaff && user?.bidang === RPC_BIDANG) ||
-    vc === 'man_perencanaan' ||
-    vc === 'sm_pc';
-  const canSelectUnit = user?.role === 'GM' || isRpcKonsolidasi;
+  // Hanya GM yang boleh pilih unit bebas untuk monitoring
+  const canSelectUnit = user?.role === 'GM';
   const lockedUnit = user?.unit ?? 'KP';
   const [selectedUnit, setSelectedUnit] = useState<string>(lockedUnit);
   const [periods, setPeriods] = useState<Period[]>([]);
@@ -115,10 +109,8 @@ export function InputRealisasiPage() {
           let merged: KpiItem[] = kontrak.flatMap((k) =>
             (k.kpiItems as KpiItem[]).map((it) => ({ ...it, bidang: k.bidang })),
           );
-          // Staff bidang hanya melihat KPI bidangnya sendiri.
-          // Konsolidator RPC (Staff Kinerja RPC, Manajer Perencanaan, SM RPC) TIDAK difilter
-          // sehingga bisa memonitor KPI semua bidang pada unit yang dipilih.
-          if (isStaff && user?.bidang && !isRpcKonsolidasi) {
+          // Semua role kecuali GM hanya melihat KPI bidangnya sendiri.
+          if (user?.bidang && user?.role !== 'GM') {
             merged = merged.filter((it) => it.bidang === user.bidang);
           }
           setKpiList(merged);
