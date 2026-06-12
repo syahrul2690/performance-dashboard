@@ -63,6 +63,7 @@ const RPC_TAIL: Step[] = [
 //   mode 'km': KM disusun Kantor Induk → selalu rantai bidang KI.
 export function buildSteps(unitCode: string, bidang: string, mode: 'realisasi' | 'km' = 'realisasi'): Step[] {
   const isUPMK = mode === 'realisasi' && unitCode !== 'KP';
+  const isUpmkKm = mode === 'km' && unitCode !== 'KP';
   let chain = (KI_CHAIN[bidang] ?? []).map((s) => ({ ...s, bidang, unit: 'KP' }));
   // Dokumen UPMK ber-bidang RPC: cukup Manajer Perencanaan (lewati Manajer Project Control).
   if (bidang === RPC_BIDANG && unitCode !== 'KP') {
@@ -74,14 +75,25 @@ export function buildSteps(unitCode: string, bidang: string, mode: 'realisasi' |
     steps.push({ role: Role.STAFF, unit: unitCode, label: `Staff Kinerja ${uname(unitCode)}` });
     steps.push({ role: Role.ASMAN, unit: unitCode, label: `ASMAN ${uname(unitCode)}` });
     steps.push({ role: Role.MANAJER, unit: unitCode, label: `Manajer (MUP) ${uname(unitCode)}` });
-    steps.push(...chain); // rantai bidang KI penuh
+    steps.push(...chain);
+  } else if (isUpmkKm) {
+    // KM UPMK dibuat & dikirim oleh Staff RPC (KP); step 0 = Staff RPC bukan Staff bidang yang dipilih.
+    steps.push({ role: Role.STAFF, bidang: RPC_BIDANG, unit: 'KP', label: 'Staff Kinerja Perencanaan (RPC)' });
+    steps.push(...chain);
   } else {
     steps.push({ role: Role.STAFF, bidang, unit: 'KP', label: `Staff Kinerja ${bidang}` });
     steps.push(...chain);
   }
 
   // Konsolidasi RPC — dilewati bila dokumen sudah bidang RPC (rantai sudah berakhir di SM RPC).
-  if (bidang !== RPC_BIDANG) steps.push(...RPC_TAIL);
+  if (bidang !== RPC_BIDANG) {
+    if (isUpmkKm) {
+      // Staff RPC sudah jadi step 0; cukup tambah Man Perencanaan + SM RPC (hindari duplikat).
+      steps.push(RPC_TAIL[1], RPC_TAIL[2]);
+    } else {
+      steps.push(...RPC_TAIL);
+    }
+  }
   return steps;
 }
 
