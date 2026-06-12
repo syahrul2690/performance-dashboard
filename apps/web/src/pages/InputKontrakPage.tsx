@@ -417,6 +417,8 @@ export function InputKontrakPage() {
                   <option value="QA/QC">QA/QC</option>
                   <option value="Keuangan, Komunikasi & Umum">Keuangan, Komunikasi &amp; Umum</option>
                   <option value="Perencanaan & Project Control">Perencanaan &amp; Project Control</option>
+                  <option value="K3L">K3L (Kesehatan, Keselamatan Kerja &amp; Lingkungan)</option>
+                  <option value="MRO">MRO (Manajemen Risiko &amp; Kepatuhan)</option>
                 </select>
               </div>
             )}

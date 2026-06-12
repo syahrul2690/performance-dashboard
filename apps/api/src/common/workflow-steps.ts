@@ -10,6 +10,8 @@ export const RPC_BIDANG = 'Perencanaan & Project Control';
 export const OMP_BIDANG = 'Operasi Manajemen Proyek';
 export const QAQC_BIDANG = 'QA/QC';
 export const KKU_BIDANG = 'Keuangan, Komunikasi & Umum';
+export const K3L_BIDANG = 'K3L';
+export const MRO_BIDANG = 'MRO';
 
 // Langkah alur. Langkah ASMAN/Manajer/SM dicocokkan ke JABATAN spesifik (roleVariant.code);
 // langkah Staff (PIC) dicocokkan ke (role + bidang/unit).
@@ -48,6 +50,12 @@ const KI_CHAIN: Record<string, Step[]> = {
     { role: Role.MANAJER, variant: 'man_akuntansi', label: 'Manajer Akuntansi' },
     { role: Role.MANAJER, variant: 'man_aset_properti', label: 'Manajer Aset & Properti' },
     { role: Role.SRMANAJER, variant: 'sm_kku', label: 'SM Keuangan, Komunikasi & Umum' },
+  ],
+  [K3L_BIDANG]: [
+    { role: Role.ASMAN, variant: 'asman_k3l', label: 'ASMAN K3L' },
+  ],
+  [MRO_BIDANG]: [
+    { role: Role.ASMAN, variant: 'asman_risiko', label: 'ASMAN Manajemen Risiko & Kepatuhan' },
   ],
 };
 

@@ -56,11 +56,13 @@ async function main() {
   }
   console.log('  role_variants:', extra.roleVariants.length);
 
-  // 4 Bidang baku PUSMANPRO (Kantor Induk)
+  // 4 Bidang baku PUSMANPRO (Kantor Induk) + 2 unit lintas-bidang di bawah GM
   const OMP = 'Operasi Manajemen Proyek';
   const QAQC = 'QA/QC';
   const RPC = 'Perencanaan & Project Control';
   const KKU = 'Keuangan, Komunikasi & Umum';
+  const K3L = 'K3L';
+  const MRO = 'MRO';
 
   const variantId = async (code: string) => (await prisma.roleVariant.findUnique({ where: { code } }))?.id ?? null;
   const upsertUser = async (slug: string, name: string, role: Role, bidang: string | null, variantCode: string, unit = 'KP') => {
@@ -98,6 +100,9 @@ async function main() {
     ['man.akuntansi', 'Manajer Akuntansi', Role.MANAJER, KKU, 'man_akuntansi'],
     ['man.aset', 'Manajer Aset & Properti', Role.MANAJER, KKU, 'man_aset_properti'],
     ['sm.kku', 'SM Keuangan, Komunikasi & Umum', Role.SRMANAJER, KKU, 'sm_kku'],
+    // K3L & MRO (langsung di bawah GM)
+    ['asman.k3l', 'ASMAN K3L', Role.ASMAN, K3L, 'asman_k3l'],
+    ['asman.mro', 'ASMAN Manajemen Risiko & Kepatuhan', Role.ASMAN, MRO, 'asman_risiko'],
   ];
   for (const [slug, name, role, bidang, vc] of KI_USERS) await upsertUser(slug, name, role, bidang, vc);
   await upsertUser('gm', 'General Manager PUSMANPRO', Role.GM, null, 'gm_pusmanpro');
