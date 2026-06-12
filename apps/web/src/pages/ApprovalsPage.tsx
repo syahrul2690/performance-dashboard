@@ -286,6 +286,7 @@ export function ApprovalsPage() {
   const [kmBundleNote, setKmBundleNote] = useState('');
   const [kmBundleBusy, setKmBundleBusy] = useState(false);
   const [kmBundleExpanded, setKmBundleExpanded] = useState<string | null>(null);
+  const [upmkGroupExpanded, setUpmkGroupExpanded] = useState<string | null>(null);
   const loadKmBundle = () => {
     inputKontrak.bundle().then((d) => setKmBundle(d as KmBundleData)).catch(() => { });
   };
@@ -710,7 +711,8 @@ export function ApprovalsPage() {
                 {kmBundle.components.length === 0 && (
                   <tr><td colSpan={5}><EmptyState title="Belum ada KM" message="Belum ada KM yang masuk konsolidasi tahun ini." /></td></tr>
                 )}
-                {kmBundle.components.map((c) => (
+                {/* KP components — flat per bidang, unchanged */}
+                {kmBundle.components.filter((c) => c.unitCode === 'KP').map((c) => (
                   <Fragment key={c.id}>
                     <tr>
                       <td style={{ fontWeight: 600 }}>{UNIT_NAMES[c.unitCode] ?? c.unitCode}</td>
@@ -750,6 +752,75 @@ export function ApprovalsPage() {
                     )}
                   </Fragment>
                 ))}
+                {/* UPMK components — one group row per unit, expandable to show per-bidang sub-rows */}
+                {Object.entries(
+                  kmBundle.components
+                    .filter((c) => c.unitCode !== 'KP')
+                    .reduce<Record<string, KmBundleComp[]>>((acc, c) => { (acc[c.unitCode] ??= []).push(c); return acc; }, {})
+                ).sort(([a], [b]) => a.localeCompare(b)).map(([unitCode, items]) => {
+                  const allApproved = items.every((c) => c.status === 'approved');
+                  const allReady = items.every((c) => c.status === 'ready' || c.status === 'approved');
+                  const anySubmitted = items.some((c) => c.status === 'submitted');
+                  const readyCount = items.filter((c) => c.status === 'ready' || c.status === 'approved').length;
+                  const isOpen = upmkGroupExpanded === unitCode;
+                  const aggregateLabel = allApproved ? 'Disahkan GM' : allReady ? 'Siap' : anySubmitted ? 'Dalam review' : `${readyCount}/${items.length} siap`;
+                  const aggregateCls = allApproved ? 'completed' : allReady ? 'at-risk' : anySubmitted ? 'in-review' : '';
+                  return (
+                    <Fragment key={unitCode}>
+                      <tr style={{ background: 'var(--color-surface-1)' }}>
+                        <td colSpan={2} style={{ fontWeight: 700 }}>
+                          <button className="btn btn-ghost btn-sm" style={{ gap: 'var(--space-1)' }} onClick={() => setUpmkGroupExpanded(isOpen ? null : unitCode)}>
+                            <ChevronDown size={12} style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform .2s', flexShrink: 0 }} />
+                            {UNIT_NAMES[unitCode] ?? unitCode}
+                          </button>
+                        </td>
+                        <td style={{ color: 'var(--color-text-muted)', fontSize: 11 }}>{items.length} bidang</td>
+                        <td><span className={`status-pill ${aggregateCls}`} style={{ fontSize: 10 }}>{aggregateLabel}</span></td>
+                        <td />
+                      </tr>
+                      {isOpen && items.map((c) => (
+                        <Fragment key={c.id}>
+                          <tr style={{ background: 'var(--color-surface-2)' }}>
+                            <td style={{ paddingLeft: 'var(--space-5)' }} />
+                            <td style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{c.bidang}</td>
+                            <td style={{ color: 'var(--color-text-muted)', fontSize: 11 }}>{c.submitter}</td>
+                            <td>
+                              <span className={`status-pill ${c.status === 'approved' ? 'completed' : c.status === 'ready' ? 'at-risk' : 'in-review'}`} style={{ fontSize: 10 }}>
+                                {c.status === 'ready' ? 'Siap' : c.status === 'approved' ? 'Disahkan GM' : 'Dalam review'}
+                              </span>
+                            </td>
+                            <td>
+                              <button className="btn btn-ghost btn-sm" onClick={() => setKmBundleExpanded(kmBundleExpanded === c.id ? null : c.id)} title="Tinjau detail KPI">
+                                <ClipboardCheck size={12} /> {(c.kpiItems?.length ?? 0)} KPI
+                                <ChevronDown size={12} style={{ transform: kmBundleExpanded === c.id ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />
+                              </button>
+                            </td>
+                          </tr>
+                          {kmBundleExpanded === c.id && (
+                            <tr>
+                              <td colSpan={5} style={{ background: 'var(--color-surface-2)', padding: 0 }}>
+                                <div style={{ padding: 'var(--space-2) var(--space-3)', fontSize: 11, color: 'var(--color-text-muted)' }}>
+                                  Penanggung Jawab: <strong style={{ color: 'var(--color-text)' }}>{c.holder ?? '—'}</strong>
+                                </div>
+                                <table className="data-table compact" style={{ margin: 0 }}>
+                                  <thead><tr><th>No</th><th>Indikator Kinerja</th><th>Formula</th><th>Satuan</th><th className="num">Bobot</th><th>Target Sem I</th><th>{`Target ${new Date().getFullYear()}`}</th></tr></thead>
+                                  <tbody>
+                                    {(c.kpiItems ?? []).map((it, idx) => (
+                                      <tr key={idx}>
+                                        <td>{idx + 1}</td><td>{it.indikator}</td><td>{it.formula}</td><td>{it.satuan}</td>
+                                        <td className="num">{it.bobot}</td><td>{it.target}</td><td>{it.target2}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
+                      ))}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
