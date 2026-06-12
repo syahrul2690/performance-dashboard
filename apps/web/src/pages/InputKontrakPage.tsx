@@ -78,7 +78,10 @@ export function InputKontrakPage() {
 
   const loadData = async () => {
     try {
-      const data = await inputKontrak.list(selectedUnit);
+      // GM filter by selected unit; others load all KMs so self-created cross-unit KMs (e.g. UPMK KM by Staff RPC) are always visible.
+      // filterKm handles display scoping.
+      const unitFilter = user?.role === 'GM' ? selectedUnit : undefined;
+      const data = await inputKontrak.list(unitFilter);
       setKontrakList(data as KontrakManajemen[]);
     } catch (e) {
       setError((e as Error)?.message ?? 'Gagal memuat data');
