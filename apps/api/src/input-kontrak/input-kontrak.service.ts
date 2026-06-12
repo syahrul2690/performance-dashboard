@@ -258,6 +258,27 @@ export class InputKontrakService {
     return result;
   }
 
+  // Edit KPI items oleh reviewer pada langkah aktif (status=submitted, stepMatches user).
+  async updateKpiItems(user: User, id: string, kpiItems: object[]) {
+    const km = await this.prisma.kontrakManajemen.findUnique({ where: { id } });
+    if (!km) throw new NotFoundException('Kontrak tidak ditemukan');
+    if (km.status !== 'submitted') throw new ForbiddenException('Hanya KM yang sedang direview yang dapat diedit');
+    const steps = (km.steps as unknown as Step[]) ?? [];
+    if (!stepMatches(steps[km.currentStepIndex], user)) {
+      throw new ForbiddenException('KM ini bukan pada langkah Anda');
+    }
+    const history = [
+      ...(Array.isArray(km.history) ? (km.history as object[]) : []),
+      { stepIndex: km.currentStepIndex, actor: user.name, role: user.role, action: 'edited', ts: new Date().toISOString() },
+    ];
+    const result = await this.prisma.kontrakManajemen.update({ where: { id }, data: { kpiItems: kpiItems as object, history } });
+    await this.prisma.auditLog.create({
+      data: { actor: user.name, userId: user.id, action: 'kontrak.edit', entity: 'KontrakManajemen', targetId: id },
+    });
+    await this.cache.del(`kontrak:${km.unitCode}`);
+    return result;
+  }
+
   // ===== BUNDLE KM tahunan (persetujuan akhir GM, sekali untuk seluruh KM tahun tsb) =====
   private async periodIdsForYear(year: string) {
     const periods = await this.prisma.period.findMany({ where: { yearMonth: { startsWith: `${year}-` } }, select: { id: true } });

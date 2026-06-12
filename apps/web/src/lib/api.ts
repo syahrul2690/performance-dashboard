@@ -175,6 +175,8 @@ export const inputKontrak = {
     api.get('/input-kontrak/bundle', { params: { year } }).then((r) => r.data),
   reviewBundle: (action: 'approve' | 'reject', note: string, year?: string) =>
     api.post('/input-kontrak/bundle/review', { action, note, year }).then((r) => r.data),
+  updateValues: (id: string, kpiItems: Record<string, unknown>[]) =>
+    api.patch(`/input-kontrak/${id}/values`, { kpiItems }).then((r) => r.data),
   uploadExcel: (file: File) => {
     const form = new FormData();
     form.append('file', file);

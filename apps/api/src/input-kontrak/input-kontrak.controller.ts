@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Post, Delete, Body, Query, Param, UseGuards, UseInterceptors, UploadedFile, Res,
+  Controller, Get, Post, Patch, Delete, Body, Query, Param, UseGuards, UseInterceptors, UploadedFile, Res,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
@@ -21,6 +21,10 @@ class ReviewDto {
   @IsIn(['approve', 'reject']) action: 'approve' | 'reject';
   @IsOptional() @IsString() note?: string;
   @IsOptional() @IsIn(['konseptor', 'previous']) returnTo?: 'konseptor' | 'previous';
+}
+
+class UpdateKpiItemsDto {
+  @IsArray() kpiItems: object[];
 }
 
 class BundleReviewDto {
@@ -88,6 +92,11 @@ export class InputKontrakController {
   @Post(':id/submit')
   submit(@CurrentUser() user: User, @Param('id') id: string) {
     return this.svc.submit(user, id);
+  }
+
+  @Patch(':id/values')
+  updateKpiItems(@CurrentUser() user: User, @Param('id') id: string, @Body() dto: UpdateKpiItemsDto) {
+    return this.svc.updateKpiItems(user, id, dto.kpiItems);
   }
 
   @Post(':id/review')

@@ -238,6 +238,8 @@ export function ApprovalsPage() {
   const [kmTarget, setKmTarget] = useState<string | null>(null);
   const [kmExpanded, setKmExpanded] = useState<string | null>(null);
   const [kmBusy, setKmBusy] = useState(false);
+  const [kmEditId, setKmEditId] = useState<string | null>(null);
+  const [kmEditItems, setKmEditItems] = useState<Record<string, unknown>[]>([]);
 
   // Review Realisasi Kinerja Bulanan (untuk Asman ke atas)
   const [realList, setRealList] = useState<RealisasiKinerja[]>([]);
@@ -411,6 +413,25 @@ export function ApprovalsPage() {
       alert((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Gagal menyimpan perubahan');
     } finally {
       setRealBusy(false);
+    }
+  };
+
+  const startEditKm = (k: KontrakManajemen) => {
+    setKmEditItems((k.kpiItems as Record<string, unknown>[]).map((item) => ({ ...(item as object) })));
+    setKmEditId(k.id);
+    setKmExpanded(k.id);
+  };
+
+  const saveEditKm = async (k: KontrakManajemen) => {
+    setKmBusy(true);
+    try {
+      await inputKontrak.updateValues(k.id, kmEditItems);
+      setKmEditId(null);
+      loadKm();
+    } catch (e) {
+      alert((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Gagal menyimpan perubahan');
+    } finally {
+      setKmBusy(false);
     }
   };
 
@@ -594,34 +615,69 @@ export function ApprovalsPage() {
                                 </div>
                               </div>
                             ) : (
-                              <button className="btn btn-secondary btn-sm" onClick={() => { setKmTarget(k.id); setKmNote(''); }}>
-                                <Clock size={12} /> Tinjau
-                              </button>
+                              <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                                <button className="btn btn-secondary btn-sm" onClick={() => { setKmTarget(k.id); setKmNote(''); }}>
+                                  <Clock size={12} /> Tinjau
+                                </button>
+                                <button className="btn btn-ghost btn-sm" onClick={() => startEditKm(k)} title="Edit KPI items pada tahap Anda">
+                                  <Pencil size={12} /> Edit KPI
+                                </button>
+                              </div>
                             )}
                           </td>
                         </tr>
                         {kmExpanded === k.id && (
                           <tr>
                             <td colSpan={8} style={{ background: 'var(--color-surface-2)', padding: 0 }}>
+                              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)', padding: 'var(--space-2) var(--space-3)' }}>
+                                {kmEditId === k.id ? (
+                                  <>
+                                    <button className="btn btn-sm" style={{ background: 'var(--color-success)', color: '#fff' }} disabled={kmBusy} onClick={() => saveEditKm(k)}>
+                                      <CheckCircle size={12} /> Simpan KPI
+                                    </button>
+                                    <button className="btn btn-ghost btn-sm" onClick={() => setKmEditId(null)}>Batal Edit</button>
+                                  </>
+                                ) : (
+                                  <button className="btn btn-secondary btn-sm" onClick={() => startEditKm(k)}>
+                                    <Pencil size={12} /> Edit KPI
+                                  </button>
+                                )}
+                              </div>
                               <table className="data-table compact" style={{ margin: 0 }}>
                                 <thead>
                                   <tr>
                                     <th>No</th><th>Indikator Kinerja</th><th>Formula</th><th>Satuan</th>
-                                    <th className="num">Bobot</th><th>Target Sem I</th>{`Target Tahun ${new Date().getFullYear()}`}
+                                    <th className="num">Bobot</th><th>Target Sem I</th><th>{`Target Tahun ${new Date().getFullYear()}`}</th>
                                   </tr>
                                 </thead>
                                 <tbody>
-                                  {(k.kpiItems as Record<string, string>[]).map((it, idx) => (
-                                    <tr key={idx}>
-                                      <td>{idx + 1}</td>
-                                      <td>{it.indikator}</td>
-                                      <td>{it.formula}</td>
-                                      <td>{it.satuan}</td>
-                                      <td className="num">{it.bobot}</td>
-                                      <td>{it.target}</td>
-                                      <td>{it.target2}</td>
-                                    </tr>
-                                  ))}
+                                  {(kmEditId === k.id ? kmEditItems : (k.kpiItems as Record<string, unknown>[])).map((it, idx) => {
+                                    const editing = kmEditId === k.id;
+                                    const itStr = it as Record<string, string>;
+                                    return (
+                                      <tr key={idx}>
+                                        <td>{idx + 1}</td>
+                                        <td>{itStr.indikator}</td>
+                                        <td>{itStr.formula}</td>
+                                        <td>{itStr.satuan}</td>
+                                        <td className="num">{itStr.bobot}</td>
+                                        <td style={{ fontWeight: editing ? 700 : undefined }}>
+                                          {editing ? (
+                                            <input type="text" className="form-input form-input-sm" style={{ width: 90 }}
+                                              value={String(kmEditItems[idx]?.target ?? '')}
+                                              onChange={(e) => setKmEditItems((items) => items.map((item, i) => i === idx ? { ...item, target: e.target.value } : item))} />
+                                          ) : itStr.target}
+                                        </td>
+                                        <td style={{ fontWeight: editing ? 700 : undefined }}>
+                                          {editing ? (
+                                            <input type="text" className="form-input form-input-sm" style={{ width: 90 }}
+                                              value={String(kmEditItems[idx]?.target2 ?? '')}
+                                              onChange={(e) => setKmEditItems((items) => items.map((item, i) => i === idx ? { ...item, target2: e.target.value } : item))} />
+                                          ) : itStr.target2}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
                                 </tbody>
                               </table>
                             </td>
@@ -815,9 +871,14 @@ export function ApprovalsPage() {
                                 </div>
                               </div>
                             ) : (
-                              <button className="btn btn-secondary btn-sm" onClick={() => { setRealTarget(rl.id); setRealNote(''); }}>
-                                <Clock size={12} /> Tinjau
-                              </button>
+                              <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                                <button className="btn btn-secondary btn-sm" onClick={() => { setRealTarget(rl.id); setRealNote(''); }}>
+                                  <Clock size={12} /> Tinjau
+                                </button>
+                                <button className="btn btn-ghost btn-sm" onClick={() => startEditReal(rl)} title="Edit nilai realisasi pada tahap Anda">
+                                  <Pencil size={12} /> Edit Nilai
+                                </button>
+                              </div>
                             )}
                           </td>
                         </tr>
