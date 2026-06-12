@@ -173,6 +173,13 @@ const UNIT_NAMES: Record<string, string> = {
   KP: 'Kantor Induk', UPMK1: 'UPMK I', UPMK2: 'UPMK II',
   UPMK3: 'UPMK III', UPMK4: 'UPMK IV', UPMK5: 'UPMK V',
 };
+const BIDANG_ORDER: Record<string, number> = {
+  'Operasi Manajemen Proyek': 0, 'QA/QC': 1,
+  'Keuangan, Komunikasi & Umum': 2, 'Perencanaan & Project Control': 3,
+  'MRO': 4, 'K3L': 5,
+};
+const sortByBidang = <T extends { bidang: string }>(arr: T[]): T[] =>
+  [...arr].sort((a, b) => (BIDANG_ORDER[a.bidang] ?? 99) - (BIDANG_ORDER[b.bidang] ?? 99));
 
 const FASE_ACCENT = [
   'var(--color-accent)',
@@ -287,6 +294,7 @@ export function ApprovalsPage() {
   const [kmBundleBusy, setKmBundleBusy] = useState(false);
   const [kmBundleExpanded, setKmBundleExpanded] = useState<string | null>(null);
   const [upmkGroupExpanded, setUpmkGroupExpanded] = useState<string | null>(null);
+  const [upmkRealGroupExpanded, setUpmkRealGroupExpanded] = useState<string | null>(null);
   const loadKmBundle = () => {
     inputKontrak.bundle().then((d) => setKmBundle(d as KmBundleData)).catch(() => { });
   };
@@ -778,7 +786,7 @@ export function ApprovalsPage() {
                         <td><span className={`status-pill ${aggregateCls}`} style={{ fontSize: 10 }}>{aggregateLabel}</span></td>
                         <td />
                       </tr>
-                      {isOpen && items.map((c) => (
+                      {isOpen && sortByBidang(items).map((c) => (
                         <Fragment key={c.id}>
                           <tr style={{ background: 'var(--color-surface-2)' }}>
                             <td style={{ paddingLeft: 'var(--space-5)' }} />
@@ -1035,7 +1043,8 @@ export function ApprovalsPage() {
                 {bundle.components.length === 0 && (
                   <tr><td colSpan={4}><EmptyState title="Belum ada realisasi" message="Belum ada realisasi yang masuk konsolidasi periode ini." /></td></tr>
                 )}
-                {bundle.components.map((c) => (
+                {/* KP — flat per bidang */}
+                {bundle.components.filter((c) => c.unitCode === 'KP').map((c) => (
                   <tr key={c.id}>
                     <td style={{ fontWeight: 600 }}>{UNIT_NAMES[c.unitCode] ?? c.unitCode}</td>
                     <td style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{c.bidang}</td>
@@ -1047,6 +1056,46 @@ export function ApprovalsPage() {
                     </td>
                   </tr>
                 ))}
+                {/* UPMK — satu baris grup per unit, expand ke sub-rows per bidang (urut BIDANG_ORDER) */}
+                {Object.entries(
+                  bundle.components
+                    .filter((c) => c.unitCode !== 'KP')
+                    .reduce<Record<string, typeof bundle.components>>((acc, c) => { (acc[c.unitCode] ??= []).push(c); return acc; }, {})
+                ).sort(([a], [b]) => a.localeCompare(b)).map(([unitCode, items]) => {
+                  const allApproved  = items.every((c) => c.status === 'approved');
+                  const allReady     = items.every((c) => c.status === 'ready' || c.status === 'approved');
+                  const anySubmitted = items.some((c) => c.status === 'submitted');
+                  const readyCount   = items.filter((c) => c.status === 'ready' || c.status === 'approved').length;
+                  const isOpen       = upmkRealGroupExpanded === unitCode;
+                  const aggrLabel    = allApproved ? 'Disetujui GM' : allReady ? 'Siap' : anySubmitted ? 'Dalam review' : `${readyCount}/${items.length} siap`;
+                  const aggrCls      = allApproved ? 'completed' : allReady ? 'at-risk' : anySubmitted ? 'in-review' : '';
+                  return (
+                    <Fragment key={unitCode}>
+                      <tr style={{ background: 'var(--color-surface-1)' }}>
+                        <td colSpan={2} style={{ fontWeight: 700 }}>
+                          <button className="btn btn-ghost btn-sm" style={{ gap: 'var(--space-1)' }} onClick={() => setUpmkRealGroupExpanded(isOpen ? null : unitCode)}>
+                            <ChevronDown size={12} style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform .2s', flexShrink: 0 }} />
+                            {UNIT_NAMES[unitCode] ?? unitCode}
+                          </button>
+                        </td>
+                        <td style={{ color: 'var(--color-text-muted)', fontSize: 11 }}>{items.length} bidang</td>
+                        <td><span className={`status-pill ${aggrCls}`} style={{ fontSize: 10 }}>{aggrLabel}</span></td>
+                      </tr>
+                      {isOpen && sortByBidang(items).map((c) => (
+                        <tr key={c.id} style={{ background: 'var(--color-surface-2)' }}>
+                          <td style={{ paddingLeft: 'var(--space-5)' }} />
+                          <td style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{c.bidang}</td>
+                          <td style={{ color: 'var(--color-text-muted)', fontSize: 11 }}>{c.submitter}</td>
+                          <td>
+                            <span className={`status-pill ${c.status === 'approved' ? 'completed' : c.status === 'ready' ? 'at-risk' : 'in-review'}`} style={{ fontSize: 10 }}>
+                              {c.status === 'ready' ? 'Siap' : c.status === 'approved' ? 'Disetujui GM' : 'Dalam review'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
