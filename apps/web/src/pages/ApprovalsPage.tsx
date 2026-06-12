@@ -620,7 +620,7 @@ export function ApprovalsPage() {
                                   <Clock size={12} /> Tinjau
                                 </button>
                                 <button className="btn btn-ghost btn-sm" onClick={() => startEditKm(k)} title="Edit KPI items pada tahap Anda">
-                                  <Pencil size={12} /> Edit KPI
+                                  <Pencil size={12} /> Edit
                                 </button>
                               </div>
                             )}
@@ -639,7 +639,7 @@ export function ApprovalsPage() {
                                   </>
                                 ) : (
                                   <button className="btn btn-secondary btn-sm" onClick={() => startEditKm(k)}>
-                                    <Pencil size={12} /> Edit KPI
+                                    <Pencil size={12} /> Edit
                                   </button>
                                 )}
                               </div>
