@@ -7,6 +7,11 @@ import type { KontrakManajemen, Period } from '../lib/types';
 
 const CURRENT_YEAR = new Date().getFullYear();
 const RPC_BIDANG = 'Perencanaan & Project Control';
+const BIDANG_SORT: Record<string, number> = {
+  'Operasi Manajemen Proyek': 0, 'QA/QC': 1,
+  'Keuangan, Komunikasi & Umum': 2, 'Perencanaan & Project Control': 3,
+  'MRO': 4, 'K3L': 5,
+};
 
 type KpiItem = {
   no?: number; indikator?: string; formula?: string; satuan?: string;
@@ -113,6 +118,7 @@ export function InputRealisasiPage() {
           if (user?.bidang && user?.role !== 'GM') {
             merged = merged.filter((it) => it.bidang === user.bidang);
           }
+          merged = merged.sort((a, b) => (BIDANG_SORT[a.bidang ?? ''] ?? 99) - (BIDANG_SORT[b.bidang ?? ''] ?? 99));
           setKpiList(merged);
           setValues({});
         }
