@@ -56,6 +56,13 @@ const DEMO_GROUPS: Array<{ label: string; accounts: Array<{ role: string; email:
       { role: 'Senior Manajer KKU', email: 'sm.kku@pusmanpro.pln.co.id' },
     ],
   },
+  {
+    label: 'KI — K3L & MRO',
+    accounts: [
+      { role: 'ASMAN K3L', email: 'asman.k3l@pusmanpro.pln.co.id' },
+      { role: 'ASMAN Manajemen Risiko & Kepatuhan', email: 'asman.mro@pusmanpro.pln.co.id' },
+    ],
+  },
   ...(['1', '2', '3', '4', '5'].map((n) => ({
     label: `UPMK ${['I', 'II', 'III', 'IV', 'V'][Number(n) - 1]}`,
     accounts: [
