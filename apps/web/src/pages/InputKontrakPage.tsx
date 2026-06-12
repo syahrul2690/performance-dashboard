@@ -245,7 +245,10 @@ export function InputKontrakPage() {
   const myUnit = user?.unit ?? null;
   const canSeeAllKm = user?.role === 'GM';
   // Hanya PIC/Staff Kinerja bidang ybs (Kantor Induk) yang boleh edit/hapus/kirim KM bidang itu.
-  const canActOnRow = (k: KontrakManajemen) => user?.role === 'STAFF' && user?.unit === 'KP' && (user?.bidang ?? null) === k.bidang;
+  // Staff RPC yang membuat KM UPMK dengan bidang lain (OMP/QAQC/KKU) tetap bisa submit KM tersebut.
+  const canActOnRow = (k: KontrakManajemen) =>
+    user?.role === 'STAFF' && user?.unit === 'KP' &&
+    ((user?.bidang ?? null) === k.bidang || k.submitterId === user?.id);
   // Opsi sasaran KM pada form.
   const formTargetOptions: Array<{ unit: string; label: string }> = !myBidang
     ? []
@@ -259,6 +262,8 @@ export function InputKontrakPage() {
   const filterKm = (list: KontrakManajemen[]) => {
     if (canSeeAllKm) return list;
     return list.filter((k) => {
+      // Tampilkan KM yang dibuat sendiri (termasuk KM UPMK dengan bidang berbeda)
+      if (k.submitterId === user?.id) return true;
       // Filter utama: unit harus cocok
       if (myUnit && k.unitCode !== myUnit) return false;
       // KP dengan bidang: filter tambahan agar tidak melihat KM bidang lain
@@ -366,14 +371,17 @@ export function InputKontrakPage() {
             )}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
               <div>
-                <label className="form-label">Bidang / Unit Sasaran <span style={{ color: 'var(--color-danger)' }}>*</span></label>
+                <label className="form-label">Unit Sasaran <span style={{ color: 'var(--color-danger)' }}>*</span></label>
                 <select
                   className="form-input"
                   value={formUnit}
-                  onChange={(e) => { setFormUnit(e.target.value); setBidang(user?.bidang ?? ''); if (formError) setFormError(null); }}
-                  style={formError && !bidang.trim() ? { borderColor: 'var(--color-danger)' } : undefined}
+                  onChange={(e) => {
+                    const u = e.target.value;
+                    setFormUnit(u);
+                    setBidang(u === 'KP' ? (user?.bidang ?? '') : '');
+                    if (formError) setFormError(null);
+                  }}
                 >
-                  {/* PIC bidang KM bidangnya sendiri. PIC RPC (konsolidator) juga bisa untuk UPMK I-V (ditag RPC). */}
                   {formTargetOptions.length === 0 && <option value="">— Tidak tersedia —</option>}
                   {formTargetOptions.map((o) => (
                     <option key={o.unit} value={o.unit}>{o.label}</option>
@@ -391,6 +399,24 @@ export function InputKontrakPage() {
                 />
               </div>
             </div>
+
+            {formUnit !== 'KP' && (
+              <div>
+                <label className="form-label">Bidang KPI <span style={{ color: 'var(--color-danger)' }}>*</span></label>
+                <select
+                  className="form-input"
+                  value={bidang}
+                  onChange={(e) => { setBidang(e.target.value); if (formError) setFormError(null); }}
+                  style={formError && !bidang.trim() ? { borderColor: 'var(--color-danger)' } : undefined}
+                >
+                  <option value="">— Pilih bidang penanggung jawab KPI —</option>
+                  <option value="Operasi Manajemen Proyek">Operasi Manajemen Proyek</option>
+                  <option value="QA/QC">QA/QC</option>
+                  <option value="Keuangan, Komunikasi & Umum">Keuangan, Komunikasi &amp; Umum</option>
+                  <option value="Perencanaan & Project Control">Perencanaan &amp; Project Control</option>
+                </select>
+              </div>
+            )}
 
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-2)' }}>

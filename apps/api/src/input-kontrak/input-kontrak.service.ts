@@ -61,8 +61,10 @@ export class InputKontrakService {
   ) {
     // Hanya Kantor Induk yang membuat KM (termasuk KM untuk UPMK). UPMK hanya mengisi realisasi.
     if (user.unit !== 'KP') throw new ForbiddenException('Kontrak Manajemen hanya dapat dibuat oleh Kantor Induk');
-    // PIC/Staff hanya boleh menyusun KM pada bidangnya sendiri (role lintas-bidang RPC/GM tidak menyusun KM bidang lain).
-    if (user.role !== Role.GM && user.bidang && bidang !== user.bidang) {
+    // KM untuk unit UPMK: Staff RPC dapat memilih bidang mana pun (setiap KPI UPMK punya bidang penanggung jawab tersendiri).
+    // KM untuk KP sendiri: bidang harus cocok dengan bidang user.
+    const isUpmkKm = unitCode !== 'KP';
+    if (user.role !== Role.GM && user.bidang && !isUpmkKm && bidang !== user.bidang) {
       throw new ForbiddenException('Anda hanya dapat menyusun Kontrak Manajemen pada bidang Anda');
     }
     const period = await this.prisma.period.findFirst({ where: { isActive: true } });
