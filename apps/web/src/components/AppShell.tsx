@@ -10,7 +10,7 @@ import {
   Bell, Moon, Sun, LogOut, ChevronDown, Menu, ChevronsLeft,
   Tv2, Search, Download, User, HelpCircle, FilePlus, LineChart,
   FileSpreadsheet, Image, Printer, ExternalLink,
-  Workflow, Network, Leaf, MapPin,
+  Workflow, Network, Leaf, MapPin, ShieldAlert,
 } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -38,6 +38,7 @@ const NAV_ITEMS = [
   {
     section: 'Pengaturan', items: [
       { to: '/settings', label: 'Settings', icon: Settings },
+      { to: '/admin',    label: 'Admin Tools', icon: ShieldAlert, devOnly: true },
     ]
   },
 ];
@@ -65,6 +66,7 @@ const ROUTE_NAMES: Record<string, string> = {
   '/workflow-km/usulan': 'Proses Usulan KM',
   '/workflow-km/realisasi': 'Proses Realisasi KM',
   '/settings': 'Settings',
+  '/admin': 'Admin Tools',
 };
 
 export function AppShell() {

@@ -206,4 +206,8 @@ export const kinerja = {
     api.get('/kinerja/latest-period').then((r) => r.data),
 };
 
+export const admin = {
+  resetTestData: () => api.delete('/admin/reset-test-data').then((r) => r.data),
+};
+
 export default api;

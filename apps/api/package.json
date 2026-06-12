@@ -12,6 +12,7 @@
     "start:prod": "node dist/main.js",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "db:seed": "ts-node prisma/seed.ts",
+    "db:setup": "prisma generate && ts-node prisma/seed.ts",
     "prisma": "prisma"
   },
   "dependencies": {

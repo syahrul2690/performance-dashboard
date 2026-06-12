@@ -12,7 +12,8 @@
     "db:deploy": "pnpm --filter @pusmanpro/api prisma migrate deploy",
     "db:seed": "pnpm --filter @pusmanpro/api db:seed",
     "db:studio": "pnpm --filter @pusmanpro/api prisma studio",
-    "db:generate": "pnpm --filter @pusmanpro/api prisma generate"
+    "db:generate": "pnpm --filter @pusmanpro/api prisma generate",
+    "db:setup": "pnpm --filter @pusmanpro/api run db:setup"
   },
   "engines": {
     "node": ">=20"

@@ -22,6 +22,7 @@ import { OrganisasiModule } from './organisasi/organisasi.module';
 import { GcgEsgModule } from './gcg-esg/gcg-esg.module';
 import { PetaModule } from './peta/peta.module';
 import { KinerjaModule } from './kinerja/kinerja.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { KinerjaModule } from './kinerja/kinerja.module';
     GcgEsgModule,
     PetaModule,
     KinerjaModule,
+    AdminModule,
   ],
 })
 export class AppModule {}
