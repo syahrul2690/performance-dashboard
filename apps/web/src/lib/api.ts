@@ -171,10 +171,10 @@ export const inputKontrak = {
     api.get('/input-kontrak/approved', { params: { unitCode, year } }).then((r) => r.data),
   review: (id: string, action: 'approve' | 'reject', note?: string, returnTo?: 'konseptor' | 'previous') =>
     api.post(`/input-kontrak/${id}/review`, { action, note, returnTo }).then((r) => r.data),
-  bundle: (year?: string) =>
-    api.get('/input-kontrak/bundle', { params: { year } }).then((r) => r.data),
-  reviewBundle: (action: 'approve' | 'reject', note: string, year?: string) =>
-    api.post('/input-kontrak/bundle/review', { action, note, year }).then((r) => r.data),
+  bundle: (scope: 'KP' | 'UPMK' = 'KP', year?: string) =>
+    api.get('/input-kontrak/bundle', { params: { scope, year } }).then((r) => r.data),
+  reviewBundle: (scope: 'KP' | 'UPMK', action: 'approve' | 'reject', note: string, year?: string) =>
+    api.post('/input-kontrak/bundle/review', { scope, action, note, year }).then((r) => r.data),
   updateValues: (id: string, kpiItems: Record<string, unknown>[]) =>
     api.patch(`/input-kontrak/${id}/values`, { kpiItems }).then((r) => r.data),
   uploadExcel: (file: File) => {
