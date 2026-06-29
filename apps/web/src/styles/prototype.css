@@ -368,10 +368,16 @@ a {
   transition: background-color var(--tr-fast);
   cursor: pointer;
 }
-.user-card:hover {
+.sidebar .user-card:hover {
   background: var(--color-surface-hover);
-  color: var(--color-text) !important;
+  color: var(--color-text);
 }
+
+.sidebar .user-card:hover .user-name,
+.sidebar .user-card:hover .user-role {
+  color: var(--color-text);
+}
+
 .user-avatar {
   width: 36px;
   height: 36px;
