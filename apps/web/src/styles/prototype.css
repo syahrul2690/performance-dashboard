@@ -79,6 +79,7 @@
 
   --sidebar-w: 240px;
   --sidebar-w-collapsed: 64px;
+  --sidebar-brand-h: 87px;
   --topbar-h: 56px;
   --bottomnav-h: 60px;
   --content-max: 1400px;
@@ -258,6 +259,9 @@ a {
   padding: var(--space-4) var(--space-5);
   border-bottom: 1px solid var(--color-border);
   min-height: var(--topbar-h);
+  height: var(--sidebar-brand-h);
+  overflow: hidden;
+  flex-shrink: 0;
   color: var(--color-accent);
 }
 .sidebar-brand .logo {

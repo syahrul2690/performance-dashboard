@@ -388,7 +388,7 @@ code {
 .fold-card-header:hover { background: var(--color-surface-hover); }
 
 /* ----- Sidebar nav label: allow long labels to wrap to 2 lines ----- */
-.nav-item { align-items: flex-start; }
+.nav-item { align-items: center; } 
 .nav-icon { margin-top: 2px; }
 .nav-label {
   white-space: normal;
