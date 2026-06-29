@@ -321,7 +321,7 @@ export class InputRealisasiService {
       canApprove,
       components: components.map((c) => ({
         id: c.id, unitCode: c.unitCode, bidang: c.bidang, status: c.status,
-        submitter: c.submitter, reviewer: c.reviewer,
+        submitter: c.submitter, reviewer: c.reviewer, values: c.values,
       })),
     };
   }

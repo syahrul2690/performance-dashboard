@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { usePeriod } from '../context/PeriodContext';
 import { useNotif } from '../context/NotifContext';
 import type { Report, KontrakManajemen, RealisasiKinerja } from '../lib/types';
-import { CheckCircle, XCircle, Clock, CalendarClock, FileText, UsersRound, FileSignature, ChevronDown, ClipboardCheck, Timer, MessageSquare, Pencil, Layers } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, CalendarClock, FileText, UsersRound, FileSignature, ChevronDown, ClipboardCheck, Timer, MessageSquare, Pencil, Layers, Printer } from 'lucide-react';
 import { SkeletonTable, EmptyState, ErrorState } from '../components/LoadState';
 
 // Badge SLA approval (Task 6): hari tersisa hingga deadline tahap berjalan.
@@ -275,7 +275,7 @@ export function ApprovalsPage() {
   const { periodId } = usePeriod();
   type BundleData = {
     period?: { label?: string } | null; status: string; total: number; readyCount: number; canApprove: boolean;
-    components: Array<{ id: string; unitCode: string; bidang: string; status: string; submitter: string }>;
+    components: Array<{ id: string; unitCode: string; bidang: string; status: string; submitter: string; values?: unknown }>;
   };
   const [bundle, setBundle] = useState<BundleData | null>(null);
   const [bundleNote, setBundleNote] = useState('');
@@ -375,6 +375,144 @@ export function ApprovalsPage() {
     } finally {
       setBundleBusy(false);
     }
+  };
+
+  const handlePrintRealBundle = () => {
+    if (!bundle) return;
+    const periodLabel = bundle.period?.label ?? 'Periode Aktif';
+    const printDate = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+    const statusLabel = (s: string) => s === 'ready' ? 'Siap (lolos SM RPC)' : s === 'approved' ? 'Disetujui GM' : 'Dalam proses review';
+    const kpiRowsHtml = (values: unknown): string => {
+      if (!values || typeof values !== 'object') return '<tr><td colspan="6" style="text-align:center;color:#999;font-style:italic">Tidak ada data KPI</td></tr>';
+      const items = Object.values(values as Record<string, Record<string, unknown>>);
+      if (!items.length) return '<tr><td colspan="6" style="text-align:center;color:#999;font-style:italic">Tidak ada data KPI</td></tr>';
+      return items.map((it, i) =>
+        `<tr><td>${i + 1}</td><td>${it['indikator'] ?? '—'}</td><td>${it['satuan'] ?? '—'}</td>` +
+        `<td style="text-align:right">${it['bobot'] ?? '—'}</td>` +
+        `<td style="text-align:right">${it['target'] ?? '—'}</td>` +
+        `<td style="text-align:right;font-weight:600;color:#125D72">${it['realisasi'] ?? '—'}</td></tr>`
+      ).join('');
+    };
+    const kpiSubTable = (values: unknown) =>
+      '<table style="width:100%;border-collapse:collapse;font-size:10px;margin:4px 0 14px 20px">' +
+      '<thead><tr style="background:#e8f4f8"><th style="padding:4px 6px;border:1px solid #ccc;text-align:left">No</th>' +
+      '<th style="padding:4px 6px;border:1px solid #ccc;text-align:left">Indikator</th>' +
+      '<th style="padding:4px 6px;border:1px solid #ccc;text-align:left">Satuan</th>' +
+      '<th style="padding:4px 6px;border:1px solid #ccc;text-align:right">Bobot</th>' +
+      '<th style="padding:4px 6px;border:1px solid #ccc;text-align:right">Target</th>' +
+      '<th style="padding:4px 6px;border:1px solid #ccc;text-align:right;color:#125D72">Realisasi</th></tr></thead>' +
+      `<tbody>${kpiRowsHtml(values)}</tbody></table>`;
+    const compRows = (comps: typeof bundle.components) =>
+      comps.map((c) =>
+        `<tr><td><strong>${c.bidang}</strong></td><td>${c.submitter}</td><td>${statusLabel(c.status)}</td></tr>` +
+        `<tr><td colspan="3" style="padding:0;border-color:#f0f0f0">${kpiSubTable(c.values)}</td></tr>`
+      ).join('');
+    const kpComponents = bundle.components.filter((c) => c.unitCode === 'KP');
+    const upmkGroups = Object.entries(
+      bundle.components.filter((c) => c.unitCode !== 'KP')
+        .reduce<Record<string, typeof bundle.components>>((acc, c) => { (acc[c.unitCode] ??= []).push(c); return acc; }, {})
+    ).sort(([a], [b]) => a.localeCompare(b));
+    const css = `@page{size:A4;margin:20mm}body{font-family:Arial,sans-serif;font-size:11px;color:#1a1a1a}h1{font-size:14px;margin:0 0 4px}` +
+      `h2{font-size:12px;margin:16px 0 6px;border-bottom:2px solid #125D72;padding-bottom:4px;color:#125D72}` +
+      `.header{text-align:center;margin-bottom:20px;border-bottom:2px solid #125D72;padding-bottom:12px}` +
+      `.meta{font-size:10px;color:#666;margin:3px 0}table.main{width:100%;border-collapse:collapse;margin-bottom:4px}` +
+      `table.main th,table.main td{border:1px solid #ddd;padding:5px 8px;font-size:11px;vertical-align:top}` +
+      `table.main th{background:#125D72;color:#fff;text-align:left}` +
+      `.summary{margin:12px 0;padding:8px 12px;background:#f0f9f0;border-left:4px solid #22c55e;border-radius:4px}` +
+      `.sign{margin-top:40px;display:flex;justify-content:flex-end}.sign-box{text-align:center;width:200px}` +
+      `.sign-line{margin-top:60px;border-top:1px solid #333;padding-top:4px;font-size:10px}`;
+    const upmkSections = upmkGroups.map(([unitCode, items], i) =>
+      `<h2>${String.fromCharCode(66 + i)}. ${UNIT_NAMES[unitCode] ?? unitCode}</h2>` +
+      `<table class="main"><thead><tr><th>Bidang</th><th>Penyusun</th><th>Status</th></tr></thead>` +
+      `<tbody>${compRows(sortByBidang(items))}</tbody></table>`
+    ).join('');
+    const html = `<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8">` +
+      `<title>Konsolidasi Realisasi Kinerja — ${periodLabel}</title><style>${css}</style></head><body>` +
+      `<div class="header"><p class="meta">PUSMANPRO PLN</p><h1>KONSOLIDASI REALISASI KINERJA</h1>` +
+      `<h1>Periode ${periodLabel}</h1><p class="meta">Dicetak: ${printDate}</p></div>` +
+      `<h2>A. Kantor Induk</h2><table class="main"><thead><tr><th>Bidang</th><th>Penyusun</th><th>Status</th></tr></thead>` +
+      `<tbody>${compRows(kpComponents)}</tbody></table>${upmkSections}` +
+      `<div class="summary">Total komponen: <strong>${bundle.total}</strong> &nbsp;|&nbsp; ` +
+      `Siap: <strong>${bundle.readyCount}</strong> &nbsp;|&nbsp; ` +
+      `Status bundle: <strong>${bundle.status === 'approved' ? 'Disetujui GM' : 'Menunggu Persetujuan GM'}</strong></div>` +
+      `<div class="sign"><div class="sign-box"><p style="margin:0;font-size:11px">General Manager,</p>` +
+      `<div class="sign-line">(__________________)<br/>General Manager PUSMANPRO</div></div></div></body></html>`;
+    const w = window.open('', '_blank', 'width=900,height=700');
+    if (!w) return;
+    w.document.write(html);
+    w.document.close();
+    w.onload = () => { w.focus(); w.print(); };
+  };
+
+  const handlePrintKmBundle = (scope: 'KP' | 'UPMK') => {
+    const km = scope === 'KP' ? kmBundleKP : kmBundleUPMK;
+    if (!km) return;
+    const year = km.year ?? String(new Date().getFullYear());
+    const scopeLabel = scope === 'KP' ? 'Kantor Induk' : 'UPMK (Gabungan)';
+    const printDate = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+    const statusLabel = (s: string) => s === 'ready' ? 'Siap (lolos SM RPC)' : s === 'approved' ? 'Disahkan GM' : 'Dalam review';
+    const kpiRowsHtml = (kpiItems: Record<string, string>[] | undefined) => {
+      if (!kpiItems?.length) return '<tr><td colspan="7" style="text-align:center;color:#999;font-style:italic">Tidak ada data KPI</td></tr>';
+      return kpiItems.map((it, i) =>
+        `<tr><td>${i + 1}</td><td>${it['indikator'] ?? '—'}</td><td>${it['formula'] ?? '—'}</td><td>${it['satuan'] ?? '—'}</td>` +
+        `<td style="text-align:right">${it['bobot'] ?? '—'}</td>` +
+        `<td style="text-align:right">${it['target'] ?? '—'}</td>` +
+        `<td style="text-align:right">${it['target2'] ?? '—'}</td></tr>`
+      ).join('');
+    };
+    const kpiSubTable = (kpiItems: Record<string, string>[] | undefined) =>
+      `<table style="width:100%;border-collapse:collapse;font-size:10px;margin:4px 0 14px 20px">` +
+      `<thead><tr style="background:#e8f4f8"><th style="padding:4px 6px;border:1px solid #ccc">No</th>` +
+      `<th style="padding:4px 6px;border:1px solid #ccc;text-align:left">Indikator Kinerja</th>` +
+      `<th style="padding:4px 6px;border:1px solid #ccc;text-align:left">Formula</th>` +
+      `<th style="padding:4px 6px;border:1px solid #ccc;text-align:left">Satuan</th>` +
+      `<th style="padding:4px 6px;border:1px solid #ccc;text-align:right">Bobot</th>` +
+      `<th style="padding:4px 6px;border:1px solid #ccc;text-align:right">Target Sem I</th>` +
+      `<th style="padding:4px 6px;border:1px solid #ccc;text-align:right">Target ${year}</th></tr></thead>` +
+      `<tbody>${kpiRowsHtml(kpiItems)}</tbody></table>`;
+    const compRows = (comps: KmBundleComp[]) =>
+      comps.map((c) =>
+        `<tr><td><strong>${c.bidang}</strong></td><td>${c.holder ?? '—'}</td><td>${c.submitter}</td><td>${statusLabel(c.status)}</td></tr>` +
+        `<tr><td colspan="4" style="padding:0;border-color:#f0f0f0">${kpiSubTable(c.kpiItems)}</td></tr>`
+      ).join('');
+    const css = `@page{size:A4;margin:20mm}body{font-family:Arial,sans-serif;font-size:11px;color:#1a1a1a}h1{font-size:14px;margin:0 0 4px}` +
+      `h2{font-size:12px;margin:16px 0 6px;border-bottom:2px solid #125D72;padding-bottom:4px;color:#125D72}` +
+      `.header{text-align:center;margin-bottom:20px;border-bottom:2px solid #125D72;padding-bottom:12px}` +
+      `.meta{font-size:10px;color:#666;margin:3px 0}table.main{width:100%;border-collapse:collapse;margin-bottom:4px}` +
+      `table.main th,table.main td{border:1px solid #ddd;padding:5px 8px;font-size:11px;vertical-align:top}` +
+      `table.main th{background:#125D72;color:#fff;text-align:left}` +
+      `.summary{margin:12px 0;padding:8px 12px;background:#f0f9f0;border-left:4px solid #22c55e;border-radius:4px}` +
+      `.sign{margin-top:40px;display:flex;justify-content:flex-end}.sign-box{text-align:center;width:200px}` +
+      `.sign-line{margin-top:60px;border-top:1px solid #333;padding-top:4px;font-size:10px}`;
+    let bodyHtml: string;
+    if (scope === 'KP') {
+      bodyHtml = `<table class="main"><thead><tr><th>Bidang</th><th>Penanggung Jawab</th><th>Penyusun</th><th>Status</th></tr></thead>` +
+        `<tbody>${compRows(km.components)}</tbody></table>`;
+    } else {
+      const groups = Object.entries(
+        km.components.reduce<Record<string, KmBundleComp[]>>((acc, c) => { (acc[c.unitCode] ??= []).push(c); return acc; }, {})
+      ).sort(([a], [b]) => a.localeCompare(b));
+      bodyHtml = groups.map(([unitCode, items], gi) =>
+        `<h2>${String.fromCharCode(65 + gi)}. ${UNIT_NAMES[unitCode] ?? unitCode}</h2>` +
+        `<table class="main"><thead><tr><th>Bidang</th><th>Penanggung Jawab</th><th>Penyusun</th><th>Status</th></tr></thead>` +
+        `<tbody>${compRows(sortByBidang(items))}</tbody></table>`
+      ).join('');
+    }
+    const html = `<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8">` +
+      `<title>Konsolidasi KM Tahunan — ${scopeLabel} ${year}</title><style>${css}</style></head><body>` +
+      `<div class="header"><p class="meta">PUSMANPRO PLN</p><h1>KONSOLIDASI KONTRAK MANAJEMEN TAHUNAN</h1>` +
+      `<h1>${scopeLabel} — Tahun ${year}</h1><p class="meta">Dicetak: ${printDate}</p></div>` +
+      bodyHtml +
+      `<div class="summary">Total KM: <strong>${km.total}</strong> &nbsp;|&nbsp; ` +
+      `Siap: <strong>${km.readyCount}</strong> &nbsp;|&nbsp; ` +
+      `Status: <strong>${km.status === 'approved' ? 'Disahkan GM' : 'Menunggu Pengesahan GM'}</strong></div>` +
+      `<div class="sign"><div class="sign-box"><p style="margin:0;font-size:11px">General Manager,</p>` +
+      `<div class="sign-line">(__________________)<br/>General Manager PUSMANPRO</div></div></div></body></html>`;
+    const w = window.open('', '_blank', 'width=900,height=700');
+    if (!w) return;
+    w.document.write(html);
+    w.document.close();
+    w.onload = () => { w.focus(); w.print(); };
   };
 
   // Saat tiba dari notifikasi: tentukan kartu yang di-highlight & scroll ke sana.
@@ -779,6 +917,13 @@ export function ApprovalsPage() {
               </tbody>
             </table>
           </div>
+          {user?.role === 'GM' && kmBundleKP.components.length > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', padding: 'var(--space-1) var(--space-3)' }}>
+              <button className="btn btn-ghost btn-sm" onClick={() => handlePrintKmBundle('KP')} title="Cetak / Print Preview KM Kantor Induk">
+                <Printer size={12} /> Cetak Preview
+              </button>
+            </div>
+          )}
           {user?.role === 'GM' && kmBundleKP.status !== 'approved' && (
             <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
               {kmBundleKP.components.some((c) => c.status === 'submitted') && (
@@ -889,6 +1034,13 @@ export function ApprovalsPage() {
               </tbody>
             </table>
           </div>
+          {user?.role === 'GM' && kmBundleUPMK.components.length > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', padding: 'var(--space-1) var(--space-3)' }}>
+              <button className="btn btn-ghost btn-sm" onClick={() => handlePrintKmBundle('UPMK')} title="Cetak / Print Preview KM UPMK">
+                <Printer size={12} /> Cetak Preview
+              </button>
+            </div>
+          )}
           {user?.role === 'GM' && kmBundleUPMK.status !== 'approved' && (
             <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
               {kmBundleUPMK.components.some((c) => c.status === 'submitted') && (
@@ -1156,6 +1308,13 @@ export function ApprovalsPage() {
               </tbody>
             </table>
           </div>
+          {user?.role === 'GM' && bundle.components.length > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', padding: 'var(--space-1) var(--space-3)' }}>
+              <button className="btn btn-ghost btn-sm" onClick={handlePrintRealBundle} title="Cetak / Print Preview Konsolidasi Realisasi">
+                <Printer size={12} /> Cetak Preview
+              </button>
+            </div>
+          )}
           {user?.role === 'GM' && bundle.status !== 'approved' && (
             <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
               {!bundle.canApprove && bundle.total > 0 && (
