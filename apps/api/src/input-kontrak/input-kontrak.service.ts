@@ -238,7 +238,7 @@ export class InputKontrakService {
       const period = await this.prisma.period.findUnique({ where: { id: k.periodId }, select: { yearMonth: true } });
       const yr = period?.yearMonth.slice(0, 4);
       if (yr) {
-        await this.prisma.kMBundle.updateMany({ where: { year: yr, status: 'rejected' }, data: { status: 'open' } });
+        await this.prisma.kMBundle.updateMany({ where: { year: yr, status: { in: ['rejected', 'approved'] } }, data: { status: 'open' } });
       }
       const gms = await this.prisma.user.findMany({ where: { role: Role.GM, isActive: true } });
       if (gms.length) {
@@ -302,8 +302,11 @@ export class InputKontrakService {
     const submittedCount = components.filter((c) => c.status === 'submitted').length;
     // GM dapat mengesahkan bila ada KM 'ready' & tak ada lagi yang masih dalam proses review.
     const canApprove = readyCount > 0 && submittedCount === 0;
+    // Bila ada KM 'ready' yang belum disahkan, bundle harus 'open' agar GM bisa approve —
+    // meski record bundle sebelumnya sudah 'approved' (dari putaran approve sebelumnya).
+    const effectiveStatus = readyCount > 0 ? 'open' : (bundle?.status ?? 'open');
     return {
-      year: yr, status: bundle?.status ?? 'open', reviewer: bundle?.reviewer ?? null,
+      year: yr, status: effectiveStatus, reviewer: bundle?.reviewer ?? null,
       reviewNote: bundle?.reviewNote ?? null, reviewedAt: bundle?.reviewedAt ?? null,
       total: components.length, readyCount, canApprove,
       // Sertakan detail KPI + riwayat agar GM dapat me-review tiap dokumen di kartu konsolidasi.
