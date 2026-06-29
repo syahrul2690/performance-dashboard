@@ -303,8 +303,10 @@ export class InputKontrakService {
     const readyCount = components.filter((c) => c.status === 'ready').length;
     const submittedCount = components.filter((c) => c.status === 'submitted').length;
     const canApprove = readyCount > 0 && submittedCount === 0;
-    // Bila ada KM 'ready' yang belum disahkan, bundle harus 'open' agar tombol approve tampil.
-    const effectiveStatus = readyCount > 0 ? 'open' : (bundle?.status ?? 'open');
+    // effectiveStatus: 'approved' bila semua komponen sudah disahkan (meski belum ada bundle record
+    // untuk scope ini — misal UPMK yang disahkan lewat bundle lama sebelum fitur pisah scope).
+    const allApproved = components.length > 0 && components.every((c) => c.status === 'approved');
+    const effectiveStatus = readyCount > 0 ? 'open' : allApproved ? 'approved' : (bundle?.status ?? 'open');
     return {
       year: yr, scope, status: effectiveStatus, reviewer: bundle?.reviewer ?? null,
       reviewNote: bundle?.reviewNote ?? null, reviewedAt: bundle?.reviewedAt ?? null,

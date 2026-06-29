@@ -728,7 +728,7 @@ export function ApprovalsPage() {
           accent="var(--color-accent)"
           icon={<Layers size={14} />}
           title={`Konsolidasi KM Tahunan — Kantor Induk${kmBundleKP.year ? ' ' + kmBundleKP.year : ''}`}
-          right={<span className="status-pill" style={{ fontWeight: 700 }}>{kmBundleKP.readyCount}/{kmBundleKP.total} siap</span>}
+          right={kmBundleKP.status === 'approved' ? <span className="status-pill completed" style={{ fontWeight: 700 }}>Disahkan GM</span> : <span className="status-pill" style={{ fontWeight: 700 }}>{kmBundleKP.readyCount}/{kmBundleKP.total} siap</span>}
         >
           <div className="table-wrap">
             <table className="data-table compact">
@@ -781,7 +781,7 @@ export function ApprovalsPage() {
           </div>
           {user?.role === 'GM' && kmBundleKP.status !== 'approved' && (
             <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-              {!kmBundleKP.canApprove && kmBundleKP.total > 0 && (
+              {kmBundleKP.components.some((c) => c.status === 'submitted') && (
                 <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-warning)' }}>
                   Belum semua KM Kantor Induk "siap" — GM dapat mengesahkan setelah seluruh KM lolos hingga SM Perencanaan & PC.
                 </div>
@@ -812,7 +812,7 @@ export function ApprovalsPage() {
           accent="var(--color-accent)"
           icon={<Layers size={14} />}
           title={`Konsolidasi KM Tahunan — UPMK${kmBundleUPMK.year ? ' ' + kmBundleUPMK.year : ''}`}
-          right={<span className="status-pill" style={{ fontWeight: 700 }}>{kmBundleUPMK.readyCount}/{kmBundleUPMK.total} siap</span>}
+          right={kmBundleUPMK.status === 'approved' ? <span className="status-pill completed" style={{ fontWeight: 700 }}>Disahkan GM</span> : <span className="status-pill" style={{ fontWeight: 700 }}>{kmBundleUPMK.readyCount}/{kmBundleUPMK.total} siap</span>}
         >
           <div className="table-wrap">
             <table className="data-table compact">
@@ -891,7 +891,7 @@ export function ApprovalsPage() {
           </div>
           {user?.role === 'GM' && kmBundleUPMK.status !== 'approved' && (
             <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-              {!kmBundleUPMK.canApprove && kmBundleUPMK.total > 0 && (
+              {kmBundleUPMK.components.some((c) => c.status === 'submitted') && (
                 <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-warning)' }}>
                   Belum semua KM UPMK "siap" — GM dapat mengesahkan setelah seluruh KM UPMK lolos hingga SM Perencanaan & PC.
                 </div>
