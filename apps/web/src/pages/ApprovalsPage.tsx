@@ -381,62 +381,77 @@ export function ApprovalsPage() {
     if (!bundle) return;
     const periodLabel = bundle.period?.label ?? 'Periode Aktif';
     const printDate = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
-    const statusLabel = (s: string) => s === 'ready' ? 'Siap (lolos SM RPC)' : s === 'approved' ? 'Disetujui GM' : 'Dalam proses review';
-    const kpiRowsHtml = (values: unknown): string => {
-      if (!values || typeof values !== 'object') return '<tr><td colspan="6" style="text-align:center;color:#999;font-style:italic">Tidak ada data KPI</td></tr>';
-      const items = Object.values(values as Record<string, Record<string, unknown>>);
-      if (!items.length) return '<tr><td colspan="6" style="text-align:center;color:#999;font-style:italic">Tidak ada data KPI</td></tr>';
-      return items.map((it, i) =>
-        `<tr><td>${i + 1}</td><td>${it['indikator'] ?? '—'}</td><td>${it['satuan'] ?? '—'}</td>` +
-        `<td style="text-align:right">${it['bobot'] ?? '—'}</td>` +
-        `<td style="text-align:right">${it['target'] ?? '—'}</td>` +
-        `<td style="text-align:right;font-weight:600;color:#125D72">${it['realisasi'] ?? '—'}</td></tr>`
-      ).join('');
+    const css = '@page{size:A4;margin:15mm}' +
+      'body{font-family:Arial,Helvetica,sans-serif;font-size:9pt;color:#111;margin:0}' +
+      '.hdr{text-align:center;margin-bottom:10pt;padding-bottom:8pt;border-bottom:2pt solid #125D72}' +
+      '.org{font-size:9pt;color:#125D72;font-weight:700;margin:0;letter-spacing:1px}' +
+      '.ttl{font-size:13pt;font-weight:700;margin:3pt 0 1pt}' +
+      '.sub{font-size:11pt;font-weight:700;margin:0 0 3pt}' +
+      '.meta{font-size:8pt;color:#666;margin:2pt 0}' +
+      'table{width:100%;border-collapse:collapse;font-size:8.5pt;table-layout:fixed}' +
+      'th{background:#125D72;color:#fff;padding:5pt 4pt;border:0.5pt solid #0e4a5c;text-align:left;word-break:break-word}' +
+      'td{padding:3.5pt 4pt;border:0.5pt solid #d0d0d0;vertical-align:top;word-break:break-word}' +
+      'tr.sec td{background:#e4f0f6;font-weight:700;color:#125D72;font-size:9pt;padding:4pt 6pt;border-top:1.5pt solid #125D72}' +
+      'tr.grp td{border-top:1pt solid #999}' +
+      '.num{text-align:right}.rl{text-align:right;font-weight:700;color:#125D72}' +
+      '.sm{font-size:7.5pt;color:#555;margin-top:2pt}' +
+      '.summ{margin:8pt 0;padding:5pt 10pt;background:#f0fdf4;border-left:3pt solid #22c55e;font-size:8.5pt}' +
+      '.sign{margin-top:28pt;display:flex;justify-content:flex-end}' +
+      '.sb{text-align:center;width:180pt}.sl{margin-top:50pt;border-top:0.5pt solid #333;padding-top:3pt;font-size:8pt}';
+    const stClr = (s: string) => s === 'ready' ? 'color:#16a34a;font-weight:700' : s === 'approved' ? 'color:#125D72;font-weight:700' : 'color:#d97706';
+    const stLbl = (s: string) => s === 'ready' ? 'Siap' : s === 'approved' ? 'Disetujui GM' : 'Dalam review';
+    let n = 1;
+    const buildRows = (comps: typeof bundle.components): string => {
+      let rows = '';
+      comps.forEach((c) => {
+        const items = (c.values && typeof c.values === 'object')
+          ? Object.values(c.values as Record<string, Record<string, unknown>>) : [];
+        const span = Math.max(items.length, 1);
+        const bidangCell = `<td rowspan="${span}"><b>${c.bidang}</b>` +
+          `<div class="sm">${c.submitter}</div>` +
+          `<div class="sm" style="${stClr(c.status)}">${stLbl(c.status)}</div></td>`;
+        if (items.length === 0) {
+          rows += `<tr class="grp"><td class="num">${n++}</td>${bidangCell}` +
+            `<td colspan="5" style="color:#999;font-style:italic">Tidak ada data KPI</td></tr>`;
+        } else {
+          items.forEach((it, i) => {
+            rows += `<tr${i === 0 ? ' class="grp"' : ''}>` +
+              `<td class="num">${n++}</td>` +
+              (i === 0 ? bidangCell : '') +
+              `<td>${it['indikator'] ?? '—'}</td>` +
+              `<td>${it['satuan'] ?? '—'}</td>` +
+              `<td class="num">${it['bobot'] ?? '—'}</td>` +
+              `<td class="num">${it['target'] ?? '—'}</td>` +
+              `<td class="rl">${it['realisasi'] ?? '—'}</td></tr>`;
+          });
+        }
+      });
+      return rows;
     };
-    const kpiSubTable = (values: unknown) =>
-      '<table style="width:100%;border-collapse:collapse;font-size:10px;margin:4px 0 14px 20px">' +
-      '<thead><tr style="background:#e8f4f8"><th style="padding:4px 6px;border:1px solid #ccc;text-align:left">No</th>' +
-      '<th style="padding:4px 6px;border:1px solid #ccc;text-align:left">Indikator</th>' +
-      '<th style="padding:4px 6px;border:1px solid #ccc;text-align:left">Satuan</th>' +
-      '<th style="padding:4px 6px;border:1px solid #ccc;text-align:right">Bobot</th>' +
-      '<th style="padding:4px 6px;border:1px solid #ccc;text-align:right">Target</th>' +
-      '<th style="padding:4px 6px;border:1px solid #ccc;text-align:right;color:#125D72">Realisasi</th></tr></thead>' +
-      `<tbody>${kpiRowsHtml(values)}</tbody></table>`;
-    const compRows = (comps: typeof bundle.components) =>
-      comps.map((c) =>
-        `<tr><td><strong>${c.bidang}</strong></td><td>${c.submitter}</td><td>${statusLabel(c.status)}</td></tr>` +
-        `<tr><td colspan="3" style="padding:0;border-color:#f0f0f0">${kpiSubTable(c.values)}</td></tr>`
-      ).join('');
-    const kpComponents = bundle.components.filter((c) => c.unitCode === 'KP');
+    const kpComps = bundle.components.filter((c) => c.unitCode === 'KP');
     const upmkGroups = Object.entries(
       bundle.components.filter((c) => c.unitCode !== 'KP')
         .reduce<Record<string, typeof bundle.components>>((acc, c) => { (acc[c.unitCode] ??= []).push(c); return acc; }, {})
     ).sort(([a], [b]) => a.localeCompare(b));
-    const css = `@page{size:A4;margin:20mm}body{font-family:Arial,sans-serif;font-size:11px;color:#1a1a1a}h1{font-size:14px;margin:0 0 4px}` +
-      `h2{font-size:12px;margin:16px 0 6px;border-bottom:2px solid #125D72;padding-bottom:4px;color:#125D72}` +
-      `.header{text-align:center;margin-bottom:20px;border-bottom:2px solid #125D72;padding-bottom:12px}` +
-      `.meta{font-size:10px;color:#666;margin:3px 0}table.main{width:100%;border-collapse:collapse;margin-bottom:4px}` +
-      `table.main th,table.main td{border:1px solid #ddd;padding:5px 8px;font-size:11px;vertical-align:top}` +
-      `table.main th{background:#125D72;color:#fff;text-align:left}` +
-      `.summary{margin:12px 0;padding:8px 12px;background:#f0f9f0;border-left:4px solid #22c55e;border-radius:4px}` +
-      `.sign{margin-top:40px;display:flex;justify-content:flex-end}.sign-box{text-align:center;width:200px}` +
-      `.sign-line{margin-top:60px;border-top:1px solid #333;padding-top:4px;font-size:10px}`;
-    const upmkSections = upmkGroups.map(([unitCode, items], i) =>
-      `<h2>${String.fromCharCode(66 + i)}. ${UNIT_NAMES[unitCode] ?? unitCode}</h2>` +
-      `<table class="main"><thead><tr><th>Bidang</th><th>Penyusun</th><th>Status</th></tr></thead>` +
-      `<tbody>${compRows(sortByBidang(items))}</tbody></table>`
-    ).join('');
+    const secRow = (label: string) => `<tr class="sec"><td colspan="7">${label}</td></tr>`;
+    let body = secRow('A. Kantor Induk') + buildRows(kpComps);
+    upmkGroups.forEach(([unitCode, items], i) => {
+      body += secRow(`${String.fromCharCode(66 + i)}. ${UNIT_NAMES[unitCode] ?? unitCode}`) + buildRows(sortByBidang(items));
+    });
     const html = `<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8">` +
       `<title>Konsolidasi Realisasi Kinerja — ${periodLabel}</title><style>${css}</style></head><body>` +
-      `<div class="header"><p class="meta">PUSMANPRO PLN</p><h1>KONSOLIDASI REALISASI KINERJA</h1>` +
-      `<h1>Periode ${periodLabel}</h1><p class="meta">Dicetak: ${printDate}</p></div>` +
-      `<h2>A. Kantor Induk</h2><table class="main"><thead><tr><th>Bidang</th><th>Penyusun</th><th>Status</th></tr></thead>` +
-      `<tbody>${compRows(kpComponents)}</tbody></table>${upmkSections}` +
-      `<div class="summary">Total komponen: <strong>${bundle.total}</strong> &nbsp;|&nbsp; ` +
-      `Siap: <strong>${bundle.readyCount}</strong> &nbsp;|&nbsp; ` +
-      `Status bundle: <strong>${bundle.status === 'approved' ? 'Disetujui GM' : 'Menunggu Persetujuan GM'}</strong></div>` +
-      `<div class="sign"><div class="sign-box"><p style="margin:0;font-size:11px">General Manager,</p>` +
-      `<div class="sign-line">(__________________)<br/>General Manager PUSMANPRO</div></div></div></body></html>`;
+      `<div class="hdr"><p class="org">PUSMANPRO PLN</p><p class="ttl">KONSOLIDASI REALISASI KINERJA</p>` +
+      `<p class="sub">Periode ${periodLabel}</p><p class="meta">Dicetak: ${printDate}</p></div>` +
+      `<table><colgroup><col style="width:4%"><col style="width:18%"><col><col style="width:8%">` +
+      `<col style="width:6%"><col style="width:12%"><col style="width:12%"></colgroup>` +
+      `<thead><tr><th>No</th><th>Bidang</th><th>Indikator Kinerja</th>` +
+      `<th>Satuan</th><th>Bobot</th><th>Target</th><th>Realisasi</th></tr></thead>` +
+      `<tbody>${body}</tbody></table>` +
+      `<div class="summ">Total komponen: <b>${bundle.total}</b> &nbsp;|&nbsp; ` +
+      `Siap: <b>${bundle.readyCount}</b> &nbsp;|&nbsp; ` +
+      `Status bundle: <b>${bundle.status === 'approved' ? 'Disetujui GM' : 'Menunggu Persetujuan GM'}</b></div>` +
+      `<div class="sign"><div class="sb"><p style="margin:0">General Manager,</p>` +
+      `<div class="sl">(__________________)<br/>General Manager PUSMANPRO</div></div></div></body></html>`;
     const w = window.open('', '_blank', 'width=900,height=700');
     if (!w) return;
     w.document.write(html);
@@ -450,64 +465,80 @@ export function ApprovalsPage() {
     const year = km.year ?? String(new Date().getFullYear());
     const scopeLabel = scope === 'KP' ? 'Kantor Induk' : 'UPMK (Gabungan)';
     const printDate = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
-    const statusLabel = (s: string) => s === 'ready' ? 'Siap (lolos SM RPC)' : s === 'approved' ? 'Disahkan GM' : 'Dalam review';
-    const kpiRowsHtml = (kpiItems: Record<string, string>[] | undefined) => {
-      if (!kpiItems?.length) return '<tr><td colspan="7" style="text-align:center;color:#999;font-style:italic">Tidak ada data KPI</td></tr>';
-      return kpiItems.map((it, i) =>
-        `<tr><td>${i + 1}</td><td>${it['indikator'] ?? '—'}</td><td>${it['formula'] ?? '—'}</td><td>${it['satuan'] ?? '—'}</td>` +
-        `<td style="text-align:right">${it['bobot'] ?? '—'}</td>` +
-        `<td style="text-align:right">${it['target'] ?? '—'}</td>` +
-        `<td style="text-align:right">${it['target2'] ?? '—'}</td></tr>`
-      ).join('');
+    const css = '@page{size:A4;margin:15mm}' +
+      'body{font-family:Arial,Helvetica,sans-serif;font-size:9pt;color:#111;margin:0}' +
+      '.hdr{text-align:center;margin-bottom:10pt;padding-bottom:8pt;border-bottom:2pt solid #125D72}' +
+      '.org{font-size:9pt;color:#125D72;font-weight:700;margin:0;letter-spacing:1px}' +
+      '.ttl{font-size:13pt;font-weight:700;margin:3pt 0 1pt}' +
+      '.sub{font-size:11pt;font-weight:700;margin:0 0 3pt}' +
+      '.meta{font-size:8pt;color:#666;margin:2pt 0}' +
+      'table{width:100%;border-collapse:collapse;font-size:8.5pt;table-layout:fixed}' +
+      'th{background:#125D72;color:#fff;padding:5pt 4pt;border:0.5pt solid #0e4a5c;text-align:left;word-break:break-word}' +
+      'td{padding:3.5pt 4pt;border:0.5pt solid #d0d0d0;vertical-align:top;word-break:break-word}' +
+      'tr.sec td{background:#e4f0f6;font-weight:700;color:#125D72;font-size:9pt;padding:4pt 6pt;border-top:1.5pt solid #125D72}' +
+      'tr.grp td{border-top:1pt solid #999}' +
+      '.num{text-align:right}.sm{font-size:7.5pt;color:#555;margin-top:2pt}' +
+      '.summ{margin:8pt 0;padding:5pt 10pt;background:#f0fdf4;border-left:3pt solid #22c55e;font-size:8.5pt}' +
+      '.sign{margin-top:28pt;display:flex;justify-content:flex-end}' +
+      '.sb{text-align:center;width:180pt}.sl{margin-top:50pt;border-top:0.5pt solid #333;padding-top:3pt;font-size:8pt}';
+    const stClr = (s: string) => s === 'ready' ? 'color:#16a34a;font-weight:700' : s === 'approved' ? 'color:#125D72;font-weight:700' : 'color:#d97706';
+    const stLbl = (s: string) => s === 'ready' ? 'Siap' : s === 'approved' ? 'Disahkan GM' : 'Dalam review';
+    let n = 1;
+    const buildRows = (comps: KmBundleComp[]): string => {
+      let rows = '';
+      comps.forEach((c) => {
+        const items = c.kpiItems ?? [];
+        const span = Math.max(items.length, 1);
+        const bidangCell = `<td rowspan="${span}"><b>${c.bidang}</b>` +
+          `<div class="sm">PJ: ${c.holder ?? '—'}</div>` +
+          `<div class="sm">${c.submitter}</div>` +
+          `<div class="sm" style="${stClr(c.status)}">${stLbl(c.status)}</div></td>`;
+        if (items.length === 0) {
+          rows += `<tr class="grp"><td class="num">${n++}</td>${bidangCell}` +
+            `<td colspan="5" style="color:#999;font-style:italic">Tidak ada data KPI</td></tr>`;
+        } else {
+          items.forEach((it, i) => {
+            rows += `<tr${i === 0 ? ' class="grp"' : ''}>` +
+              `<td class="num">${n++}</td>` +
+              (i === 0 ? bidangCell : '') +
+              `<td>${it['indikator'] ?? '—'}</td>` +
+              `<td>${it['satuan'] ?? '—'}</td>` +
+              `<td class="num">${it['bobot'] ?? '—'}</td>` +
+              `<td class="num">${it['target'] ?? '—'}</td>` +
+              `<td class="num">${it['target2'] ?? '—'}</td></tr>`;
+          });
+        }
+      });
+      return rows;
     };
-    const kpiSubTable = (kpiItems: Record<string, string>[] | undefined) =>
-      `<table style="width:100%;border-collapse:collapse;font-size:10px;margin:4px 0 14px 20px">` +
-      `<thead><tr style="background:#e8f4f8"><th style="padding:4px 6px;border:1px solid #ccc">No</th>` +
-      `<th style="padding:4px 6px;border:1px solid #ccc;text-align:left">Indikator Kinerja</th>` +
-      `<th style="padding:4px 6px;border:1px solid #ccc;text-align:left">Formula</th>` +
-      `<th style="padding:4px 6px;border:1px solid #ccc;text-align:left">Satuan</th>` +
-      `<th style="padding:4px 6px;border:1px solid #ccc;text-align:right">Bobot</th>` +
-      `<th style="padding:4px 6px;border:1px solid #ccc;text-align:right">Target Sem I</th>` +
-      `<th style="padding:4px 6px;border:1px solid #ccc;text-align:right">Target ${year}</th></tr></thead>` +
-      `<tbody>${kpiRowsHtml(kpiItems)}</tbody></table>`;
-    const compRows = (comps: KmBundleComp[]) =>
-      comps.map((c) =>
-        `<tr><td><strong>${c.bidang}</strong></td><td>${c.holder ?? '—'}</td><td>${c.submitter}</td><td>${statusLabel(c.status)}</td></tr>` +
-        `<tr><td colspan="4" style="padding:0;border-color:#f0f0f0">${kpiSubTable(c.kpiItems)}</td></tr>`
-      ).join('');
-    const css = `@page{size:A4;margin:20mm}body{font-family:Arial,sans-serif;font-size:11px;color:#1a1a1a}h1{font-size:14px;margin:0 0 4px}` +
-      `h2{font-size:12px;margin:16px 0 6px;border-bottom:2px solid #125D72;padding-bottom:4px;color:#125D72}` +
-      `.header{text-align:center;margin-bottom:20px;border-bottom:2px solid #125D72;padding-bottom:12px}` +
-      `.meta{font-size:10px;color:#666;margin:3px 0}table.main{width:100%;border-collapse:collapse;margin-bottom:4px}` +
-      `table.main th,table.main td{border:1px solid #ddd;padding:5px 8px;font-size:11px;vertical-align:top}` +
-      `table.main th{background:#125D72;color:#fff;text-align:left}` +
-      `.summary{margin:12px 0;padding:8px 12px;background:#f0f9f0;border-left:4px solid #22c55e;border-radius:4px}` +
-      `.sign{margin-top:40px;display:flex;justify-content:flex-end}.sign-box{text-align:center;width:200px}` +
-      `.sign-line{margin-top:60px;border-top:1px solid #333;padding-top:4px;font-size:10px}`;
-    let bodyHtml: string;
+    const secRow = (label: string) => `<tr class="sec"><td colspan="7">${label}</td></tr>`;
+    let body: string;
     if (scope === 'KP') {
-      bodyHtml = `<table class="main"><thead><tr><th>Bidang</th><th>Penanggung Jawab</th><th>Penyusun</th><th>Status</th></tr></thead>` +
-        `<tbody>${compRows(km.components)}</tbody></table>`;
+      body = buildRows(km.components);
     } else {
       const groups = Object.entries(
         km.components.reduce<Record<string, KmBundleComp[]>>((acc, c) => { (acc[c.unitCode] ??= []).push(c); return acc; }, {})
       ).sort(([a], [b]) => a.localeCompare(b));
-      bodyHtml = groups.map(([unitCode, items], gi) =>
-        `<h2>${String.fromCharCode(65 + gi)}. ${UNIT_NAMES[unitCode] ?? unitCode}</h2>` +
-        `<table class="main"><thead><tr><th>Bidang</th><th>Penanggung Jawab</th><th>Penyusun</th><th>Status</th></tr></thead>` +
-        `<tbody>${compRows(sortByBidang(items))}</tbody></table>`
+      body = groups.map(([unitCode, items], gi) =>
+        secRow(`${String.fromCharCode(65 + gi)}. ${UNIT_NAMES[unitCode] ?? unitCode}`) +
+        buildRows(sortByBidang(items))
       ).join('');
     }
+    const colgroup = `<colgroup><col style="width:4%"><col style="width:18%"><col>` +
+      `<col style="width:8%"><col style="width:6%"><col style="width:12%"><col style="width:12%"></colgroup>`;
     const html = `<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8">` +
       `<title>Konsolidasi KM Tahunan — ${scopeLabel} ${year}</title><style>${css}</style></head><body>` +
-      `<div class="header"><p class="meta">PUSMANPRO PLN</p><h1>KONSOLIDASI KONTRAK MANAJEMEN TAHUNAN</h1>` +
-      `<h1>${scopeLabel} — Tahun ${year}</h1><p class="meta">Dicetak: ${printDate}</p></div>` +
-      bodyHtml +
-      `<div class="summary">Total KM: <strong>${km.total}</strong> &nbsp;|&nbsp; ` +
-      `Siap: <strong>${km.readyCount}</strong> &nbsp;|&nbsp; ` +
-      `Status: <strong>${km.status === 'approved' ? 'Disahkan GM' : 'Menunggu Pengesahan GM'}</strong></div>` +
-      `<div class="sign"><div class="sign-box"><p style="margin:0;font-size:11px">General Manager,</p>` +
-      `<div class="sign-line">(__________________)<br/>General Manager PUSMANPRO</div></div></div></body></html>`;
+      `<div class="hdr"><p class="org">PUSMANPRO PLN</p><p class="ttl">KONSOLIDASI KONTRAK MANAJEMEN TAHUNAN</p>` +
+      `<p class="sub">${scopeLabel} — Tahun ${year}</p><p class="meta">Dicetak: ${printDate}</p></div>` +
+      `<table>${colgroup}` +
+      `<thead><tr><th>No</th><th>Bidang</th><th>Indikator Kinerja</th>` +
+      `<th>Satuan</th><th>Bobot</th><th>Target Sem I</th><th>Target ${year}</th></tr></thead>` +
+      `<tbody>${body}</tbody></table>` +
+      `<div class="summ">Total KM: <b>${km.total}</b> &nbsp;|&nbsp; ` +
+      `Siap: <b>${km.readyCount}</b> &nbsp;|&nbsp; ` +
+      `Status: <b>${km.status === 'approved' ? 'Disahkan GM' : 'Menunggu Pengesahan GM'}</b></div>` +
+      `<div class="sign"><div class="sb"><p style="margin:0">General Manager,</p>` +
+      `<div class="sl">(__________________)<br/>General Manager PUSMANPRO</div></div></div></body></html>`;
     const w = window.open('', '_blank', 'width=900,height=700');
     if (!w) return;
     w.document.write(html);
