@@ -368,10 +368,11 @@ model KontrakManajemen {
   @@map("kontrak_manajemen")
 }
 
-// Konsolidasi KM per TAHUN — GM menyetujui sekali seluruh KM (semua bidang KI + UPMK) tahun tsb.
+// Konsolidasi KM per TAHUN per SCOPE — GM menyetujui KP dan UPMK secara terpisah.
 model KMBundle {
   id         String    @id @default(cuid())
-  year       String    @unique
+  year       String
+  scope      String    @default("KP") // 'KP' | 'UPMK'
   status     String    @default("open") // open | approved | rejected
   reviewer   String?
   reviewNote String?
@@ -379,5 +380,6 @@ model KMBundle {
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
+  @@unique([year, scope])
   @@map("km_bundles")
 }

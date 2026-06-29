@@ -234,11 +234,12 @@ export class InputKontrakService {
       },
     });
     if (chainDone) {
-      // Bila bundle tahun ini sebelumnya 'rejected', buka kembali agar GM bisa meninjau ulang.
+      // Reset bundle scope yang relevan ke 'open' agar GM bisa menyahkan ulang.
       const period = await this.prisma.period.findUnique({ where: { id: k.periodId }, select: { yearMonth: true } });
       const yr = period?.yearMonth.slice(0, 4);
       if (yr) {
-        await this.prisma.kMBundle.updateMany({ where: { year: yr, status: 'rejected' }, data: { status: 'open' } });
+        const scope = k.unitCode === 'KP' ? 'KP' : 'UPMK';
+        await this.prisma.kMBundle.updateMany({ where: { year: yr, scope, status: { in: ['rejected', 'approved'] } }, data: { status: 'open' } });
       }
       const gms = await this.prisma.user.findMany({ where: { role: Role.GM, isActive: true } });
       if (gms.length) {
@@ -290,23 +291,26 @@ export class InputKontrakService {
     return active ? active.yearMonth.slice(0, 4) : String(new Date().getFullYear());
   }
 
-  async getBundle(year?: string) {
+  async getBundle(scope: 'KP' | 'UPMK' = 'KP', year?: string) {
     const yr = await this.resolveYear(year);
     const pids = await this.periodIdsForYear(yr);
+    const unitFilter = scope === 'KP' ? { unitCode: 'KP' } : { unitCode: { not: 'KP' } };
     const components = await this.prisma.kontrakManajemen.findMany({
-      where: { periodId: { in: pids }, status: { in: ['submitted', 'ready', 'approved'] } },
+      where: { periodId: { in: pids }, status: { in: ['submitted', 'ready', 'approved'] }, ...unitFilter },
       orderBy: [{ unitCode: 'asc' }, { bidang: 'asc' }],
     });
-    const bundle = await this.prisma.kMBundle.findUnique({ where: { year: yr } });
+    const bundle = await this.prisma.kMBundle.findUnique({ where: { year_scope: { year: yr, scope } } });
     const readyCount = components.filter((c) => c.status === 'ready').length;
     const submittedCount = components.filter((c) => c.status === 'submitted').length;
-    // GM dapat mengesahkan bila ada KM 'ready' & tak ada lagi yang masih dalam proses review.
     const canApprove = readyCount > 0 && submittedCount === 0;
+    // effectiveStatus: 'approved' bila semua komponen sudah disahkan (meski belum ada bundle record
+    // untuk scope ini — misal UPMK yang disahkan lewat bundle lama sebelum fitur pisah scope).
+    const allApproved = components.length > 0 && components.every((c) => c.status === 'approved');
+    const effectiveStatus = readyCount > 0 ? 'open' : allApproved ? 'approved' : (bundle?.status ?? 'open');
     return {
-      year: yr, status: bundle?.status ?? 'open', reviewer: bundle?.reviewer ?? null,
+      year: yr, scope, status: effectiveStatus, reviewer: bundle?.reviewer ?? null,
       reviewNote: bundle?.reviewNote ?? null, reviewedAt: bundle?.reviewedAt ?? null,
       total: components.length, readyCount, canApprove,
-      // Sertakan detail KPI + riwayat agar GM dapat me-review tiap dokumen di kartu konsolidasi.
       components: components.map((c) => ({
         id: c.id, unitCode: c.unitCode, bidang: c.bidang, status: c.status,
         submitter: c.submitter, holder: c.holder, kpiItems: c.kpiItems, history: c.history,
@@ -314,20 +318,21 @@ export class InputKontrakService {
     };
   }
 
-  async reviewBundle(user: User, action: 'approve' | 'reject', note: string, year?: string) {
+  async reviewBundle(user: User, scope: 'KP' | 'UPMK', action: 'approve' | 'reject', note: string, year?: string) {
     if (user.role !== Role.GM) throw new ForbiddenException('Hanya General Manager yang menyetujui bundle KM');
     if (!note?.trim()) throw new BadRequestException('Catatan/komentar wajib diisi');
     const yr = await this.resolveYear(year);
     const pids = await this.periodIdsForYear(yr);
-    const components = await this.prisma.kontrakManajemen.findMany({ where: { periodId: { in: pids }, status: { in: ['submitted', 'ready'] } } });
-    if (components.length === 0) throw new BadRequestException('Tidak ada KM yang siap dikonsolidasi pada tahun ini');
+    const unitFilter = scope === 'KP' ? { unitCode: 'KP' } : { unitCode: { not: 'KP' } };
+    const scopeLabel = scope === 'KP' ? 'Kantor Induk' : 'UPMK';
+    const components = await this.prisma.kontrakManajemen.findMany({ where: { periodId: { in: pids }, status: { in: ['submitted', 'ready'] }, ...unitFilter } });
+    if (components.length === 0) throw new BadRequestException(`Tidak ada KM ${scopeLabel} yang siap dikonsolidasi pada tahun ini`);
 
     if (action === 'approve') {
-      if (!components.every((c) => c.status === 'ready')) throw new ForbiddenException('Masih ada KM yang belum lolos sampai SM Perencanaan & PC');
-      await this.prisma.kontrakManajemen.updateMany({ where: { periodId: { in: pids }, status: 'ready' }, data: { status: 'approved', reviewer: user.name, reviewedAt: new Date() } });
+      if (!components.every((c) => c.status === 'ready')) throw new ForbiddenException(`Masih ada KM ${scopeLabel} yang belum lolos sampai SM Perencanaan & PC`);
+      await this.prisma.kontrakManajemen.updateMany({ where: { periodId: { in: pids }, status: 'ready', ...unitFilter }, data: { status: 'approved', reviewer: user.name, reviewedAt: new Date() } });
     } else {
-      // GM tolak bundle → kembalikan tiap komponen 'ready' ke langkah Manajer Perencanaan
-      // (bukan ke konseptor). Manajer Perencanaan yang memilah; jika perlu, baru escalate ke konseptor.
+      // GM tolak bundle → kembalikan tiap komponen 'ready' ke langkah Manajer Perencanaan.
       for (const c of components.filter((x) => x.status === 'ready')) {
         const cSteps = (c.steps as unknown as Step[]) ?? [];
         let idx = cSteps.findIndex((s) => s.variant === 'man_perencanaan');
@@ -345,9 +350,9 @@ export class InputKontrakService {
       }
     }
     const bundle = await this.prisma.kMBundle.upsert({
-      where: { year: yr },
+      where: { year_scope: { year: yr, scope } },
       update: { status: action === 'approve' ? 'approved' : 'rejected', reviewer: user.name, reviewNote: note, reviewedAt: new Date() },
-      create: { year: yr, status: action === 'approve' ? 'approved' : 'rejected', reviewer: user.name, reviewNote: note, reviewedAt: new Date() },
+      create: { year: yr, scope, status: action === 'approve' ? 'approved' : 'rejected', reviewer: user.name, reviewNote: note, reviewedAt: new Date() },
     });
     if (action === 'approve') {
       const submitterIds = [...new Set(components.map((c) => c.submitterId).filter(Boolean))] as string[];

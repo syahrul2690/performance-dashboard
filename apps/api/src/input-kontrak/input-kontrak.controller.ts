@@ -29,6 +29,7 @@ class UpdateKpiItemsDto {
 
 class BundleReviewDto {
   @IsIn(['approve', 'reject']) action: 'approve' | 'reject';
+  @IsIn(['KP', 'UPMK']) scope: 'KP' | 'UPMK';
   @IsString() note: string;
   @IsOptional() @IsString() year?: string;
 }
@@ -54,13 +55,13 @@ export class InputKontrakController {
   }
 
   @Get('bundle')
-  bundle(@Query('year') year?: string) {
-    return this.svc.getBundle(year);
+  bundle(@Query('scope') scope: 'KP' | 'UPMK' = 'KP', @Query('year') year?: string) {
+    return this.svc.getBundle(scope, year);
   }
 
   @Post('bundle/review')
   reviewBundle(@CurrentUser() user: User, @Body() dto: BundleReviewDto) {
-    return this.svc.reviewBundle(user, dto.action, dto.note, dto.year);
+    return this.svc.reviewBundle(user, dto.scope, dto.action, dto.note, dto.year);
   }
 
   @Get(':id')
