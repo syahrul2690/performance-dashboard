@@ -289,14 +289,18 @@ export function ApprovalsPage() {
     year?: string; status: string; total: number; readyCount: number; canApprove: boolean;
     components: KmBundleComp[];
   };
-  const [kmBundle, setKmBundle] = useState<KmBundleData | null>(null);
-  const [kmBundleNote, setKmBundleNote] = useState('');
-  const [kmBundleBusy, setKmBundleBusy] = useState(false);
+  const [kmBundleKP, setKmBundleKP] = useState<KmBundleData | null>(null);
+  const [kmBundleUPMK, setKmBundleUPMK] = useState<KmBundleData | null>(null);
+  const [kmBundleKPNote, setKmBundleKPNote] = useState('');
+  const [kmBundleUPMKNote, setKmBundleUPMKNote] = useState('');
+  const [kmBundleKPBusy, setKmBundleKPBusy] = useState(false);
+  const [kmBundleUPMKBusy, setKmBundleUPMKBusy] = useState(false);
   const [kmBundleExpanded, setKmBundleExpanded] = useState<string | null>(null);
   const [upmkGroupExpanded, setUpmkGroupExpanded] = useState<string | null>(null);
   const [upmkRealGroupExpanded, setUpmkRealGroupExpanded] = useState<string | null>(null);
   const loadKmBundle = () => {
-    inputKontrak.bundle().then((d) => setKmBundle(d as KmBundleData)).catch(() => { });
+    inputKontrak.bundle('KP').then((d) => setKmBundleKP(d as KmBundleData)).catch(() => { });
+    inputKontrak.bundle('UPMK').then((d) => setKmBundleUPMK(d as KmBundleData)).catch(() => { });
   };
 
   const load = () => {
@@ -332,17 +336,30 @@ export function ApprovalsPage() {
   useEffect(() => { load(); loadKm(); loadReal(); loadDocs(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { loadBundle(); loadKmBundle(); }, [periodId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleKmBundleReview = async (action: 'approve' | 'reject') => {
-    if (!kmBundleNote.trim()) { alert('Catatan/komentar wajib diisi'); return; }
-    setKmBundleBusy(true);
+  const handleKmBundleKPReview = async (action: 'approve' | 'reject') => {
+    if (!kmBundleKPNote.trim()) { alert('Catatan/komentar wajib diisi'); return; }
+    setKmBundleKPBusy(true);
     try {
-      await inputKontrak.reviewBundle(action, kmBundleNote);
-      setKmBundleNote('');
+      await inputKontrak.reviewBundle('KP', action, kmBundleKPNote);
+      setKmBundleKPNote('');
       loadKmBundle(); loadKm(); refreshNotif();
     } catch (e) {
-      alert((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Gagal memproses bundle KM');
+      alert((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Gagal memproses bundle KM Kantor Induk');
     } finally {
-      setKmBundleBusy(false);
+      setKmBundleKPBusy(false);
+    }
+  };
+  const handleKmBundleUPMKReview = async (action: 'approve' | 'reject') => {
+    if (!kmBundleUPMKNote.trim()) { alert('Catatan/komentar wajib diisi'); return; }
+    setKmBundleUPMKBusy(true);
+    try {
+      await inputKontrak.reviewBundle('UPMK', action, kmBundleUPMKNote);
+      setKmBundleUPMKNote('');
+      loadKmBundle(); loadKm(); refreshNotif();
+    } catch (e) {
+      alert((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Gagal memproses bundle KM UPMK');
+    } finally {
+      setKmBundleUPMKBusy(false);
     }
   };
 
@@ -703,27 +720,26 @@ export function ApprovalsPage() {
       )}
 
       {/* Bundle Konsolidasi KM Tahunan — persetujuan akhir GM */}
-      {canReview && kmBundle && (
+      {/* === Card 1: Bundle KM Kantor Induk === */}
+      {canReview && kmBundleKP && (
         <FoldCard
-          id="card-km-bundle"
+          id="card-km-bundle-kp"
           highlight={highlight === 'kmbundle'}
           accent="var(--color-accent)"
           icon={<Layers size={14} />}
-          title={`Konsolidasi Kontrak Manajemen Tahunan${kmBundle.year ? ' — ' + kmBundle.year : ''}`}
-          right={<span className="status-pill" style={{ fontWeight: 700 }}>{kmBundle.readyCount}/{kmBundle.total} siap</span>}
+          title={`Konsolidasi KM Tahunan — Kantor Induk${kmBundleKP.year ? ' ' + kmBundleKP.year : ''}`}
+          right={<span className="status-pill" style={{ fontWeight: 700 }}>{kmBundleKP.readyCount}/{kmBundleKP.total} siap</span>}
         >
           <div className="table-wrap">
             <table className="data-table compact">
-              <thead><tr><th>Unit</th><th>Bidang</th><th>Penyusun</th><th>Status</th><th>Review</th></tr></thead>
+              <thead><tr><th>Bidang</th><th>Penyusun</th><th>Status</th><th>Review</th></tr></thead>
               <tbody>
-                {kmBundle.components.length === 0 && (
-                  <tr><td colSpan={5}><EmptyState title="Belum ada KM" message="Belum ada KM yang masuk konsolidasi tahun ini." /></td></tr>
+                {kmBundleKP.components.length === 0 && (
+                  <tr><td colSpan={4}><EmptyState title="Belum ada KM" message="Belum ada KM Kantor Induk yang masuk konsolidasi tahun ini." /></td></tr>
                 )}
-                {/* KP components — flat per bidang, unchanged */}
-                {kmBundle.components.filter((c) => c.unitCode === 'KP').map((c) => (
+                {kmBundleKP.components.map((c) => (
                   <Fragment key={c.id}>
                     <tr>
-                      <td style={{ fontWeight: 600 }}>{UNIT_NAMES[c.unitCode] ?? c.unitCode}</td>
                       <td style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{c.bidang}</td>
                       <td style={{ color: 'var(--color-text-muted)' }}>{c.submitter}</td>
                       <td>
@@ -740,7 +756,7 @@ export function ApprovalsPage() {
                     </tr>
                     {kmBundleExpanded === c.id && (
                       <tr>
-                        <td colSpan={5} style={{ background: 'var(--color-surface-2)', padding: 0 }}>
+                        <td colSpan={4} style={{ background: 'var(--color-surface-2)', padding: 0 }}>
                           <div style={{ padding: 'var(--space-2) var(--space-3)', fontSize: 11, color: 'var(--color-text-muted)' }}>
                             Penanggung Jawab: <strong style={{ color: 'var(--color-text)' }}>{c.holder ?? '—'}</strong>
                           </div>
@@ -760,10 +776,53 @@ export function ApprovalsPage() {
                     )}
                   </Fragment>
                 ))}
-                {/* UPMK components — one group row per unit, expandable to show per-bidang sub-rows */}
+              </tbody>
+            </table>
+          </div>
+          {user?.role === 'GM' && kmBundleKP.status !== 'approved' && (
+            <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+              {!kmBundleKP.canApprove && kmBundleKP.total > 0 && (
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-warning)' }}>
+                  Belum semua KM Kantor Induk "siap" — GM dapat mengesahkan setelah seluruh KM lolos hingga SM Perencanaan & PC.
+                </div>
+              )}
+              <textarea className="form-textarea" style={{ fontSize: 'var(--text-xs)', minHeight: 48 }} placeholder="Catatan pengesahan/penolakan bundle KM Kantor Induk (wajib)" value={kmBundleKPNote} onChange={(e) => setKmBundleKPNote(e.target.value)} />
+              <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                <button className="btn btn-sm" style={{ background: 'var(--color-success)', color: '#fff' }} disabled={kmBundleKPBusy || !kmBundleKP.canApprove} onClick={() => handleKmBundleKPReview('approve')}>
+                  <CheckCircle size={12} /> Sahkan KM Kantor Induk (Final)
+                </button>
+                <button className="btn btn-sm" style={{ background: 'var(--color-danger)', color: '#fff' }} disabled={kmBundleKPBusy || kmBundleKP.total === 0} onClick={() => handleKmBundleKPReview('reject')}>
+                  <XCircle size={12} /> Kembalikan Bundle KI
+                </button>
+              </div>
+            </div>
+          )}
+          {kmBundleKP.status === 'approved' && (
+            <div className="card-body" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-success)' }}>
+              ✓ Bundle KM Kantor Induk tahun ini telah disahkan oleh General Manager.
+            </div>
+          )}
+        </FoldCard>
+      )}
+
+      {/* === Card 2: Bundle KM UPMK (gabungan UPMK I–V) === */}
+      {canReview && kmBundleUPMK && (
+        <FoldCard
+          id="card-km-bundle-upmk"
+          accent="var(--color-accent)"
+          icon={<Layers size={14} />}
+          title={`Konsolidasi KM Tahunan — UPMK${kmBundleUPMK.year ? ' ' + kmBundleUPMK.year : ''}`}
+          right={<span className="status-pill" style={{ fontWeight: 700 }}>{kmBundleUPMK.readyCount}/{kmBundleUPMK.total} siap</span>}
+        >
+          <div className="table-wrap">
+            <table className="data-table compact">
+              <thead><tr><th>Unit</th><th>Bidang / Penyusun</th><th>Status</th><th>Review</th></tr></thead>
+              <tbody>
+                {kmBundleUPMK.components.length === 0 && (
+                  <tr><td colSpan={4}><EmptyState title="Belum ada KM UPMK" message="Belum ada KM UPMK yang masuk konsolidasi tahun ini." /></td></tr>
+                )}
                 {Object.entries(
-                  kmBundle.components
-                    .filter((c) => c.unitCode !== 'KP')
+                  kmBundleUPMK.components
                     .reduce<Record<string, KmBundleComp[]>>((acc, c) => { (acc[c.unitCode] ??= []).push(c); return acc; }, {})
                 ).sort(([a], [b]) => a.localeCompare(b)).map(([unitCode, items]) => {
                   const allApproved = items.every((c) => c.status === 'approved');
@@ -782,16 +841,14 @@ export function ApprovalsPage() {
                             {UNIT_NAMES[unitCode] ?? unitCode}
                           </button>
                         </td>
-                        <td style={{ color: 'var(--color-text-muted)', fontSize: 11 }}>{items.length} bidang</td>
                         <td><span className={`status-pill ${aggregateCls}`} style={{ fontSize: 10 }}>{aggregateLabel}</span></td>
-                        <td />
+                        <td style={{ color: 'var(--color-text-muted)', fontSize: 11 }}>{items.length} bidang</td>
                       </tr>
                       {isOpen && sortByBidang(items).map((c) => (
                         <Fragment key={c.id}>
                           <tr style={{ background: 'var(--color-surface-2)' }}>
                             <td style={{ paddingLeft: 'var(--space-5)' }} />
-                            <td style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{c.bidang}</td>
-                            <td style={{ color: 'var(--color-text-muted)', fontSize: 11 }}>{c.submitter}</td>
+                            <td style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{c.bidang} · {c.submitter}</td>
                             <td>
                               <span className={`status-pill ${c.status === 'approved' ? 'completed' : c.status === 'ready' ? 'at-risk' : 'in-review'}`} style={{ fontSize: 10 }}>
                                 {c.status === 'ready' ? 'Siap' : c.status === 'approved' ? 'Disahkan GM' : 'Dalam review'}
@@ -806,7 +863,7 @@ export function ApprovalsPage() {
                           </tr>
                           {kmBundleExpanded === c.id && (
                             <tr>
-                              <td colSpan={5} style={{ background: 'var(--color-surface-2)', padding: 0 }}>
+                              <td colSpan={4} style={{ background: 'var(--color-surface-2)', padding: 0 }}>
                                 <div style={{ padding: 'var(--space-2) var(--space-3)', fontSize: 11, color: 'var(--color-text-muted)' }}>
                                   Penanggung Jawab: <strong style={{ color: 'var(--color-text)' }}>{c.holder ?? '—'}</strong>
                                 </div>
@@ -832,27 +889,27 @@ export function ApprovalsPage() {
               </tbody>
             </table>
           </div>
-          {user?.role === 'GM' && kmBundle.status !== 'approved' && (
+          {user?.role === 'GM' && kmBundleUPMK.status !== 'approved' && (
             <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-              {!kmBundle.canApprove && kmBundle.total > 0 && (
+              {!kmBundleUPMK.canApprove && kmBundleUPMK.total > 0 && (
                 <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-warning)' }}>
-                  Belum semua KM "siap" — GM dapat mengesahkan setelah seluruh KM lolos hingga SM Perencanaan & PC.
+                  Belum semua KM UPMK "siap" — GM dapat mengesahkan setelah seluruh KM UPMK lolos hingga SM Perencanaan & PC.
                 </div>
               )}
-              <textarea className="form-textarea" style={{ fontSize: 'var(--text-xs)', minHeight: 48 }} placeholder="Catatan pengesahan/penolakan bundle KM (wajib)" value={kmBundleNote} onChange={(e) => setKmBundleNote(e.target.value)} />
+              <textarea className="form-textarea" style={{ fontSize: 'var(--text-xs)', minHeight: 48 }} placeholder="Catatan pengesahan/penolakan bundle KM UPMK (wajib)" value={kmBundleUPMKNote} onChange={(e) => setKmBundleUPMKNote(e.target.value)} />
               <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                <button className="btn btn-sm" style={{ background: 'var(--color-success)', color: '#fff' }} disabled={kmBundleBusy || !kmBundle.canApprove} onClick={() => handleKmBundleReview('approve')}>
-                  <CheckCircle size={12} /> Sahkan Seluruh KM (Final)
+                <button className="btn btn-sm" style={{ background: 'var(--color-success)', color: '#fff' }} disabled={kmBundleUPMKBusy || !kmBundleUPMK.canApprove} onClick={() => handleKmBundleUPMKReview('approve')}>
+                  <CheckCircle size={12} /> Sahkan KM UPMK (Final)
                 </button>
-                <button className="btn btn-sm" style={{ background: 'var(--color-danger)', color: '#fff' }} disabled={kmBundleBusy || kmBundle.total === 0} onClick={() => handleKmBundleReview('reject')}>
-                  <XCircle size={12} /> Kembalikan Seluruh Bundle
+                <button className="btn btn-sm" style={{ background: 'var(--color-danger)', color: '#fff' }} disabled={kmBundleUPMKBusy || kmBundleUPMK.total === 0} onClick={() => handleKmBundleUPMKReview('reject')}>
+                  <XCircle size={12} /> Kembalikan Bundle UPMK
                 </button>
               </div>
             </div>
           )}
-          {kmBundle.status === 'approved' && (
+          {kmBundleUPMK.status === 'approved' && (
             <div className="card-body" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-success)' }}>
-              ✓ Bundle KM tahun ini telah disahkan penuh oleh General Manager.
+              ✓ Bundle KM UPMK tahun ini telah disahkan oleh General Manager.
             </div>
           )}
         </FoldCard>
