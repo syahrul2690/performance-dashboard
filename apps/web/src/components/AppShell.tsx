@@ -108,8 +108,7 @@ export function AppShell() {
   }, []);
 
   return (
-    <div className="app" data-sidebar={collapsed ? 'collapsed' : 'expanded'}>
-
+    <div className="app" data-sidebar={collapsed ? "collapsed" : "expanded"}>
       {/* ==================== SIDEBAR ==================== */}
       <aside className="sidebar" aria-label="Navigasi utama">
         <div className="sidebar-brand">
@@ -117,8 +116,19 @@ export function AppShell() {
             className="logo sidebar-brand-img"
             src="/brand/Logo_PLN.png"
             alt="PLN"
-            style={{ width: 52, height: 52, objectFit: 'contain', flexShrink: 0, borderRadius: 10, background: 'var(--color-surface)', padding: 4, border: '1px solid var(--color-border)' }}
-            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            style={{
+              width: collapsed ? 48 : 52,
+              height: collapsed ? 48 : 52,
+              objectFit: "contain",
+              flexShrink: 0,
+              borderRadius: 10,
+              background: "var(--color-surface)",
+              padding: 4,
+              border: "1px solid var(--color-border)",
+            }}
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = "none";
+            }}
           />
           <div className="sidebar-brand-text">
             <span className="sidebar-brand-name">SIMPP</span>
@@ -129,9 +139,10 @@ export function AppShell() {
         <nav className="sidebar-nav" aria-label="Halaman">
           {NAV_ITEMS.map((section) => {
             // hideForUpmk: sembunyikan dari user unit UPMK (non-KP)
-            const isUpmkUser = user?.unit && user.unit !== 'KP';
+            const isUpmkUser = user?.unit && user.unit !== "KP";
             // devOnly: hanya tampil untuk SUPERADMIN dan DEVELOPER
-            const isPrivileged = user?.role === 'SUPERADMIN' || user?.role === 'DEVELOPER';
+            const isPrivileged =
+              user?.role === "SUPERADMIN" || user?.role === "DEVELOPER";
             const visibleItems = section.items.filter((it) => {
               const nav = it as { hideForUpmk?: boolean; devOnly?: boolean };
               if (isUpmkUser && nav.hideForUpmk) return false;
@@ -148,9 +159,13 @@ export function AppShell() {
                     to={to}
                     end={end}
                     className="nav-item"
-                    aria-current={location.pathname === to || (!end && location.pathname.startsWith(to) && to !== '/') ? 'page' : undefined}
-                    title={collapsed ? label : undefined}
-                  >
+                    aria-current={
+                      location.pathname === to ||
+                      (!end && location.pathname.startsWith(to) && to !== "/")
+                        ? "page"
+                        : undefined
+                    }
+                    title={collapsed ? label : undefined}>
                     <Icon size={18} className="nav-icon" />
                     <span className="nav-label">{label}</span>
                   </NavLink>
@@ -161,19 +176,32 @@ export function AppShell() {
         </nav>
 
         <div className="sidebar-footer">
-          <div className="user-card" role="button" tabIndex={0} aria-label="Profil pengguna">
-            <div className="user-avatar" aria-hidden="true">{avatarInitials}</div>
+          <div
+            className="user-card"
+            role="button"
+            tabIndex={0}
+            aria-label="Profil pengguna">
+            <div className="user-avatar" aria-hidden="true">
+              {avatarInitials}
+            </div>
             <div className="user-info">
-              <span className="user-name">{user?.name ?? '—'}</span>
-              <span className="user-role">{ROLE_LABELS[user?.role ?? ''] ?? user?.role}</span>
+              <span className="user-name">{user?.name ?? "—"}</span>
+              <span className="user-role">
+                {ROLE_LABELS[user?.role ?? ""] ?? user?.role}
+              </span>
             </div>
           </div>
           <button
             className="sidebar-collapse-btn"
             aria-label="Ciutkan atau perluas sidebar"
-            onClick={() => setCollapsed((v) => !v)}
-          >
-            <ChevronsLeft size={16} style={{ transition: 'transform 0.2s', transform: collapsed ? 'rotate(180deg)' : 'none' }} />
+            onClick={() => setCollapsed((v) => !v)}>
+            <ChevronsLeft
+              size={16}
+              style={{
+                transition: "transform 0.2s",
+                transform: collapsed ? "rotate(180deg)" : "none",
+              }}
+            />
             <span className="sidebar-collapse-label">Ciutkan</span>
           </button>
         </div>
@@ -184,7 +212,10 @@ export function AppShell() {
       {/* ==================== TOPBAR ==================== */}
       <header className="topbar" role="banner">
         <div className="topbar-left">
-          <button className="icon-btn hamburger-btn" aria-label="Buka menu" onClick={() => setCollapsed((v) => !v)}>
+          <button
+            className="icon-btn hamburger-btn"
+            aria-label="Buka menu"
+            onClick={() => setCollapsed((v) => !v)}>
             <Menu size={18} />
           </button>
           <nav className="breadcrumb" aria-label="Breadcrumb">
@@ -195,14 +226,16 @@ export function AppShell() {
         </div>
 
         <div className="topbar-center">
-          <div className="segmented" role="group" aria-label="Periode pelaporan">
-            {(['Bulan', 'Semester', 'Tahun'] as const).map((mode) => (
+          <div
+            className="segmented"
+            role="group"
+            aria-label="Periode pelaporan">
+            {(["Bulan", "Semester", "Tahun"] as const).map((mode) => (
               <button
                 key={mode}
                 type="button"
                 aria-pressed={periodMode === mode}
-                onClick={() => setPeriodMode(mode)}
-              >
+                onClick={() => setPeriodMode(mode)}>
                 {mode}
               </button>
             ))}
@@ -213,12 +246,18 @@ export function AppShell() {
               className="form-input form-input-sm"
               value={periodId}
               onChange={(e) => setPeriodId(e.target.value)}
-              style={{ width: 'auto', minWidth: 130, marginLeft: 8, fontWeight: 700 }}
+              style={{
+                width: "auto",
+                minWidth: 130,
+                marginLeft: 8,
+                fontWeight: 700,
+              }}
               title="Periode data dashboard"
-              aria-label="Periode dashboard"
-            >
+              aria-label="Periode dashboard">
               {periods.map((p) => (
-                <option key={p.id} value={p.id}>{p.label}</option>
+                <option key={p.id} value={p.id}>
+                  {p.label}
+                </option>
               ))}
             </select>
           )}
@@ -232,13 +271,18 @@ export function AppShell() {
               aria-label="Mode pengguna"
               aria-haspopup="true"
               aria-expanded={roleMenuOpen}
-              onClick={() => setRoleMenuOpen((v) => !v)}
-            >
+              onClick={() => setRoleMenuOpen((v) => !v)}>
               <span className="dot" />
-              <span>Mode: <strong>{ROLE_LABELS[effectiveRole] ?? effectiveRole}</strong></span>
+              <span>
+                Mode:{" "}
+                <strong>{ROLE_LABELS[effectiveRole] ?? effectiveRole}</strong>
+              </span>
               <ChevronDown size={12} style={{ opacity: 0.6 }} />
             </button>
-            <div className="dropdown-menu" data-open={String(roleMenuOpen)} role="menu">
+            <div
+              className="dropdown-menu"
+              data-open={String(roleMenuOpen)}
+              role="menu">
               <div className="role-switcher-section">
                 <div className="role-switcher-label">View As (Demo)</div>
                 {Object.entries(ROLE_LABELS).map(([k, v]) => (
@@ -247,8 +291,10 @@ export function AppShell() {
                     className="role-option"
                     role="menuitemradio"
                     aria-pressed={effectiveRole === k}
-                    onClick={() => { setViewAs(k === user?.role ? null : k); setRoleMenuOpen(false); }}
-                  >
+                    onClick={() => {
+                      setViewAs(k === user?.role ? null : k);
+                      setRoleMenuOpen(false);
+                    }}>
                     <User size={14} />
                     <span className="role-label">{v}</span>
                     <span className="role-level">{k}</span>
@@ -259,7 +305,10 @@ export function AppShell() {
           </div>
 
           {/* Search */}
-          <button className="icon-btn" aria-label="Cari (Ctrl+K)" title="Ctrl+K">
+          <button
+            className="icon-btn"
+            aria-label="Cari (Ctrl+K)"
+            title="Ctrl+K">
             <Search size={18} />
           </button>
 
@@ -270,39 +319,49 @@ export function AppShell() {
               aria-label="Notifikasi"
               aria-haspopup="true"
               aria-expanded={notifOpen}
-              onClick={() => setNotifOpen((v) => !v)}
-            >
+              onClick={() => setNotifOpen((v) => !v)}>
               <Bell size={18} />
               {unreadCount > 0 && <span className="badge" aria-hidden="true" />}
             </button>
-            <div className="dropdown-menu wide" data-open={String(notifOpen)} role="menu">
+            <div
+              className="dropdown-menu wide"
+              data-open={String(notifOpen)}
+              role="menu">
               <div className="dropdown-header">
                 <span className="dropdown-title">Notifikasi</span>
-                <button className="dropdown-action" onClick={markAllRead}>Tandai semua dibaca</button>
+                <button className="dropdown-action" onClick={markAllRead}>
+                  Tandai semua dibaca
+                </button>
               </div>
               <div className="notif-list">
                 {notifs.length === 0 && (
-                  <div style={{ padding: '24px', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)' }}>
+                  <div
+                    style={{
+                      padding: "24px",
+                      textAlign: "center",
+                      color: "var(--color-text-muted)",
+                      fontSize: "var(--text-xs)",
+                    }}>
                     Tidak ada notifikasi
                   </div>
                 )}
                 {notifs.map((n) => (
                   <div
                     key={n.id}
-                    className={`notif-item${n.unread ? ' unread' : ''}`}
+                    className={`notif-item${n.unread ? " unread" : ""}`}
                     onClick={() => {
                       if (n.route) {
                         // Sisipkan targetId sebagai `focus` agar kartu terkait di-highlight (Task 10).
                         const tid = (n as { targetId?: string }).targetId;
                         const route = tid
-                          ? `${n.route}${n.route.includes('?') ? '&' : '?'}focus=${encodeURIComponent(tid)}`
+                          ? `${n.route}${n.route.includes("?") ? "&" : "?"}focus=${encodeURIComponent(tid)}`
                           : n.route;
                         navigate(route);
                       }
                       setNotifOpen(false);
-                    }}
-                  >
-                    <div className={`notif-icon ${n.type === 'alert' ? 'warning' : 'info'}`}>
+                    }}>
+                    <div
+                      className={`notif-icon ${n.type === "alert" ? "warning" : "info"}`}>
                       <Bell size={14} />
                     </div>
                     <div className="notif-body">
@@ -326,18 +385,32 @@ export function AppShell() {
               className="btn btn-secondary"
               aria-haspopup="true"
               aria-expanded={exportOpen}
-              onClick={() => setExportOpen((v) => !v)}
-            >
+              onClick={() => setExportOpen((v) => !v)}>
               <Download size={14} />
               <span className="btn-export-text">Ekspor</span>
               <ChevronDown size={12} />
             </button>
-            <div className="dropdown-menu" data-open={String(exportOpen)} role="menu">
-              <button className="dropdown-item"><FileText size={14} /><span>Ekspor PDF</span></button>
-              <button className="dropdown-item"><FileSpreadsheet size={14} /><span>Ekspor CSV</span></button>
-              <button className="dropdown-item"><Image size={14} /><span>Unduh Chart (PNG)</span></button>
+            <div
+              className="dropdown-menu"
+              data-open={String(exportOpen)}
+              role="menu">
+              <button className="dropdown-item">
+                <FileText size={14} />
+                <span>Ekspor PDF</span>
+              </button>
+              <button className="dropdown-item">
+                <FileSpreadsheet size={14} />
+                <span>Ekspor CSV</span>
+              </button>
+              <button className="dropdown-item">
+                <Image size={14} />
+                <span>Unduh Chart (PNG)</span>
+              </button>
               <div className="dropdown-divider" />
-              <button className="dropdown-item"><Printer size={14} /><span>Print</span></button>
+              <button className="dropdown-item">
+                <Printer size={14} />
+                <span>Print</span>
+              </button>
             </div>
           </div>
 
@@ -346,15 +419,17 @@ export function AppShell() {
             className="btn btn-ghost"
             aria-label="War Room Mode"
             title="War Room Mode — auto-rotate fullscreen"
-            onClick={() => setWarRoomActive(true)}
-          >
+            onClick={() => setWarRoomActive(true)}>
             <Tv2 size={16} />
             <span className="btn-warroom-text">War Room</span>
           </button>
 
           {/* Theme toggle */}
-          <button className="icon-btn" aria-label="Ubah tema" onClick={toggleTheme}>
-            {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+          <button
+            className="icon-btn"
+            aria-label="Ubah tema"
+            onClick={toggleTheme}>
+            {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
           </button>
 
           {/* User menu */}
@@ -364,11 +439,15 @@ export function AppShell() {
               aria-haspopup="true"
               aria-expanded={userMenuOpen}
               aria-label="Menu pengguna"
-              onClick={() => setUserMenuOpen((v) => !v)}
-            >
-              <div className="user-avatar" aria-hidden="true">{avatarInitials}</div>
+              onClick={() => setUserMenuOpen((v) => !v)}>
+              <div className="user-avatar" aria-hidden="true">
+                {avatarInitials}
+              </div>
             </button>
-            <div className="dropdown-menu wider" data-open={String(userMenuOpen)} role="menu">
+            <div
+              className="dropdown-menu wider"
+              data-open={String(userMenuOpen)}
+              role="menu">
               <div className="user-menu-header">
                 <div className="user-avatar">{avatarInitials}</div>
                 <div className="user-menu-info">
@@ -377,14 +456,25 @@ export function AppShell() {
                 </div>
               </div>
               <div className="dropdown-divider" />
-              <button className="dropdown-item"><User size={14} /><span>Profil saya</span></button>
-              <NavLink to="/settings" className="dropdown-item" onClick={() => setUserMenuOpen(false)}>
-                <Settings size={14} /><span>Pengaturan</span>
+              <button className="dropdown-item">
+                <User size={14} />
+                <span>Profil saya</span>
+              </button>
+              <NavLink
+                to="/settings"
+                className="dropdown-item"
+                onClick={() => setUserMenuOpen(false)}>
+                <Settings size={14} />
+                <span>Pengaturan</span>
               </NavLink>
-              <button className="dropdown-item"><HelpCircle size={14} /><span>Bantuan</span></button>
+              <button className="dropdown-item">
+                <HelpCircle size={14} />
+                <span>Bantuan</span>
+              </button>
               <div className="dropdown-divider" />
               <button className="dropdown-item danger" onClick={handleLogout}>
-                <LogOut size={14} /><span>Keluar</span>
+                <LogOut size={14} />
+                <span>Keluar</span>
               </button>
             </div>
           </div>
@@ -403,14 +493,23 @@ export function AppShell() {
         <div className="warroom-overlay">
           <button
             className="warroom-close"
-            style={{ position: 'absolute', top: 20, right: 20, color: 'rgba(255,255,255,0.7)', background: 'none', border: 'none', cursor: 'pointer' }}
-            onClick={() => setWarRoomActive(false)}
-          >
+            style={{
+              position: "absolute",
+              top: 20,
+              right: 20,
+              color: "rgba(255,255,255,0.7)",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+            }}
+            onClick={() => setWarRoomActive(false)}>
             ✕
           </button>
-          <div style={{ textAlign: 'center', opacity: 0.4 }}>
+          <div style={{ textAlign: "center", opacity: 0.4 }}>
             <Tv2 size={48} color="#fff" />
-            <p style={{ color: '#fff', marginTop: 12, fontSize: 16 }}>War Room — Coming in next build</p>
+            <p style={{ color: "#fff", marginTop: 12, fontSize: 16 }}>
+              War Room — Coming in next build
+            </p>
           </div>
         </div>
       )}
