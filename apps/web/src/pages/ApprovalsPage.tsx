@@ -486,27 +486,87 @@ export function ApprovalsPage() {
         '.summ{margin:6pt 0;padding:4pt 8pt;background:#f5f5f5;border:0.5pt solid #aaa;font-size:7.5pt}' +
         '.sign{margin-top:24pt;display:flex;justify-content:flex-end}' +
         '.sb{text-align:center;width:170pt}.sl{margin-top:46pt;border-top:0.5pt solid #333;padding-top:3pt;font-size:7.5pt}';
-      let n = 1;
-      const buildKpRows = (c: KmBundleComp): string => {
-        const items = c.kpiItems ?? [];
-        if (items.length === 0) return '';
-        return items.map((it) =>
-          `<tr>` +
-          `<td class="num">${n++}</td>` +
-          `<td>${it['indikator'] ?? '—'}</td>` +
-          `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
-          `<td class="num">${it['satuan'] ?? '—'}</td>` +
-          `<td class="num">${it['bobot'] ?? '—'}</td>` +
-          `<td class="rt">${it['target'] ?? '—'}</td>` +
-          `<td class="rw">${it['target2'] ?? '—'}</td>` +
-          `<td class="num" style="font-size:7pt">${c.bidang}</td>` +
-          `</tr>`
-        ).join('');
+      const allFlat = km.components.flatMap((c) =>
+        (c.kpiItems ?? []).map((it) => ({ it, bidang: c.bidang }))
+      );
+      const getItemOrder = (ind: string): number => {
+        const s = ind.toLowerCase();
+        if (s.includes('inspection quality') || s.includes('iqc')) return 10;
+        if (s.includes('kajian supervisi')) return 20;
+        if (s.includes('evaluasi, analisa') || s.includes('evaluasi analisa')) return 30;
+        if (s.includes('persentase pelaksanaan')) return 40;
+        if (s.includes('kapasitas pembangkit')) return 50;
+        if (s.includes('kapasitas transmisi')) return 60;
+        if (s.includes('kapasitas gardu induk')) return 70;
+        if (s.includes('pengendalian') && (s.includes('anggaran investasi') || s.includes('penggunaan anggaran'))) return 81;
+        if (s.includes('pengendalian nac') || s.includes('non allowable')) return 82;
+        if (s.includes('evaluasi akurasi data')) return 90;
+        if (s.includes('pemenuhan pdn') || s.includes('pdn korporat')) return 100;
+        if (s.includes('dokumen legal aset tanah') || s.includes('penyelesaian dokumen legal')) return 110;
+        if (s.includes('maturity level')) return 121;
+        if (s.includes('pengurang') && s.includes('kepatuhan')) return 122;
+        if (s.includes('tata kelola')) return 123;
+        return 999;
       };
-      const totalBobot = km.components.reduce((s, c) =>
-        s + (c.kpiItems ?? []).reduce((ss, it) => ss + (Number(it['bobot']) || 0), 0), 0);
-      const body = km.components.map(buildKpRows).join('') +
-        `<tr class="tot">` +
+      const sortedFlat = [...allFlat].sort(
+        (a, b) => getItemOrder(String(a.it['indikator'] ?? '')) - getItemOrder(String(b.it['indikator'] ?? ''))
+      );
+      const totalBobot = allFlat.reduce((s, { it }) => s + (Number(it['bobot']) || 0), 0);
+      let n = 1;
+      let grp8Emitted = false;
+      let grp12Emitted = false;
+      let sub8 = 0;
+      let sub12 = 0;
+      const subLtr = (i: number) => String.fromCharCode(97 + i);
+      let body = '';
+      for (const { it, bidang } of sortedFlat) {
+        const ord = getItemOrder(String(it['indikator'] ?? ''));
+        const isGrp8 = ord === 81 || ord === 82;
+        const isGrp12 = ord === 121 || ord === 122 || ord === 123;
+        if (isGrp8 && !grp8Emitted) {
+          body += `<tr><td class="num">${n++}</td>` +
+            `<td colspan="6" style="font-weight:700">Pengendalian Anggaran</td>` +
+            `<td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+          grp8Emitted = true; sub8 = 0;
+        }
+        if (isGrp12 && !grp12Emitted) {
+          body += `<tr><td class="num">${n++}</td>` +
+            `<td colspan="6" style="font-weight:700">Kepatuhan, Maturity Level dan Tata Kelola Perusahaan</td>` +
+            `<td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+          grp12Emitted = true; sub12 = 0;
+        }
+        if (isGrp8) {
+          const subInd = String(it['indikator'] ?? '').replace(/^Pengendalian Anggaran\s*[-–]\s*/i, '');
+          body += `<tr><td class="num" style="font-size:7pt">${subLtr(sub8++)}.</td>` +
+            `<td style="padding-left:10pt">${subInd}</td>` +
+            `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
+            `<td class="num">${it['satuan'] ?? '—'}</td>` +
+            `<td class="num">${it['bobot'] ?? '—'}</td>` +
+            `<td class="rt">${it['target'] ?? '—'}</td>` +
+            `<td class="rw">${it['target2'] ?? '—'}</td>` +
+            `<td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+        } else if (isGrp12) {
+          const subInd = String(it['indikator'] ?? '').replace(/^Pengurang\s*[-–]\s*/i, '');
+          body += `<tr><td class="num" style="font-size:7pt">${subLtr(sub12++)}.</td>` +
+            `<td style="padding-left:10pt">${subInd}</td>` +
+            `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
+            `<td class="num">${it['satuan'] ?? '—'}</td>` +
+            `<td class="num">${it['bobot'] ?? '—'}</td>` +
+            `<td class="rt">${it['target'] ?? '—'}</td>` +
+            `<td class="rw">${it['target2'] ?? '—'}</td>` +
+            `<td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+        } else {
+          body += `<tr><td class="num">${n++}</td>` +
+            `<td>${it['indikator'] ?? '—'}</td>` +
+            `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
+            `<td class="num">${it['satuan'] ?? '—'}</td>` +
+            `<td class="num">${it['bobot'] ?? '—'}</td>` +
+            `<td class="rt">${it['target'] ?? '—'}</td>` +
+            `<td class="rw">${it['target2'] ?? '—'}</td>` +
+            `<td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+        }
+      }
+      body += `<tr class="tot">` +
         `<td colspan="4" style="text-align:right;padding-right:8pt">TOTAL</td>` +
         `<td class="num">${totalBobot || '—'}</td><td colspan="3"></td></tr>`;
       html = `<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8">` +
