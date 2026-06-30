@@ -427,12 +427,149 @@ export function ApprovalsPage() {
         .reduce<Record<string, typeof bundle.components>>((acc, c) => { (acc[c.unitCode] ??= []).push(c); return acc; }, {})
     ).sort(([a], [b]) => a.localeCompare(b));
     const catRow = (label: string) => `<tr class="cat"><td colspan="8">${label}</td></tr>`;
+    const kpAllFlat = kpComps.flatMap((c) => {
+      const items2 = (c.values && typeof c.values === 'object')
+        ? Object.values(c.values as Record<string, Record<string, unknown>>) : [];
+      return items2.map((it) => ({ it, bidang: c.bidang }));
+    });
+    const getKpOrder = (ind: string): number => {
+      const s = ind.toLowerCase();
+      if (s.includes('inspection quality') || s.includes('iqc')) return 10;
+      if (s.includes('kajian supervisi')) return 20;
+      if (s.includes('evaluasi, analisa') || s.includes('evaluasi analisa')) return 30;
+      if (s.includes('persentase pelaksanaan')) return 40;
+      if (s.includes('kapasitas pembangkit')) return 50;
+      if (s.includes('kapasitas transmisi')) return 60;
+      if (s.includes('kapasitas gardu induk')) return 70;
+      if (s.includes('pengendalian') && (s.includes('anggaran investasi') || s.includes('penggunaan anggaran'))) return 81;
+      if (s.includes('pengendalian nac') || s.includes('non allowable')) return 82;
+      if (s.includes('evaluasi akurasi data')) return 90;
+      if (s.includes('pemenuhan pdn') || s.includes('pdn korporat')) return 100;
+      if (s.includes('dokumen legal aset tanah') || s.includes('penyelesaian dokumen legal')) return 110;
+      if (s.includes('maturity level')) return 121;
+      if (s.includes('pengurang') && s.includes('kepatuhan')) return 122;
+      if (s.includes('tata kelola')) return 123;
+      return 999;
+    };
+    const kpSorted = [...kpAllFlat].sort(
+      (a, b) => getKpOrder(String(a.it['indikator'] ?? '')) - getKpOrder(String(b.it['indikator'] ?? ''))
+    );
     n = 1;
-    let body = catRow('A. KANTOR INDUK') + kpComps.map(buildSection).join('');
-    upmkGroups.forEach(([unitCode, items], i) => {
+    let grpR8 = false, grpR12 = false, subR8 = 0, subR12 = 0;
+    const subLtrR = (i: number) => String.fromCharCode(97 + i);
+    let kpBody = '';
+    for (const { it, bidang } of kpSorted) {
+      const ord = getKpOrder(String(it['indikator'] ?? ''));
+      const isG8 = ord === 81 || ord === 82;
+      const isG12 = ord === 121 || ord === 122 || ord === 123;
+      if (isG8 && !grpR8) {
+        kpBody += `<tr><td class="num">${n++}</td><td colspan="6" style="font-weight:700">Pengendalian Anggaran</td><td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+        grpR8 = true; subR8 = 0;
+      }
+      if (isG12 && !grpR12) {
+        kpBody += `<tr><td class="num">${n++}</td><td colspan="6" style="font-weight:700">Kepatuhan, Maturity Level dan Tata Kelola Perusahaan</td><td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+        grpR12 = true; subR12 = 0;
+      }
+      if (isG8) {
+        const subInd = String(it['indikator'] ?? '').replace(/^Pengendalian Anggaran\s*[-–]\s*/i, '');
+        kpBody += `<tr><td class="num" style="font-size:7pt">${subLtrR(subR8++)}.</td>` +
+          `<td style="padding-left:10pt">${subInd}</td>` +
+          `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
+          `<td class="num">${it['satuan'] ?? '—'}</td>` +
+          `<td class="num">${it['bobot'] ?? '—'}</td>` +
+          `<td class="rt">${it['target'] ?? '—'}</td>` +
+          `<td class="rw">${it['realisasi'] ?? '—'}</td>` +
+          `<td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+      } else if (isG12) {
+        const subInd = String(it['indikator'] ?? '').replace(/^Pengurang\s*[-–]\s*/i, '');
+        kpBody += `<tr><td class="num" style="font-size:7pt">${subLtrR(subR12++)}.</td>` +
+          `<td style="padding-left:10pt">${subInd}</td>` +
+          `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
+          `<td class="num">${it['satuan'] ?? '—'}</td>` +
+          `<td class="num">${it['bobot'] ?? '—'}</td>` +
+          `<td class="rt">${it['target'] ?? '—'}</td>` +
+          `<td class="rw">${it['realisasi'] ?? '—'}</td>` +
+          `<td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+      } else {
+        kpBody += `<tr><td class="num">${n++}</td>` +
+          `<td>${it['indikator'] ?? '—'}</td>` +
+          `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
+          `<td class="num">${it['satuan'] ?? '—'}</td>` +
+          `<td class="num">${it['bobot'] ?? '—'}</td>` +
+          `<td class="rt">${it['target'] ?? '—'}</td>` +
+          `<td class="rw">${it['realisasi'] ?? '—'}</td>` +
+          `<td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+      }
+    }
+    let body = catRow('A. KANTOR INDUK') + kpBody;
+    const getUpmkOrdR = (ind: string): number => {
+      const s = ind.toLowerCase();
+      if (s.includes('kajian supervisi')) return 10;
+      if (s.includes('persentase pelaksanaan')) return 20;
+      if (s.includes('kapasitas pembangkit')) return 30;
+      if (s.includes('kapasitas transmisi')) return 40;
+      if (s.includes('kapasitas gardu induk')) return 50;
+      if (s.includes('pengendalian nac') || s.includes('non allowable')) return 61;
+      if (s.includes('pengendalian') && s.includes('penggunaan anggaran')) return 62;
+      if (s.includes('pemenuhan pdn') || s.includes('pdn korporat')) return 70;
+      if (s.includes('evaluasi penyelesaian') || s.includes('penyelesaian proyek supervisi')) return 80;
+      if (s.includes('maturity level')) return 91;
+      if (s.includes('pengurang') && s.includes('kepatuhan')) return 92;
+      if (s.includes('tata kelola')) return 93;
+      return 999;
+    };
+    upmkGroups.forEach(([unitCode, comps], i) => {
       n = 1;
       body += catRow(`${String.fromCharCode(66 + i)}. ${(UNIT_NAMES[unitCode] ?? unitCode).toUpperCase()}`);
-      body += sortByBidang(items).map(buildSection).join('');
+      const uFlat = comps.flatMap((c) => {
+        const vals = (c.values && typeof c.values === 'object')
+          ? Object.values(c.values as Record<string, Record<string, unknown>>) : [];
+        return vals.map((it) => ({ it, bidang: c.bidang }));
+      });
+      const uSorted = [...uFlat].sort(
+        (a, b) => getUpmkOrdR(String(a.it['indikator'] ?? '')) - getUpmkOrdR(String(b.it['indikator'] ?? ''))
+      );
+      let uG6 = false, uG9 = false, uS6 = 0, uS9 = 0;
+      const slU = (j: number) => String.fromCharCode(97 + j);
+      for (const { it, bidang } of uSorted) {
+        const ord = getUpmkOrdR(String(it['indikator'] ?? ''));
+        const iG6 = ord === 61 || ord === 62;
+        const iG9 = ord === 91 || ord === 92 || ord === 93;
+        if (iG6 && !uG6) {
+          body += `<tr><td class="num">${n++}</td><td colspan="6" style="font-weight:700">Pengendalian Anggaran</td><td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+          uG6 = true; uS6 = 0;
+        }
+        if (iG9 && !uG9) {
+          body += `<tr><td class="num">${n++}</td><td colspan="6" style="font-weight:700">Kepatuhan, Maturity Level dan Tata Kelola Perusahaan</td><td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+          uG9 = true; uS9 = 0;
+        }
+        if (iG6) {
+          const si = String(it['indikator'] ?? '').replace(/^Pengendalian Anggaran\s*[-–]\s*/i, '');
+          body += `<tr><td class="num" style="font-size:7pt">${slU(uS6++)}.</td>` +
+            `<td style="padding-left:10pt">${si}</td>` +
+            `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
+            `<td class="num">${it['satuan'] ?? '—'}</td><td class="num">${it['bobot'] ?? '—'}</td>` +
+            `<td class="rt">${it['target'] ?? '—'}</td><td class="rw">${it['realisasi'] ?? '—'}</td>` +
+            `<td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+        } else if (iG9) {
+          const si = String(it['indikator'] ?? '').replace(/^Pengurang\s*[-–]\s*/i, '');
+          body += `<tr><td class="num" style="font-size:7pt">${slU(uS9++)}.</td>` +
+            `<td style="padding-left:10pt">${si}</td>` +
+            `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
+            `<td class="num">${it['satuan'] ?? '—'}</td><td class="num">${it['bobot'] ?? '—'}</td>` +
+            `<td class="rt">${it['target'] ?? '—'}</td><td class="rw">${it['realisasi'] ?? '—'}</td>` +
+            `<td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+        } else {
+          body += `<tr><td class="num">${n++}</td><td>${it['indikator'] ?? '—'}</td>` +
+            `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
+            `<td class="num">${it['satuan'] ?? '—'}</td><td class="num">${it['bobot'] ?? '—'}</td>` +
+            `<td class="rt">${it['target'] ?? '—'}</td><td class="rw">${it['realisasi'] ?? '—'}</td>` +
+            `<td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+        }
+      }
+      if (uSorted.length === 0) {
+        body += `<tr><td class="num">—</td><td colspan="7" style="color:#999;font-style:italic">Tidak ada data KPI</td></tr>`;
+      }
     });
     const html = `<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8">` +
       `<title>Laporan Kinerja Bulanan — ${periodLabel}</title><style>${css}</style></head><body>` +
@@ -605,34 +742,74 @@ export function ApprovalsPage() {
         '.sign{margin-top:24pt;display:flex;justify-content:flex-end}' +
         '.sb{text-align:center;width:170pt}.sl{margin-top:46pt;border-top:0.5pt solid #333;padding-top:3pt;font-size:7.5pt}';
       let n = 1;
-      const buildUpmkRows = (c: KmBundleComp): string => {
-        const items = c.kpiItems ?? [];
+      const getUpmkOrd = (ind: string): number => {
+        const s = ind.toLowerCase();
+        if (s.includes('kajian supervisi')) return 10;
+        if (s.includes('persentase pelaksanaan')) return 20;
+        if (s.includes('kapasitas pembangkit')) return 30;
+        if (s.includes('kapasitas transmisi')) return 40;
+        if (s.includes('kapasitas gardu induk')) return 50;
+        if (s.includes('pengendalian nac') || s.includes('non allowable')) return 61;
+        if (s.includes('pengendalian') && s.includes('penggunaan anggaran')) return 62;
+        if (s.includes('pemenuhan pdn') || s.includes('pdn korporat')) return 70;
+        if (s.includes('evaluasi penyelesaian') || s.includes('penyelesaian proyek supervisi')) return 80;
+        if (s.includes('maturity level')) return 91;
+        if (s.includes('pengurang') && s.includes('kepatuhan')) return 92;
+        if (s.includes('tata kelola')) return 93;
+        return 999;
+      };
+      const buildUpmkGroupRows = (comps: KmBundleComp[]): string => {
+        const flat = comps.flatMap(c => (c.kpiItems ?? []).map(it => ({ it, bidang: c.bidang })));
+        const sorted = [...flat].sort((a, b) => getUpmkOrd(String(a.it['indikator'] ?? '')) - getUpmkOrd(String(b.it['indikator'] ?? '')));
+        let g6 = false, g9 = false, s6 = 0, s9 = 0;
+        const sl = (i: number) => String.fromCharCode(97 + i);
         let rows = '';
-        if (items.length === 0) {
-          rows += `<tr><td class="num">—</td><td colspan="7" style="color:#999;font-style:italic">Tidak ada data KPI</td></tr>`;
-        } else {
-          items.forEach((it) => {
-            rows += `<tr>` +
-              `<td class="num">${n++}</td>` +
-              `<td>${it['indikator'] ?? '—'}</td>` +
+        for (const { it, bidang } of sorted) {
+          const ord = getUpmkOrd(String(it['indikator'] ?? ''));
+          const iG6 = ord === 61 || ord === 62;
+          const iG9 = ord === 91 || ord === 92 || ord === 93;
+          if (iG6 && !g6) {
+            rows += `<tr><td class="num">${n++}</td><td colspan="6" style="font-weight:700">Pengendalian Anggaran</td><td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+            g6 = true; s6 = 0;
+          }
+          if (iG9 && !g9) {
+            rows += `<tr><td class="num">${n++}</td><td colspan="6" style="font-weight:700">Kepatuhan, Maturity Level dan Tata Kelola Perusahaan</td><td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+            g9 = true; s9 = 0;
+          }
+          if (iG6) {
+            const si = String(it['indikator'] ?? '').replace(/^Pengendalian Anggaran\s*[-–]\s*/i, '');
+            rows += `<tr><td class="num" style="font-size:7pt">${sl(s6++)}.</td>` +
+              `<td style="padding-left:10pt">${si}</td>` +
               `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
-              `<td class="num">${it['satuan'] ?? '—'}</td>` +
-              `<td class="num">${it['bobot'] ?? '—'}</td>` +
-              `<td class="rt">${it['target'] ?? '—'}</td>` +
-              `<td class="rw">${it['target2'] ?? '—'}</td>` +
-              `<td class="num" style="font-size:7pt">${c.bidang}</td>` +
-              `</tr>`;
-          });
+              `<td class="num">${it['satuan'] ?? '—'}</td><td class="num">${it['bobot'] ?? '—'}</td>` +
+              `<td class="rt">${it['target'] ?? '—'}</td><td class="rw">${it['target2'] ?? '—'}</td>` +
+              `<td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+          } else if (iG9) {
+            const si = String(it['indikator'] ?? '').replace(/^Pengurang\s*[-–]\s*/i, '');
+            rows += `<tr><td class="num" style="font-size:7pt">${sl(s9++)}.</td>` +
+              `<td style="padding-left:10pt">${si}</td>` +
+              `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
+              `<td class="num">${it['satuan'] ?? '—'}</td><td class="num">${it['bobot'] ?? '—'}</td>` +
+              `<td class="rt">${it['target'] ?? '—'}</td><td class="rw">${it['target2'] ?? '—'}</td>` +
+              `<td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+          } else {
+            rows += `<tr><td class="num">${n++}</td><td>${it['indikator'] ?? '—'}</td>` +
+              `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
+              `<td class="num">${it['satuan'] ?? '—'}</td><td class="num">${it['bobot'] ?? '—'}</td>` +
+              `<td class="rt">${it['target'] ?? '—'}</td><td class="rw">${it['target2'] ?? '—'}</td>` +
+              `<td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+          }
         }
+        if (rows === '') rows = `<tr><td class="num">—</td><td colspan="7" style="color:#999;font-style:italic">Tidak ada data KPI</td></tr>`;
         return rows;
       };
       const groups = Object.entries(
         km.components.reduce<Record<string, KmBundleComp[]>>((acc, c) => { (acc[c.unitCode] ??= []).push(c); return acc; }, {})
       ).sort(([a], [b]) => a.localeCompare(b));
-      const body = groups.map(([unitCode, items], gi) => {
+      const body = groups.map(([unitCode, comps], gi) => {
         n = 1;
         return `<tr class="cat"><td colspan="8">${String.fromCharCode(65 + gi)}. ${(UNIT_NAMES[unitCode] ?? unitCode).toUpperCase()}</td></tr>` +
-          sortByBidang(items).map(buildUpmkRows).join('');
+          buildUpmkGroupRows(comps);
       }).join('');
       const colgroup = `<colgroup>` +
         `<col style="width:3%"><col style="width:22%"><col style="width:18%">` +
