@@ -381,51 +381,52 @@ export function ApprovalsPage() {
     if (!bundle) return;
     const periodLabel = bundle.period?.label ?? 'Periode Aktif';
     const printDate = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
-    const css = '@page{size:A4;margin:15mm}' +
-      'body{font-family:Arial,Helvetica,sans-serif;font-size:9pt;color:#111;margin:0}' +
-      '.hdr{text-align:center;margin-bottom:10pt;padding-bottom:8pt;border-bottom:2pt solid #125D72}' +
-      '.org{font-size:9pt;color:#125D72;font-weight:700;margin:0;letter-spacing:1px}' +
-      '.ttl{font-size:13pt;font-weight:700;margin:3pt 0 1pt}' +
-      '.sub{font-size:11pt;font-weight:700;margin:0 0 3pt}' +
-      '.meta{font-size:8pt;color:#666;margin:2pt 0}' +
-      'table{width:100%;border-collapse:collapse;font-size:8.5pt;table-layout:fixed}' +
-      'th{background:#125D72;color:#fff;padding:5pt 4pt;border:0.5pt solid #0e4a5c;text-align:left;word-break:break-word}' +
-      'td{padding:3.5pt 4pt;border:0.5pt solid #d0d0d0;vertical-align:top;word-break:break-word}' +
-      'tr.sec td{background:#e4f0f6;font-weight:700;color:#125D72;font-size:9pt;padding:4pt 6pt;border-top:1.5pt solid #125D72}' +
-      'tr.grp td{border-top:1pt solid #999}' +
-      '.num{text-align:right}.rl{text-align:right;font-weight:700;color:#125D72}' +
-      '.sm{font-size:7.5pt;color:#555;margin-top:2pt}' +
-      '.summ{margin:8pt 0;padding:5pt 10pt;background:#f0fdf4;border-left:3pt solid #22c55e;font-size:8.5pt}' +
-      '.sign{margin-top:28pt;display:flex;justify-content:flex-end}' +
-      '.sb{text-align:center;width:180pt}.sl{margin-top:50pt;border-top:0.5pt solid #333;padding-top:3pt;font-size:8pt}';
-    const stClr = (s: string) => s === 'ready' ? 'color:#16a34a;font-weight:700' : s === 'approved' ? 'color:#125D72;font-weight:700' : 'color:#d97706';
+    const css = '@page{size:A4 landscape;margin:12mm}' +
+      'body{font-family:Arial,Helvetica,sans-serif;font-size:8pt;color:#000;margin:0}' +
+      '.hdr{text-align:center;margin-bottom:6pt;padding-bottom:6pt;border-bottom:2pt solid #000}' +
+      '.t1{font-size:12pt;font-weight:700;margin:0 0 2pt;text-transform:uppercase;letter-spacing:0.5px}' +
+      '.t2{font-size:10pt;font-weight:700;margin:0 0 2pt}' +
+      '.t3{font-size:9pt;margin:0 0 2pt}' +
+      '.meta{font-size:7.5pt;color:#444;margin:2pt 0}' +
+      'table{width:100%;border-collapse:collapse;font-size:7.5pt;table-layout:fixed}' +
+      'th{background:#1f3c6b;color:#fff;padding:5pt 3pt;border:1pt solid #000;text-align:center;word-break:break-word;font-weight:700;font-size:8pt}' +
+      'td{padding:3pt 3pt;border:0.5pt solid #777;vertical-align:top;word-break:break-word}' +
+      'tr.cat td{background:#1f3c6b;color:#fff;font-weight:700;font-size:8pt;padding:4pt 6pt;border:1pt solid #000}' +
+      'tr.sec td{background:#d6e4f7;font-weight:700;color:#1f3c6b;font-size:8pt;padding:3.5pt 6pt;border:0.5pt solid #999}' +
+      '.num{text-align:center}.rt{text-align:right}.rw{text-align:right;font-weight:700}' +
+      '.ok{color:#15803d;font-weight:700}.nd{color:#d97706}' +
+      '.summ{margin:6pt 0;padding:4pt 8pt;background:#f5f5f5;border:0.5pt solid #aaa;font-size:7.5pt}' +
+      '.sign{margin-top:24pt;display:flex;justify-content:flex-end}' +
+      '.sb{text-align:center;width:170pt}.sl{margin-top:46pt;border-top:0.5pt solid #333;padding-top:3pt;font-size:7.5pt}';
     const stLbl = (s: string) => s === 'ready' ? 'Siap' : s === 'approved' ? 'Disetujui GM' : 'Dalam review';
+    const stCls = (s: string) => s === 'ready' || s === 'approved' ? 'ok' : 'nd';
     let n = 1;
-    const buildRows = (comps: typeof bundle.components): string => {
-      let rows = '';
-      comps.forEach((c) => {
-        const items = (c.values && typeof c.values === 'object')
-          ? Object.values(c.values as Record<string, Record<string, unknown>>) : [];
-        const span = Math.max(items.length, 1);
-        const bidangCell = `<td rowspan="${span}"><b>${c.bidang}</b>` +
-          `<div class="sm">${c.submitter}</div>` +
-          `<div class="sm" style="${stClr(c.status)}">${stLbl(c.status)}</div></td>`;
-        if (items.length === 0) {
-          rows += `<tr class="grp"><td class="num">${n++}</td>${bidangCell}` +
-            `<td colspan="5" style="color:#999;font-style:italic">Tidak ada data KPI</td></tr>`;
-        } else {
-          items.forEach((it, i) => {
-            rows += `<tr${i === 0 ? ' class="grp"' : ''}>` +
-              `<td class="num">${n++}</td>` +
-              (i === 0 ? bidangCell : '') +
-              `<td>${it['indikator'] ?? '—'}</td>` +
-              `<td>${it['satuan'] ?? '—'}</td>` +
-              `<td class="num">${it['bobot'] ?? '—'}</td>` +
-              `<td class="num">${it['target'] ?? '—'}</td>` +
-              `<td class="rl">${it['realisasi'] ?? '—'}</td></tr>`;
-          });
-        }
-      });
+    const buildSection = (c: typeof bundle.components[number]): string => {
+      const items = (c.values && typeof c.values === 'object')
+        ? Object.values(c.values as Record<string, Record<string, unknown>>) : [];
+      const totalBobot = items.reduce((s, it) => s + (Number(it['bobot']) || 0), 0);
+      let rows = `<tr class="sec"><td colspan="8">` +
+        `<b>${c.bidang}</b>` +
+        `&emsp;<span style="font-weight:400">PIC: ${c.submitter}</span>` +
+        `&emsp;<span style="font-weight:400">Bobot: ${totalBobot || '—'}</span>` +
+        `&emsp;<span class="${stCls(c.status)}" style="font-weight:400">Status: ${stLbl(c.status)}</span>` +
+        `</td></tr>`;
+      if (items.length === 0) {
+        rows += `<tr><td class="num">—</td><td colspan="7" style="color:#999;font-style:italic">Tidak ada data KPI</td></tr>`;
+      } else {
+        items.forEach((it) => {
+          rows += `<tr>` +
+            `<td class="num">${n++}</td>` +
+            `<td>${it['indikator'] ?? '—'}</td>` +
+            `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
+            `<td class="num">${it['satuan'] ?? '—'}</td>` +
+            `<td class="num">${it['bobot'] ?? '—'}</td>` +
+            `<td class="rt">${it['target'] ?? '—'}</td>` +
+            `<td class="rw">${it['realisasi'] ?? '—'}</td>` +
+            `<td class="num" style="font-size:7pt">${c.bidang}</td>` +
+            `</tr>`;
+        });
+      }
       return rows;
     };
     const kpComps = bundle.components.filter((c) => c.unitCode === 'KP');
@@ -433,26 +434,34 @@ export function ApprovalsPage() {
       bundle.components.filter((c) => c.unitCode !== 'KP')
         .reduce<Record<string, typeof bundle.components>>((acc, c) => { (acc[c.unitCode] ??= []).push(c); return acc; }, {})
     ).sort(([a], [b]) => a.localeCompare(b));
-    const secRow = (label: string) => `<tr class="sec"><td colspan="7">${label}</td></tr>`;
-    let body = secRow('A. Kantor Induk') + buildRows(kpComps);
+    const catRow = (label: string) => `<tr class="cat"><td colspan="8">${label}</td></tr>`;
+    let body = catRow('A. KANTOR INDUK') + kpComps.map(buildSection).join('');
     upmkGroups.forEach(([unitCode, items], i) => {
-      body += secRow(`${String.fromCharCode(66 + i)}. ${UNIT_NAMES[unitCode] ?? unitCode}`) + buildRows(sortByBidang(items));
+      body += catRow(`${String.fromCharCode(66 + i)}. ${(UNIT_NAMES[unitCode] ?? unitCode).toUpperCase()}`);
+      body += sortByBidang(items).map(buildSection).join('');
     });
     const html = `<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8">` +
-      `<title>Konsolidasi Realisasi Kinerja — ${periodLabel}</title><style>${css}</style></head><body>` +
-      `<div class="hdr"><p class="org">PUSMANPRO PLN</p><p class="ttl">KONSOLIDASI REALISASI KINERJA</p>` +
-      `<p class="sub">Periode ${periodLabel}</p><p class="meta">Dicetak: ${printDate}</p></div>` +
-      `<table><colgroup><col style="width:4%"><col style="width:18%"><col><col style="width:8%">` +
-      `<col style="width:6%"><col style="width:12%"><col style="width:12%"></colgroup>` +
-      `<thead><tr><th>No</th><th>Bidang</th><th>Indikator Kinerja</th>` +
-      `<th>Satuan</th><th>Bobot</th><th>Target</th><th>Realisasi</th></tr></thead>` +
+      `<title>Laporan Kinerja Bulanan — ${periodLabel}</title><style>${css}</style></head><body>` +
+      `<div class="hdr">` +
+      `<p class="t1">Laporan Kinerja Bulanan</p>` +
+      `<p class="t2">PT PLN (Persero) Pusat Manajemen Proyek</p>` +
+      `<p class="t3">Periode ${periodLabel}</p>` +
+      `<p class="meta">Dicetak: ${printDate}</p></div>` +
+      `<table><colgroup>` +
+      `<col style="width:3%"><col style="width:22%"><col style="width:18%">` +
+      `<col style="width:6%"><col style="width:5%"><col style="width:12%"><col style="width:12%"><col style="width:12%">` +
+      `</colgroup>` +
+      `<thead><tr>` +
+      `<th>No</th><th>INDIKATOR KINERJA KUNCI</th><th>FORMULA</th>` +
+      `<th>SATUAN</th><th>BOBOT</th><th>TARGET</th><th>REALISASI</th><th>PIC</th>` +
+      `</tr></thead>` +
       `<tbody>${body}</tbody></table>` +
       `<div class="summ">Total komponen: <b>${bundle.total}</b> &nbsp;|&nbsp; ` +
       `Siap: <b>${bundle.readyCount}</b> &nbsp;|&nbsp; ` +
       `Status bundle: <b>${bundle.status === 'approved' ? 'Disetujui GM' : 'Menunggu Persetujuan GM'}</b></div>` +
       `<div class="sign"><div class="sb"><p style="margin:0">General Manager,</p>` +
       `<div class="sl">(__________________)<br/>General Manager PUSMANPRO</div></div></div></body></html>`;
-    const w = window.open('', '_blank', 'width=900,height=700');
+    const w = window.open('', '_blank', 'width=1050,height=750');
     if (!w) return;
     w.document.write(html);
     w.document.close();
@@ -465,81 +474,89 @@ export function ApprovalsPage() {
     const year = km.year ?? String(new Date().getFullYear());
     const scopeLabel = scope === 'KP' ? 'Kantor Induk' : 'UPMK (Gabungan)';
     const printDate = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
-    const css = '@page{size:A4;margin:15mm}' +
-      'body{font-family:Arial,Helvetica,sans-serif;font-size:9pt;color:#111;margin:0}' +
-      '.hdr{text-align:center;margin-bottom:10pt;padding-bottom:8pt;border-bottom:2pt solid #125D72}' +
-      '.org{font-size:9pt;color:#125D72;font-weight:700;margin:0;letter-spacing:1px}' +
-      '.ttl{font-size:13pt;font-weight:700;margin:3pt 0 1pt}' +
-      '.sub{font-size:11pt;font-weight:700;margin:0 0 3pt}' +
-      '.meta{font-size:8pt;color:#666;margin:2pt 0}' +
-      'table{width:100%;border-collapse:collapse;font-size:8.5pt;table-layout:fixed}' +
-      'th{background:#125D72;color:#fff;padding:5pt 4pt;border:0.5pt solid #0e4a5c;text-align:left;word-break:break-word}' +
-      'td{padding:3.5pt 4pt;border:0.5pt solid #d0d0d0;vertical-align:top;word-break:break-word}' +
-      'tr.sec td{background:#e4f0f6;font-weight:700;color:#125D72;font-size:9pt;padding:4pt 6pt;border-top:1.5pt solid #125D72}' +
-      'tr.grp td{border-top:1pt solid #999}' +
-      '.num{text-align:right}.sm{font-size:7.5pt;color:#555;margin-top:2pt}' +
-      '.summ{margin:8pt 0;padding:5pt 10pt;background:#f0fdf4;border-left:3pt solid #22c55e;font-size:8.5pt}' +
-      '.sign{margin-top:28pt;display:flex;justify-content:flex-end}' +
-      '.sb{text-align:center;width:180pt}.sl{margin-top:50pt;border-top:0.5pt solid #333;padding-top:3pt;font-size:8pt}';
-    const stClr = (s: string) => s === 'ready' ? 'color:#16a34a;font-weight:700' : s === 'approved' ? 'color:#125D72;font-weight:700' : 'color:#d97706';
+    const css = '@page{size:A4 landscape;margin:12mm}' +
+      'body{font-family:Arial,Helvetica,sans-serif;font-size:8pt;color:#000;margin:0}' +
+      '.hdr{text-align:center;margin-bottom:6pt;padding-bottom:6pt;border-bottom:2pt solid #000}' +
+      '.t1{font-size:12pt;font-weight:700;margin:0 0 2pt;text-transform:uppercase;letter-spacing:0.5px}' +
+      '.t2{font-size:10pt;font-weight:700;margin:0 0 2pt}' +
+      '.t3{font-size:9pt;margin:0 0 2pt}' +
+      '.meta{font-size:7.5pt;color:#444;margin:2pt 0}' +
+      'table{width:100%;border-collapse:collapse;font-size:7.5pt;table-layout:fixed}' +
+      'th{background:#1f3c6b;color:#fff;padding:5pt 3pt;border:1pt solid #000;text-align:center;word-break:break-word;font-weight:700;font-size:8pt}' +
+      'td{padding:3pt 3pt;border:0.5pt solid #777;vertical-align:top;word-break:break-word}' +
+      'tr.cat td{background:#1f3c6b;color:#fff;font-weight:700;font-size:8pt;padding:4pt 6pt;border:1pt solid #000}' +
+      'tr.sec td{background:#d6e4f7;font-weight:700;color:#1f3c6b;font-size:8pt;padding:3.5pt 6pt;border:0.5pt solid #999}' +
+      '.num{text-align:center}.rt{text-align:right}.rw{text-align:right;font-weight:700}' +
+      '.ok{color:#15803d;font-weight:700}.nd{color:#d97706}' +
+      '.summ{margin:6pt 0;padding:4pt 8pt;background:#f5f5f5;border:0.5pt solid #aaa;font-size:7.5pt}' +
+      '.sign{margin-top:24pt;display:flex;justify-content:flex-end}' +
+      '.sb{text-align:center;width:170pt}.sl{margin-top:46pt;border-top:0.5pt solid #333;padding-top:3pt;font-size:7.5pt}';
     const stLbl = (s: string) => s === 'ready' ? 'Siap' : s === 'approved' ? 'Disahkan GM' : 'Dalam review';
+    const stCls = (s: string) => s === 'ready' || s === 'approved' ? 'ok' : 'nd';
     let n = 1;
-    const buildRows = (comps: KmBundleComp[]): string => {
-      let rows = '';
-      comps.forEach((c) => {
-        const items = c.kpiItems ?? [];
-        const span = Math.max(items.length, 1);
-        const bidangCell = `<td rowspan="${span}"><b>${c.bidang}</b>` +
-          `<div class="sm">PJ: ${c.holder ?? '—'}</div>` +
-          `<div class="sm">${c.submitter}</div>` +
-          `<div class="sm" style="${stClr(c.status)}">${stLbl(c.status)}</div></td>`;
-        if (items.length === 0) {
-          rows += `<tr class="grp"><td class="num">${n++}</td>${bidangCell}` +
-            `<td colspan="5" style="color:#999;font-style:italic">Tidak ada data KPI</td></tr>`;
-        } else {
-          items.forEach((it, i) => {
-            rows += `<tr${i === 0 ? ' class="grp"' : ''}>` +
-              `<td class="num">${n++}</td>` +
-              (i === 0 ? bidangCell : '') +
-              `<td>${it['indikator'] ?? '—'}</td>` +
-              `<td>${it['satuan'] ?? '—'}</td>` +
-              `<td class="num">${it['bobot'] ?? '—'}</td>` +
-              `<td class="num">${it['target'] ?? '—'}</td>` +
-              `<td class="num">${it['target2'] ?? '—'}</td></tr>`;
-          });
-        }
-      });
+    const buildSection = (c: KmBundleComp): string => {
+      const items = c.kpiItems ?? [];
+      const totalBobot = items.reduce((s, it) => s + (Number(it['bobot']) || 0), 0);
+      let rows = `<tr class="sec"><td colspan="8">` +
+        `<b>${c.bidang}</b>` +
+        `&emsp;<span style="font-weight:400">PJ: ${c.holder ?? '—'}</span>` +
+        `&emsp;<span style="font-weight:400">Penyusun: ${c.submitter}</span>` +
+        `&emsp;<span style="font-weight:400">Bobot: ${totalBobot || '—'}</span>` +
+        `&emsp;<span class="${stCls(c.status)}" style="font-weight:400">Status: ${stLbl(c.status)}</span>` +
+        `</td></tr>`;
+      if (items.length === 0) {
+        rows += `<tr><td class="num">—</td><td colspan="7" style="color:#999;font-style:italic">Tidak ada data KPI</td></tr>`;
+      } else {
+        items.forEach((it) => {
+          rows += `<tr>` +
+            `<td class="num">${n++}</td>` +
+            `<td>${it['indikator'] ?? '—'}</td>` +
+            `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
+            `<td class="num">${it['satuan'] ?? '—'}</td>` +
+            `<td class="num">${it['bobot'] ?? '—'}</td>` +
+            `<td class="rt">${it['target'] ?? '—'}</td>` +
+            `<td class="rw">${it['target2'] ?? '—'}</td>` +
+            `<td class="num" style="font-size:7pt">${c.bidang}</td>` +
+            `</tr>`;
+        });
+      }
       return rows;
     };
-    const secRow = (label: string) => `<tr class="sec"><td colspan="7">${label}</td></tr>`;
     let body: string;
     if (scope === 'KP') {
-      body = buildRows(km.components);
+      body = km.components.map(buildSection).join('');
     } else {
       const groups = Object.entries(
         km.components.reduce<Record<string, KmBundleComp[]>>((acc, c) => { (acc[c.unitCode] ??= []).push(c); return acc; }, {})
       ).sort(([a], [b]) => a.localeCompare(b));
       body = groups.map(([unitCode, items], gi) =>
-        secRow(`${String.fromCharCode(65 + gi)}. ${UNIT_NAMES[unitCode] ?? unitCode}`) +
-        buildRows(sortByBidang(items))
+        `<tr class="cat"><td colspan="8">${String.fromCharCode(65 + gi)}. ${(UNIT_NAMES[unitCode] ?? unitCode).toUpperCase()}</td></tr>` +
+        sortByBidang(items).map(buildSection).join('')
       ).join('');
     }
-    const colgroup = `<colgroup><col style="width:4%"><col style="width:18%"><col>` +
-      `<col style="width:8%"><col style="width:6%"><col style="width:12%"><col style="width:12%"></colgroup>`;
+    const colgroup = `<colgroup>` +
+      `<col style="width:3%"><col style="width:22%"><col style="width:18%">` +
+      `<col style="width:6%"><col style="width:5%"><col style="width:12%"><col style="width:12%"><col style="width:12%">` +
+      `</colgroup>`;
     const html = `<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8">` +
-      `<title>Konsolidasi KM Tahunan — ${scopeLabel} ${year}</title><style>${css}</style></head><body>` +
-      `<div class="hdr"><p class="org">PUSMANPRO PLN</p><p class="ttl">KONSOLIDASI KONTRAK MANAJEMEN TAHUNAN</p>` +
-      `<p class="sub">${scopeLabel} — Tahun ${year}</p><p class="meta">Dicetak: ${printDate}</p></div>` +
+      `<title>Kontrak Manajemen Tahunan — ${scopeLabel} ${year}</title><style>${css}</style></head><body>` +
+      `<div class="hdr">` +
+      `<p class="t1">Kontrak Manajemen Tahunan</p>` +
+      `<p class="t2">PT PLN (Persero) Pusat Manajemen Proyek</p>` +
+      `<p class="t3">${scopeLabel} &mdash; Tahun ${year}</p>` +
+      `<p class="meta">Dicetak: ${printDate}</p></div>` +
       `<table>${colgroup}` +
-      `<thead><tr><th>No</th><th>Bidang</th><th>Indikator Kinerja</th>` +
-      `<th>Satuan</th><th>Bobot</th><th>Target Sem I</th><th>Target ${year}</th></tr></thead>` +
+      `<thead><tr>` +
+      `<th>No</th><th>INDIKATOR KINERJA KUNCI</th><th>FORMULA</th>` +
+      `<th>SATUAN</th><th>BOBOT</th><th>TARGET SEM I</th><th>TARGET ${year}</th><th>PIC</th>` +
+      `</tr></thead>` +
       `<tbody>${body}</tbody></table>` +
       `<div class="summ">Total KM: <b>${km.total}</b> &nbsp;|&nbsp; ` +
       `Siap: <b>${km.readyCount}</b> &nbsp;|&nbsp; ` +
       `Status: <b>${km.status === 'approved' ? 'Disahkan GM' : 'Menunggu Pengesahan GM'}</b></div>` +
       `<div class="sign"><div class="sb"><p style="margin:0">General Manager,</p>` +
       `<div class="sl">(__________________)<br/>General Manager PUSMANPRO</div></div></div></body></html>`;
-    const w = window.open('', '_blank', 'width=900,height=700');
+    const w = window.open('', '_blank', 'width=1050,height=750');
     if (!w) return;
     w.document.write(html);
     w.document.close();
