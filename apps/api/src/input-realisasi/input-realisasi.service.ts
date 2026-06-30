@@ -3,6 +3,8 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { PrismaService } from '../prisma/prisma.service';
 import { Role, User } from '@prisma/client';
+import { ExecutiveService } from '../executive/executive.service';
+import { OperationalService } from '../operational/operational.service';
 import { Step, buildSteps, stepMatches, stepRecipientWhere, slaRemainingDays, uname } from '../common/workflow-steps';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -21,6 +23,8 @@ export class InputRealisasiService {
   constructor(
     private prisma: PrismaService,
     @Inject(CACHE_MANAGER) private cache: Cache,
+    private executiveSvc: ExecutiveService,
+    private operationalSvc: OperationalService,
   ) {}
 
   private async invalidateKinerja(periodId: string, unitCode: string) {
@@ -376,10 +380,22 @@ export class InputRealisasiService {
       });
     }
     await this.prisma.auditLog.create({ data: { actor: user.name, userId: user.id, action: `realisasi.bundle.${action}`, entity: 'RealisasiBundle', targetId: bundle.id, note } });
-    // Segarkan dashboard
+    // Segarkan dashboard kinerja
     for (const m of ['Bulan', 'Semester', 'Tahun']) {
       await this.cache.del(`kinerja:active:${m}`);
       await this.cache.del(`kinerja:${period.id}:${m}`);
+    }
+    // Perbarui snapshot Executive & Operational dari data realisasi aktual (fire-and-forget)
+    if (action === 'approve') {
+      const pid = period.id;
+      setImmediate(() => {
+        Promise.all([
+          this.executiveSvc.refreshFromRealisasi(pid),
+          this.operationalSvc.refreshFromRealisasi(pid),
+        ]).catch((err: unknown) => {
+          console.error('[Snapshot Refresh] Error saat memperbarui snapshot:', err);
+        });
+      });
     }
     return bundle;
   }
