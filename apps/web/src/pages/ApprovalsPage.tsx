@@ -466,84 +466,154 @@ export function ApprovalsPage() {
     const km = scope === 'KP' ? kmBundleKP : kmBundleUPMK;
     if (!km) return;
     const year = km.year ?? String(new Date().getFullYear());
-    const scopeLabel = scope === 'KP' ? 'Kantor Induk' : 'UPMK (Gabungan)';
     const printDate = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
-    const css = '@page{size:A4 landscape;margin:12mm}' +
-      'body{font-family:Arial,Helvetica,sans-serif;font-size:8pt;color:#000;margin:0}' +
-      '.hdr{text-align:center;margin-bottom:6pt;padding-bottom:6pt;border-bottom:2pt solid #000}' +
-      '.t1{font-size:12pt;font-weight:700;margin:0 0 2pt;text-transform:uppercase;letter-spacing:0.5px}' +
-      '.t2{font-size:10pt;font-weight:700;margin:0 0 2pt}' +
-      '.t3{font-size:9pt;margin:0 0 2pt}' +
-      '.meta{font-size:7.5pt;color:#444;margin:2pt 0}' +
-      'table{width:100%;border-collapse:collapse;font-size:7.5pt;table-layout:fixed}' +
-      'th{background:#1f3c6b;color:#fff;padding:5pt 3pt;border:1pt solid #000;text-align:center;word-break:break-word;font-weight:700;font-size:8pt}' +
-      'td{padding:3pt 3pt;border:0.5pt solid #777;vertical-align:top;word-break:break-word}' +
-      'tr.cat td{background:#1f3c6b;color:#fff;font-weight:700;font-size:8pt;padding:4pt 6pt;border:1pt solid #000}' +
-      'tr.sec td{background:#d6e4f7;font-weight:700;color:#1f3c6b;font-size:8pt;padding:3.5pt 6pt;border:0.5pt solid #999}' +
-      '.num{text-align:center}.rt{text-align:right}.rw{text-align:right;font-weight:700}' +
-      '.ok{color:#15803d;font-weight:700}.nd{color:#d97706}' +
-      '.summ{margin:6pt 0;padding:4pt 8pt;background:#f5f5f5;border:0.5pt solid #aaa;font-size:7.5pt}' +
-      '.sign{margin-top:24pt;display:flex;justify-content:flex-end}' +
-      '.sb{text-align:center;width:170pt}.sl{margin-top:46pt;border-top:0.5pt solid #333;padding-top:3pt;font-size:7.5pt}';
-    let n = 1;
-    const buildSection = (c: KmBundleComp): string => {
-      const items = c.kpiItems ?? [];
-      let rows = '';
-      if (items.length === 0) {
-        rows += `<tr><td class="num">—</td><td colspan="7" style="color:#999;font-style:italic">Tidak ada data KPI</td></tr>`;
-      } else {
-        items.forEach((it) => {
-          rows += `<tr>` +
-            `<td class="num">${n++}</td>` +
-            `<td>${it['indikator'] ?? '—'}</td>` +
-            `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
-            `<td class="num">${it['satuan'] ?? '—'}</td>` +
-            `<td class="num">${it['bobot'] ?? '—'}</td>` +
-            `<td class="rt">${it['target'] ?? '—'}</td>` +
-            `<td class="rw">${it['target2'] ?? '—'}</td>` +
-            `<td class="num" style="font-size:7pt">${c.bidang}</td>` +
-            `</tr>`;
-        });
-      }
-      return rows;
-    };
-    let body: string;
+
+    let html: string;
+
     if (scope === 'KP') {
-      n = 1;
-      body = km.components.map(buildSection).join('');
+      // ── Portrait, format dokumen KM resmi ──
+      const css = '@page{size:A4 portrait;margin:18mm 15mm}' +
+        'body{font-family:Arial,Helvetica,sans-serif;font-size:9pt;color:#000;margin:0}p{margin:0}' +
+        '.hdr{text-align:center;margin-bottom:10pt}' +
+        '.ht{font-weight:700;font-size:12pt;line-height:1.6}' +
+        '.hs{font-weight:700;font-size:10.5pt;line-height:1.6}' +
+        '.intro{font-size:9pt;margin:8pt 0 10pt;line-height:1.5;text-align:justify}' +
+        'table{width:100%;border-collapse:collapse;font-size:8.5pt;table-layout:fixed}' +
+        'th{background:#003882;color:#fff;padding:5pt 3pt;border:1pt solid #000;text-align:center;word-break:break-word;font-weight:700}' +
+        'tr.cn td{background:#c8daff;border:0.5pt solid #000;text-align:center;font-weight:700;padding:2pt 3pt}' +
+        'td{padding:3pt 4pt;border:0.5pt solid #555;vertical-align:middle;word-break:break-word}' +
+        'tr.bd td{background:#003882;color:#fff;font-weight:700;font-size:9pt;padding:4pt 6pt;border:1pt solid #000}' +
+        'tr.tot td{font-weight:700;background:#d8d8d8;border:0.5pt solid #555}' +
+        '.nc{text-align:center}.ct{text-align:center}' +
+        '.sign{margin-top:28pt;display:flex;justify-content:space-between}' +
+        '.sb{text-align:center;width:44%}.sl{margin-top:52pt;border-top:1pt solid #000;padding-top:3pt;font-size:9pt;font-weight:700}' +
+        '.sb p{font-size:9pt;line-height:1.5;font-weight:700}';
+      let n = 1;
+      const buildKpRows = (c: KmBundleComp): string => {
+        const items = c.kpiItems ?? [];
+        let rows = `<tr class="bd"><td colspan="7">${c.bidang.toUpperCase()}</td></tr>`;
+        if (items.length === 0) {
+          rows += `<tr><td class="nc">—</td><td colspan="6" style="color:#999;font-style:italic">Tidak ada data KPI</td></tr>`;
+        } else {
+          items.forEach((it) => {
+            rows += `<tr>` +
+              `<td class="nc">${n++}</td>` +
+              `<td>${it['indikator'] ?? '—'}</td>` +
+              `<td>${it['formula'] ?? '—'}</td>` +
+              `<td class="ct">${it['satuan'] ?? '—'}</td>` +
+              `<td class="nc">${it['bobot'] ?? '—'}</td>` +
+              `<td class="ct">${it['target'] ?? '—'}</td>` +
+              `<td class="ct">${it['target2'] ?? '—'}</td>` +
+              `</tr>`;
+          });
+        }
+        return rows;
+      };
+      const totalBobot = km.components.reduce((s, c) =>
+        s + (c.kpiItems ?? []).reduce((ss, it) => ss + (Number(it['bobot']) || 0), 0), 0);
+      const body = km.components.map(buildKpRows).join('') +
+        `<tr class="tot">` +
+        `<td colspan="4" style="text-align:right;padding-right:8pt">TOTAL</td>` +
+        `<td class="nc">${totalBobot || '—'}</td><td colspan="2"></td></tr>`;
+      html = `<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8">` +
+        `<title>Kontrak Manajemen Tahun ${year}</title><style>${css}</style></head><body>` +
+        `<div class="hdr">` +
+        `<p class="ht">KONTRAK MANAJEMEN TAHUN ${year}</p>` +
+        `<p class="ht">ANTARA</p>` +
+        `<p class="hs">DIREKTUR MANAJEMEN PROYEK DAN ENERGI BARU TERBARUKAN</p>` +
+        `<p class="ht">DENGAN</p>` +
+        `<p class="hs"><i>GENERAL MANAGER</i> PT PLN (PERSERO) PUSAT MANAJEMEN PROYEK</p>` +
+        `</div>` +
+        `<p class="intro">Pada hari ini, .............. tanggal .......... bulan ................ tahun ` +
+        `Dua Ribu Dua Puluh Enam, Direktur Manajemen Proyek Dan Energi Baru Terbarukan beserta ` +
+        `<i>General Manager</i> PT PLN (Persero) Pusat Manajemen Proyek sepakat mengenai target ` +
+        `<i>Key Performance Indicators</i> (KPI) Tahun ${year} PT PLN (Persero) Pusat Manajemen Proyek ` +
+        `adalah sebagai berikut :</p>` +
+        `<table><colgroup>` +
+        `<col style="width:5%"><col style="width:22%"><col style="width:28%">` +
+        `<col style="width:9%"><col style="width:7%"><col style="width:14%"><col style="width:15%">` +
+        `</colgroup><thead>` +
+        `<tr><th>NO</th><th>INDIKATOR KINERJA</th><th>FORMULA</th>` +
+        `<th>SATUAN</th><th>BOBOT</th><th>TARGET SEMESTER I</th><th>TARGET ${year}</th></tr>` +
+        `<tr class="cn"><td>1</td><td>2</td><td>3</td><td>4</td><td>5</td><td>6</td><td>7</td></tr>` +
+        `</thead><tbody>${body}</tbody></table>` +
+        `<p style="margin:10pt 0 4pt;font-size:9pt">Demikian Kontrak Manajemen ini dibuat dengan itikad baik untuk dilaksanakan sebagaimana mestinya.</p>` +
+        `<p style="text-align:center;margin:6pt 0 20pt;font-size:9pt">Jakarta, ...................... ${year}</p>` +
+        `<div class="sign">` +
+        `<div class="sb"><p>Direktur Manajemen Proyek<br/>dan Energi Baru Terbarukan,</p>` +
+        `<div class="sl">( ........................... )<br/>Direktur MPBT</div></div>` +
+        `<div class="sb"><p><i>General Manager</i><br/>PT PLN (Persero) Pusat Manajemen Proyek,</p>` +
+        `<div class="sl">( ........................... )<br/><i>General Manager</i> PUSMANPRO</div></div>` +
+        `</div></body></html>`;
+
     } else {
+      // ── Landscape, format ringkas UPMK ──
+      const css = '@page{size:A4 landscape;margin:12mm}' +
+        'body{font-family:Arial,Helvetica,sans-serif;font-size:8pt;color:#000;margin:0}' +
+        '.hdr{text-align:center;margin-bottom:6pt;padding-bottom:6pt;border-bottom:2pt solid #000}' +
+        '.t1{font-size:12pt;font-weight:700;margin:0 0 2pt;text-transform:uppercase}' +
+        '.t2{font-size:10pt;font-weight:700;margin:0 0 2pt}.t3{font-size:9pt;margin:0 0 2pt}' +
+        '.meta{font-size:7.5pt;color:#444;margin:2pt 0}' +
+        'table{width:100%;border-collapse:collapse;font-size:7.5pt;table-layout:fixed}' +
+        'th{background:#1f3c6b;color:#fff;padding:5pt 3pt;border:1pt solid #000;text-align:center;word-break:break-word;font-weight:700;font-size:8pt}' +
+        'td{padding:3pt 3pt;border:0.5pt solid #777;vertical-align:top;word-break:break-word}' +
+        'tr.cat td{background:#1f3c6b;color:#fff;font-weight:700;font-size:8pt;padding:4pt 6pt;border:1pt solid #000}' +
+        '.num{text-align:center}.rt{text-align:right}.rw{text-align:right;font-weight:700}' +
+        '.summ{margin:6pt 0;padding:4pt 8pt;background:#f5f5f5;border:0.5pt solid #aaa;font-size:7.5pt}' +
+        '.sign{margin-top:24pt;display:flex;justify-content:flex-end}' +
+        '.sb{text-align:center;width:170pt}.sl{margin-top:46pt;border-top:0.5pt solid #333;padding-top:3pt;font-size:7.5pt}';
+      let n = 1;
+      const buildUpmkRows = (c: KmBundleComp): string => {
+        const items = c.kpiItems ?? [];
+        let rows = '';
+        if (items.length === 0) {
+          rows += `<tr><td class="num">—</td><td colspan="7" style="color:#999;font-style:italic">Tidak ada data KPI</td></tr>`;
+        } else {
+          items.forEach((it) => {
+            rows += `<tr>` +
+              `<td class="num">${n++}</td>` +
+              `<td>${it['indikator'] ?? '—'}</td>` +
+              `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
+              `<td class="num">${it['satuan'] ?? '—'}</td>` +
+              `<td class="num">${it['bobot'] ?? '—'}</td>` +
+              `<td class="rt">${it['target'] ?? '—'}</td>` +
+              `<td class="rw">${it['target2'] ?? '—'}</td>` +
+              `<td class="num" style="font-size:7pt">${c.bidang}</td>` +
+              `</tr>`;
+          });
+        }
+        return rows;
+      };
       const groups = Object.entries(
         km.components.reduce<Record<string, KmBundleComp[]>>((acc, c) => { (acc[c.unitCode] ??= []).push(c); return acc; }, {})
       ).sort(([a], [b]) => a.localeCompare(b));
-      body = groups.map(([unitCode, items], gi) => {
+      const body = groups.map(([unitCode, items], gi) => {
         n = 1;
         return `<tr class="cat"><td colspan="8">${String.fromCharCode(65 + gi)}. ${(UNIT_NAMES[unitCode] ?? unitCode).toUpperCase()}</td></tr>` +
-          sortByBidang(items).map(buildSection).join('');
+          sortByBidang(items).map(buildUpmkRows).join('');
       }).join('');
+      const colgroup = `<colgroup>` +
+        `<col style="width:3%"><col style="width:22%"><col style="width:18%">` +
+        `<col style="width:6%"><col style="width:5%"><col style="width:12%"><col style="width:12%"><col style="width:12%">` +
+        `</colgroup>`;
+      html = `<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8">` +
+        `<title>Kontrak Manajemen Tahunan — UPMK ${year}</title><style>${css}</style></head><body>` +
+        `<div class="hdr"><p class="t1">Kontrak Manajemen Tahunan</p>` +
+        `<p class="t2">PT PLN (Persero) Pusat Manajemen Proyek</p>` +
+        `<p class="t3">UPMK (Gabungan) &mdash; Tahun ${year}</p>` +
+        `<p class="meta">Dicetak: ${printDate}</p></div>` +
+        `<table>${colgroup}<thead><tr>` +
+        `<th>No</th><th>INDIKATOR KINERJA</th><th>FORMULA</th>` +
+        `<th>SATUAN</th><th>BOBOT</th><th>TARGET SEM I</th><th>TARGET ${year}</th><th>PIC</th>` +
+        `</tr></thead><tbody>${body}</tbody></table>` +
+        `<div class="summ">Total KM: <b>${km.total}</b> &nbsp;|&nbsp; ` +
+        `Siap: <b>${km.readyCount}</b> &nbsp;|&nbsp; ` +
+        `Status: <b>${km.status === 'approved' ? 'Disahkan GM' : 'Menunggu Pengesahan GM'}</b></div>` +
+        `<div class="sign"><div class="sb"><p style="margin:0">General Manager,</p>` +
+        `<div class="sl">(__________________)<br/>General Manager PUSMANPRO</div></div></div></body></html>`;
     }
-    const colgroup = `<colgroup>` +
-      `<col style="width:3%"><col style="width:22%"><col style="width:18%">` +
-      `<col style="width:6%"><col style="width:5%"><col style="width:12%"><col style="width:12%"><col style="width:12%">` +
-      `</colgroup>`;
-    const html = `<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8">` +
-      `<title>Kontrak Manajemen Tahunan — ${scopeLabel} ${year}</title><style>${css}</style></head><body>` +
-      `<div class="hdr">` +
-      `<p class="t1">Kontrak Manajemen Tahunan</p>` +
-      `<p class="t2">PT PLN (Persero) Pusat Manajemen Proyek</p>` +
-      `<p class="t3">${scopeLabel} &mdash; Tahun ${year}</p>` +
-      `<p class="meta">Dicetak: ${printDate}</p></div>` +
-      `<table>${colgroup}` +
-      `<thead><tr>` +
-      `<th>No</th><th>INDIKATOR KINERJA KUNCI</th><th>FORMULA</th>` +
-      `<th>SATUAN</th><th>BOBOT</th><th>TARGET SEM I</th><th>TARGET ${year}</th><th>PIC</th>` +
-      `</tr></thead>` +
-      `<tbody>${body}</tbody></table>` +
-      `<div class="summ">Total KM: <b>${km.total}</b> &nbsp;|&nbsp; ` +
-      `Siap: <b>${km.readyCount}</b> &nbsp;|&nbsp; ` +
-      `Status: <b>${km.status === 'approved' ? 'Disahkan GM' : 'Menunggu Pengesahan GM'}</b></div>` +
-      `<div class="sign"><div class="sb"><p style="margin:0">General Manager,</p>` +
-      `<div class="sl">(__________________)<br/>General Manager PUSMANPRO</div></div></div></body></html>`;
-    const w = window.open('', '_blank', 'width=1050,height=750');
+
+    const w = window.open('', '_blank', scope === 'KP' ? 'width=850,height=1100' : 'width=1050,height=750');
     if (!w) return;
     w.document.write(html);
     w.document.close();
