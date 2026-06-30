@@ -398,19 +398,11 @@ export function ApprovalsPage() {
       '.summ{margin:6pt 0;padding:4pt 8pt;background:#f5f5f5;border:0.5pt solid #aaa;font-size:7.5pt}' +
       '.sign{margin-top:24pt;display:flex;justify-content:flex-end}' +
       '.sb{text-align:center;width:170pt}.sl{margin-top:46pt;border-top:0.5pt solid #333;padding-top:3pt;font-size:7.5pt}';
-    const stLbl = (s: string) => s === 'ready' ? 'Siap' : s === 'approved' ? 'Disetujui GM' : 'Dalam review';
-    const stCls = (s: string) => s === 'ready' || s === 'approved' ? 'ok' : 'nd';
     let n = 1;
     const buildSection = (c: typeof bundle.components[number]): string => {
       const items = (c.values && typeof c.values === 'object')
         ? Object.values(c.values as Record<string, Record<string, unknown>>) : [];
-      const totalBobot = items.reduce((s, it) => s + (Number(it['bobot']) || 0), 0);
-      let rows = `<tr class="sec"><td colspan="8">` +
-        `<b>${c.bidang}</b>` +
-        `&emsp;<span style="font-weight:400">PIC: ${c.submitter}</span>` +
-        `&emsp;<span style="font-weight:400">Bobot: ${totalBobot || '—'}</span>` +
-        `&emsp;<span class="${stCls(c.status)}" style="font-weight:400">Status: ${stLbl(c.status)}</span>` +
-        `</td></tr>`;
+      let rows = '';
       if (items.length === 0) {
         rows += `<tr><td class="num">—</td><td colspan="7" style="color:#999;font-style:italic">Tidak ada data KPI</td></tr>`;
       } else {
@@ -435,8 +427,10 @@ export function ApprovalsPage() {
         .reduce<Record<string, typeof bundle.components>>((acc, c) => { (acc[c.unitCode] ??= []).push(c); return acc; }, {})
     ).sort(([a], [b]) => a.localeCompare(b));
     const catRow = (label: string) => `<tr class="cat"><td colspan="8">${label}</td></tr>`;
+    n = 1;
     let body = catRow('A. KANTOR INDUK') + kpComps.map(buildSection).join('');
     upmkGroups.forEach(([unitCode, items], i) => {
+      n = 1;
       body += catRow(`${String.fromCharCode(66 + i)}. ${(UNIT_NAMES[unitCode] ?? unitCode).toUpperCase()}`);
       body += sortByBidang(items).map(buildSection).join('');
     });
@@ -491,19 +485,10 @@ export function ApprovalsPage() {
       '.summ{margin:6pt 0;padding:4pt 8pt;background:#f5f5f5;border:0.5pt solid #aaa;font-size:7.5pt}' +
       '.sign{margin-top:24pt;display:flex;justify-content:flex-end}' +
       '.sb{text-align:center;width:170pt}.sl{margin-top:46pt;border-top:0.5pt solid #333;padding-top:3pt;font-size:7.5pt}';
-    const stLbl = (s: string) => s === 'ready' ? 'Siap' : s === 'approved' ? 'Disahkan GM' : 'Dalam review';
-    const stCls = (s: string) => s === 'ready' || s === 'approved' ? 'ok' : 'nd';
     let n = 1;
     const buildSection = (c: KmBundleComp): string => {
       const items = c.kpiItems ?? [];
-      const totalBobot = items.reduce((s, it) => s + (Number(it['bobot']) || 0), 0);
-      let rows = `<tr class="sec"><td colspan="8">` +
-        `<b>${c.bidang}</b>` +
-        `&emsp;<span style="font-weight:400">PJ: ${c.holder ?? '—'}</span>` +
-        `&emsp;<span style="font-weight:400">Penyusun: ${c.submitter}</span>` +
-        `&emsp;<span style="font-weight:400">Bobot: ${totalBobot || '—'}</span>` +
-        `&emsp;<span class="${stCls(c.status)}" style="font-weight:400">Status: ${stLbl(c.status)}</span>` +
-        `</td></tr>`;
+      let rows = '';
       if (items.length === 0) {
         rows += `<tr><td class="num">—</td><td colspan="7" style="color:#999;font-style:italic">Tidak ada data KPI</td></tr>`;
       } else {
@@ -524,15 +509,17 @@ export function ApprovalsPage() {
     };
     let body: string;
     if (scope === 'KP') {
+      n = 1;
       body = km.components.map(buildSection).join('');
     } else {
       const groups = Object.entries(
         km.components.reduce<Record<string, KmBundleComp[]>>((acc, c) => { (acc[c.unitCode] ??= []).push(c); return acc; }, {})
       ).sort(([a], [b]) => a.localeCompare(b));
-      body = groups.map(([unitCode, items], gi) =>
-        `<tr class="cat"><td colspan="8">${String.fromCharCode(65 + gi)}. ${(UNIT_NAMES[unitCode] ?? unitCode).toUpperCase()}</td></tr>` +
-        sortByBidang(items).map(buildSection).join('')
-      ).join('');
+      body = groups.map(([unitCode, items], gi) => {
+        n = 1;
+        return `<tr class="cat"><td colspan="8">${String.fromCharCode(65 + gi)}. ${(UNIT_NAMES[unitCode] ?? unitCode).toUpperCase()}</td></tr>` +
+          sortByBidang(items).map(buildSection).join('');
+      }).join('');
     }
     const colgroup = `<colgroup>` +
       `<col style="width:3%"><col style="width:22%"><col style="width:18%">` +
