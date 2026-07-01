@@ -339,6 +339,7 @@ a {
   background: var(--color-surface-hover);
   color: var(--color-text);
 }
+
 .nav-item[aria-current="page"] {
   color: var(--color-accent);
   background: var(--color-sidebar-active);
@@ -463,6 +464,11 @@ a {
   height: var(--sidebar-icon-collapsed);
   padding: 0;
 }
+
+.app[data-sidebar="collapsed"] .nav-item[aria-current="page"] {
+  margin-top: 4px;
+}
+
 .app[data-sidebar="collapsed"] .sidebar-brand {
   justify-content: center;
   padding: 0;
