@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { usePeriod } from '../context/PeriodContext';
 import { useNotif } from '../context/NotifContext';
 import type { Report, KontrakManajemen, RealisasiKinerja } from '../lib/types';
-import { CheckCircle, XCircle, Clock, CalendarClock, FileText, UsersRound, FileSignature, ChevronDown, ClipboardCheck, Timer, MessageSquare, Pencil, Layers } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, CalendarClock, FileText, UsersRound, FileSignature, ChevronDown, ClipboardCheck, Timer, MessageSquare, Pencil, Layers, Printer } from 'lucide-react';
 import { SkeletonTable, EmptyState, ErrorState } from '../components/LoadState';
 
 // Badge SLA approval (Task 6): hari tersisa hingga deadline tahap berjalan.
@@ -275,7 +275,7 @@ export function ApprovalsPage() {
   const { periodId } = usePeriod();
   type BundleData = {
     period?: { label?: string } | null; status: string; total: number; readyCount: number; canApprove: boolean;
-    components: Array<{ id: string; unitCode: string; bidang: string; status: string; submitter: string }>;
+    components: Array<{ id: string; unitCode: string; bidang: string; status: string; submitter: string; values?: unknown }>;
   };
   const [bundle, setBundle] = useState<BundleData | null>(null);
   const [bundleNote, setBundleNote] = useState('');
@@ -375,6 +375,468 @@ export function ApprovalsPage() {
     } finally {
       setBundleBusy(false);
     }
+  };
+
+  const handlePrintRealBundle = () => {
+    if (!bundle) return;
+    const periodLabel = bundle.period?.label ?? 'Periode Aktif';
+    const printDate = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+    const css = '@page{size:A4 landscape;margin:12mm}' +
+      'body{font-family:Arial,Helvetica,sans-serif;font-size:8pt;color:#000;margin:0}' +
+      '.hdr{text-align:center;margin-bottom:6pt;padding-bottom:6pt;border-bottom:2pt solid #000}' +
+      '.t1{font-size:12pt;font-weight:700;margin:0 0 2pt;text-transform:uppercase;letter-spacing:0.5px}' +
+      '.t2{font-size:10pt;font-weight:700;margin:0 0 2pt}' +
+      '.t3{font-size:9pt;margin:0 0 2pt}' +
+      '.meta{font-size:7.5pt;color:#444;margin:2pt 0}' +
+      'table{width:100%;border-collapse:collapse;font-size:7.5pt;table-layout:fixed}' +
+      'th{background:#1f3c6b;color:#fff;padding:5pt 3pt;border:1pt solid #000;text-align:center;word-break:break-word;font-weight:700;font-size:8pt}' +
+      'td{padding:3pt 3pt;border:0.5pt solid #777;vertical-align:top;word-break:break-word}' +
+      'tr.cat td{background:#1f3c6b;color:#fff;font-weight:700;font-size:8pt;padding:4pt 6pt;border:1pt solid #000}' +
+      'tr.sec td{background:#d6e4f7;font-weight:700;color:#1f3c6b;font-size:8pt;padding:3.5pt 6pt;border:0.5pt solid #999}' +
+      '.num{text-align:center}.rt{text-align:right}.rw{text-align:right;font-weight:700}' +
+      '.ok{color:#15803d;font-weight:700}.nd{color:#d97706}' +
+      '.summ{margin:6pt 0;padding:4pt 8pt;background:#f5f5f5;border:0.5pt solid #aaa;font-size:7.5pt}' +
+      '.sign{margin-top:24pt;display:flex;justify-content:flex-end}' +
+      '.sb{text-align:center;width:170pt}.sl{margin-top:46pt;border-top:0.5pt solid #333;padding-top:3pt;font-size:7.5pt}';
+    let n = 1;
+    const buildSection = (c: typeof bundle.components[number]): string => {
+      const items = (c.values && typeof c.values === 'object')
+        ? Object.values(c.values as Record<string, Record<string, unknown>>) : [];
+      let rows = '';
+      if (items.length === 0) {
+        rows += `<tr><td class="num">—</td><td colspan="7" style="color:#999;font-style:italic">Tidak ada data KPI</td></tr>`;
+      } else {
+        items.forEach((it) => {
+          rows += `<tr>` +
+            `<td class="num">${n++}</td>` +
+            `<td>${it['indikator'] ?? '—'}</td>` +
+            `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
+            `<td class="num">${it['satuan'] ?? '—'}</td>` +
+            `<td class="num">${it['bobot'] ?? '—'}</td>` +
+            `<td class="rt">${it['target'] ?? '—'}</td>` +
+            `<td class="rw">${it['realisasi'] ?? '—'}</td>` +
+            `<td class="num" style="font-size:7pt">${c.bidang}</td>` +
+            `</tr>`;
+        });
+      }
+      return rows;
+    };
+    const kpComps = bundle.components.filter((c) => c.unitCode === 'KP');
+    const upmkGroups = Object.entries(
+      bundle.components.filter((c) => c.unitCode !== 'KP')
+        .reduce<Record<string, typeof bundle.components>>((acc, c) => { (acc[c.unitCode] ??= []).push(c); return acc; }, {})
+    ).sort(([a], [b]) => a.localeCompare(b));
+    const catRow = (label: string) => `<tr class="cat"><td colspan="8">${label}</td></tr>`;
+    const kpAllFlat = kpComps.flatMap((c) => {
+      const items2 = (c.values && typeof c.values === 'object')
+        ? Object.values(c.values as Record<string, Record<string, unknown>>) : [];
+      return items2.map((it) => ({ it, bidang: c.bidang }));
+    });
+    const getKpOrder = (ind: string): number => {
+      const s = ind.toLowerCase();
+      if (s.includes('inspection quality') || s.includes('iqc')) return 10;
+      if (s.includes('kajian supervisi')) return 20;
+      if (s.includes('evaluasi, analisa') || s.includes('evaluasi analisa')) return 30;
+      if (s.includes('persentase pelaksanaan')) return 40;
+      if (s.includes('kapasitas pembangkit')) return 50;
+      if (s.includes('kapasitas transmisi')) return 60;
+      if (s.includes('kapasitas gardu induk')) return 70;
+      if (s.includes('pengendalian') && (s.includes('anggaran investasi') || s.includes('penggunaan anggaran'))) return 81;
+      if (s.includes('pengendalian nac') || s.includes('non allowable')) return 82;
+      if (s.includes('evaluasi akurasi data')) return 90;
+      if (s.includes('pemenuhan pdn') || s.includes('pdn korporat')) return 100;
+      if (s.includes('dokumen legal aset tanah') || s.includes('penyelesaian dokumen legal')) return 110;
+      if (s.includes('maturity level')) return 121;
+      if (s.includes('pengurang') && s.includes('kepatuhan')) return 122;
+      if (s.includes('tata kelola')) return 123;
+      return 999;
+    };
+    const kpSorted = [...kpAllFlat].sort(
+      (a, b) => getKpOrder(String(a.it['indikator'] ?? '')) - getKpOrder(String(b.it['indikator'] ?? ''))
+    );
+    n = 1;
+    let grpR8 = false, grpR12 = false, subR8 = 0, subR12 = 0;
+    const subLtrR = (i: number) => String.fromCharCode(97 + i);
+    let kpBody = '';
+    for (const { it, bidang } of kpSorted) {
+      const ord = getKpOrder(String(it['indikator'] ?? ''));
+      const isG8 = ord === 81 || ord === 82;
+      const isG12 = ord === 121 || ord === 122 || ord === 123;
+      if (isG8 && !grpR8) {
+        kpBody += `<tr><td class="num">${n++}</td><td colspan="6" style="font-weight:700">Pengendalian Anggaran</td><td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+        grpR8 = true; subR8 = 0;
+      }
+      if (isG12 && !grpR12) {
+        kpBody += `<tr><td class="num">${n++}</td><td colspan="6" style="font-weight:700">Kepatuhan, Maturity Level dan Tata Kelola Perusahaan</td><td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+        grpR12 = true; subR12 = 0;
+      }
+      if (isG8) {
+        const subInd = String(it['indikator'] ?? '').replace(/^Pengendalian Anggaran\s*[-–]\s*/i, '');
+        kpBody += `<tr><td class="num" style="font-size:7pt">${subLtrR(subR8++)}.</td>` +
+          `<td style="padding-left:10pt">${subInd}</td>` +
+          `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
+          `<td class="num">${it['satuan'] ?? '—'}</td>` +
+          `<td class="num">${it['bobot'] ?? '—'}</td>` +
+          `<td class="rt">${it['target'] ?? '—'}</td>` +
+          `<td class="rw">${it['realisasi'] ?? '—'}</td>` +
+          `<td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+      } else if (isG12) {
+        const subInd = String(it['indikator'] ?? '').replace(/^Pengurang\s*[-–]\s*/i, '');
+        kpBody += `<tr><td class="num" style="font-size:7pt">${subLtrR(subR12++)}.</td>` +
+          `<td style="padding-left:10pt">${subInd}</td>` +
+          `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
+          `<td class="num">${it['satuan'] ?? '—'}</td>` +
+          `<td class="num">${it['bobot'] ?? '—'}</td>` +
+          `<td class="rt">${it['target'] ?? '—'}</td>` +
+          `<td class="rw">${it['realisasi'] ?? '—'}</td>` +
+          `<td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+      } else {
+        kpBody += `<tr><td class="num">${n++}</td>` +
+          `<td>${it['indikator'] ?? '—'}</td>` +
+          `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
+          `<td class="num">${it['satuan'] ?? '—'}</td>` +
+          `<td class="num">${it['bobot'] ?? '—'}</td>` +
+          `<td class="rt">${it['target'] ?? '—'}</td>` +
+          `<td class="rw">${it['realisasi'] ?? '—'}</td>` +
+          `<td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+      }
+    }
+    let body = catRow('A. KANTOR INDUK') + kpBody;
+    const getUpmkOrdR = (ind: string): number => {
+      const s = ind.toLowerCase();
+      if (s.includes('kajian supervisi')) return 10;
+      if (s.includes('persentase pelaksanaan')) return 20;
+      if (s.includes('kapasitas pembangkit')) return 30;
+      if (s.includes('kapasitas transmisi')) return 40;
+      if (s.includes('kapasitas gardu induk')) return 50;
+      if (s.includes('pengendalian nac') || s.includes('non allowable')) return 61;
+      if (s.includes('pengendalian') && s.includes('penggunaan anggaran')) return 62;
+      if (s.includes('pemenuhan pdn') || s.includes('pdn korporat')) return 70;
+      if (s.includes('evaluasi penyelesaian') || s.includes('penyelesaian proyek supervisi')) return 80;
+      if (s.includes('maturity level')) return 91;
+      if (s.includes('pengurang') && s.includes('kepatuhan')) return 92;
+      if (s.includes('tata kelola')) return 93;
+      return 999;
+    };
+    upmkGroups.forEach(([unitCode, comps], i) => {
+      n = 1;
+      body += catRow(`${String.fromCharCode(66 + i)}. ${(UNIT_NAMES[unitCode] ?? unitCode).toUpperCase()}`);
+      const uFlat = comps.flatMap((c) => {
+        const vals = (c.values && typeof c.values === 'object')
+          ? Object.values(c.values as Record<string, Record<string, unknown>>) : [];
+        return vals.map((it) => ({ it, bidang: c.bidang }));
+      });
+      const uSorted = [...uFlat].sort(
+        (a, b) => getUpmkOrdR(String(a.it['indikator'] ?? '')) - getUpmkOrdR(String(b.it['indikator'] ?? ''))
+      );
+      let uG6 = false, uG9 = false, uS6 = 0, uS9 = 0;
+      const slU = (j: number) => String.fromCharCode(97 + j);
+      for (const { it, bidang } of uSorted) {
+        const ord = getUpmkOrdR(String(it['indikator'] ?? ''));
+        const iG6 = ord === 61 || ord === 62;
+        const iG9 = ord === 91 || ord === 92 || ord === 93;
+        if (iG6 && !uG6) {
+          body += `<tr><td class="num">${n++}</td><td colspan="6" style="font-weight:700">Pengendalian Anggaran</td><td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+          uG6 = true; uS6 = 0;
+        }
+        if (iG9 && !uG9) {
+          body += `<tr><td class="num">${n++}</td><td colspan="6" style="font-weight:700">Kepatuhan, Maturity Level dan Tata Kelola Perusahaan</td><td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+          uG9 = true; uS9 = 0;
+        }
+        if (iG6) {
+          const si = String(it['indikator'] ?? '').replace(/^Pengendalian Anggaran\s*[-–]\s*/i, '');
+          body += `<tr><td class="num" style="font-size:7pt">${slU(uS6++)}.</td>` +
+            `<td style="padding-left:10pt">${si}</td>` +
+            `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
+            `<td class="num">${it['satuan'] ?? '—'}</td><td class="num">${it['bobot'] ?? '—'}</td>` +
+            `<td class="rt">${it['target'] ?? '—'}</td><td class="rw">${it['realisasi'] ?? '—'}</td>` +
+            `<td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+        } else if (iG9) {
+          const si = String(it['indikator'] ?? '').replace(/^Pengurang\s*[-–]\s*/i, '');
+          body += `<tr><td class="num" style="font-size:7pt">${slU(uS9++)}.</td>` +
+            `<td style="padding-left:10pt">${si}</td>` +
+            `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
+            `<td class="num">${it['satuan'] ?? '—'}</td><td class="num">${it['bobot'] ?? '—'}</td>` +
+            `<td class="rt">${it['target'] ?? '—'}</td><td class="rw">${it['realisasi'] ?? '—'}</td>` +
+            `<td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+        } else {
+          body += `<tr><td class="num">${n++}</td><td>${it['indikator'] ?? '—'}</td>` +
+            `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
+            `<td class="num">${it['satuan'] ?? '—'}</td><td class="num">${it['bobot'] ?? '—'}</td>` +
+            `<td class="rt">${it['target'] ?? '—'}</td><td class="rw">${it['realisasi'] ?? '—'}</td>` +
+            `<td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+        }
+      }
+      if (uSorted.length === 0) {
+        body += `<tr><td class="num">—</td><td colspan="7" style="color:#999;font-style:italic">Tidak ada data KPI</td></tr>`;
+      }
+    });
+    const html = `<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8">` +
+      `<title>Laporan Kinerja Bulanan — ${periodLabel}</title><style>${css}</style></head><body>` +
+      `<div class="hdr">` +
+      `<p class="t1">Laporan Kinerja Bulanan</p>` +
+      `<p class="t2">PT PLN (Persero) Pusat Manajemen Proyek</p>` +
+      `<p class="t3">Periode ${periodLabel}</p>` +
+      `<p class="meta">Dicetak: ${printDate}</p></div>` +
+      `<table><colgroup>` +
+      `<col style="width:3%"><col style="width:22%"><col style="width:18%">` +
+      `<col style="width:6%"><col style="width:5%"><col style="width:12%"><col style="width:12%"><col style="width:12%">` +
+      `</colgroup>` +
+      `<thead><tr>` +
+      `<th>No</th><th>INDIKATOR KINERJA KUNCI</th><th>FORMULA</th>` +
+      `<th>SATUAN</th><th>BOBOT</th><th>TARGET</th><th>REALISASI</th><th>PIC</th>` +
+      `</tr></thead>` +
+      `<tbody>${body}</tbody></table>` +
+      `<div class="summ">Total komponen: <b>${bundle.total}</b> &nbsp;|&nbsp; ` +
+      `Siap: <b>${bundle.readyCount}</b> &nbsp;|&nbsp; ` +
+      `Status bundle: <b>${bundle.status === 'approved' ? 'Disetujui GM' : 'Menunggu Persetujuan GM'}</b></div>` +
+      `<div class="sign"><div class="sb"><p style="margin:0">General Manager,</p>` +
+      `<div class="sl">(__________________)<br/>General Manager PUSMANPRO</div></div></div></body></html>`;
+    const w = window.open('', '_blank', 'width=1050,height=750');
+    if (!w) return;
+    w.document.write(html);
+    w.document.close();
+    w.onload = () => { w.focus(); w.print(); };
+  };
+
+  const handlePrintKmBundle = (scope: 'KP' | 'UPMK') => {
+    const km = scope === 'KP' ? kmBundleKP : kmBundleUPMK;
+    if (!km) return;
+    const year = km.year ?? String(new Date().getFullYear());
+    const printDate = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+
+    let html: string;
+
+    if (scope === 'KP') {
+      // ── Landscape, susunan KM flat per item (tanpa grouping bidang) ──
+      const css = '@page{size:A4 landscape;margin:12mm}' +
+        'body{font-family:Arial,Helvetica,sans-serif;font-size:8pt;color:#000;margin:0}' +
+        '.hdr{text-align:center;margin-bottom:6pt;padding-bottom:6pt;border-bottom:2pt solid #000}' +
+        '.t1{font-size:12pt;font-weight:700;margin:0 0 2pt;text-transform:uppercase}' +
+        '.t2{font-size:10pt;font-weight:700;margin:0 0 2pt}.t3{font-size:9pt;margin:0 0 2pt}' +
+        '.meta{font-size:7.5pt;color:#444;margin:2pt 0}' +
+        'table{width:100%;border-collapse:collapse;font-size:7.5pt;table-layout:fixed}' +
+        'th{background:#1f3c6b;color:#fff;padding:5pt 3pt;border:1pt solid #000;text-align:center;word-break:break-word;font-weight:700;font-size:8pt}' +
+        'td{padding:3pt 3pt;border:0.5pt solid #777;vertical-align:top;word-break:break-word}' +
+        'tr.tot td{font-weight:700;background:#e8e8e8;border:0.5pt solid #777}' +
+        '.num{text-align:center}.rt{text-align:right}.rw{text-align:right;font-weight:700}' +
+        '.summ{margin:6pt 0;padding:4pt 8pt;background:#f5f5f5;border:0.5pt solid #aaa;font-size:7.5pt}' +
+        '.sign{margin-top:24pt;display:flex;justify-content:flex-end}' +
+        '.sb{text-align:center;width:170pt}.sl{margin-top:46pt;border-top:0.5pt solid #333;padding-top:3pt;font-size:7.5pt}';
+      const allFlat = km.components.flatMap((c) =>
+        (c.kpiItems ?? []).map((it) => ({ it, bidang: c.bidang }))
+      );
+      const getItemOrder = (ind: string): number => {
+        const s = ind.toLowerCase();
+        if (s.includes('inspection quality') || s.includes('iqc')) return 10;
+        if (s.includes('kajian supervisi')) return 20;
+        if (s.includes('evaluasi, analisa') || s.includes('evaluasi analisa')) return 30;
+        if (s.includes('persentase pelaksanaan')) return 40;
+        if (s.includes('kapasitas pembangkit')) return 50;
+        if (s.includes('kapasitas transmisi')) return 60;
+        if (s.includes('kapasitas gardu induk')) return 70;
+        if (s.includes('pengendalian') && (s.includes('anggaran investasi') || s.includes('penggunaan anggaran'))) return 81;
+        if (s.includes('pengendalian nac') || s.includes('non allowable')) return 82;
+        if (s.includes('evaluasi akurasi data')) return 90;
+        if (s.includes('pemenuhan pdn') || s.includes('pdn korporat')) return 100;
+        if (s.includes('dokumen legal aset tanah') || s.includes('penyelesaian dokumen legal')) return 110;
+        if (s.includes('maturity level')) return 121;
+        if (s.includes('pengurang') && s.includes('kepatuhan')) return 122;
+        if (s.includes('tata kelola')) return 123;
+        return 999;
+      };
+      const sortedFlat = [...allFlat].sort(
+        (a, b) => getItemOrder(String(a.it['indikator'] ?? '')) - getItemOrder(String(b.it['indikator'] ?? ''))
+      );
+      const totalBobot = allFlat.reduce((s, { it }) => s + (Number(it['bobot']) || 0), 0);
+      let n = 1;
+      let grp8Emitted = false;
+      let grp12Emitted = false;
+      let sub8 = 0;
+      let sub12 = 0;
+      const subLtr = (i: number) => String.fromCharCode(97 + i);
+      let body = '';
+      for (const { it, bidang } of sortedFlat) {
+        const ord = getItemOrder(String(it['indikator'] ?? ''));
+        const isGrp8 = ord === 81 || ord === 82;
+        const isGrp12 = ord === 121 || ord === 122 || ord === 123;
+        if (isGrp8 && !grp8Emitted) {
+          body += `<tr><td class="num">${n++}</td>` +
+            `<td colspan="6" style="font-weight:700">Pengendalian Anggaran</td>` +
+            `<td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+          grp8Emitted = true; sub8 = 0;
+        }
+        if (isGrp12 && !grp12Emitted) {
+          body += `<tr><td class="num">${n++}</td>` +
+            `<td colspan="6" style="font-weight:700">Kepatuhan, Maturity Level dan Tata Kelola Perusahaan</td>` +
+            `<td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+          grp12Emitted = true; sub12 = 0;
+        }
+        if (isGrp8) {
+          const subInd = String(it['indikator'] ?? '').replace(/^Pengendalian Anggaran\s*[-–]\s*/i, '');
+          body += `<tr><td class="num" style="font-size:7pt">${subLtr(sub8++)}.</td>` +
+            `<td style="padding-left:10pt">${subInd}</td>` +
+            `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
+            `<td class="num">${it['satuan'] ?? '—'}</td>` +
+            `<td class="num">${it['bobot'] ?? '—'}</td>` +
+            `<td class="rt">${it['target'] ?? '—'}</td>` +
+            `<td class="rw">${it['target2'] ?? '—'}</td>` +
+            `<td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+        } else if (isGrp12) {
+          const subInd = String(it['indikator'] ?? '').replace(/^Pengurang\s*[-–]\s*/i, '');
+          body += `<tr><td class="num" style="font-size:7pt">${subLtr(sub12++)}.</td>` +
+            `<td style="padding-left:10pt">${subInd}</td>` +
+            `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
+            `<td class="num">${it['satuan'] ?? '—'}</td>` +
+            `<td class="num">${it['bobot'] ?? '—'}</td>` +
+            `<td class="rt">${it['target'] ?? '—'}</td>` +
+            `<td class="rw">${it['target2'] ?? '—'}</td>` +
+            `<td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+        } else {
+          body += `<tr><td class="num">${n++}</td>` +
+            `<td>${it['indikator'] ?? '—'}</td>` +
+            `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
+            `<td class="num">${it['satuan'] ?? '—'}</td>` +
+            `<td class="num">${it['bobot'] ?? '—'}</td>` +
+            `<td class="rt">${it['target'] ?? '—'}</td>` +
+            `<td class="rw">${it['target2'] ?? '—'}</td>` +
+            `<td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+        }
+      }
+      body += `<tr class="tot">` +
+        `<td colspan="4" style="text-align:right;padding-right:8pt">TOTAL</td>` +
+        `<td class="num">${totalBobot || '—'}</td><td colspan="3"></td></tr>`;
+      html = `<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8">` +
+        `<title>Kontrak Manajemen Tahunan — Kantor Induk ${year}</title><style>${css}</style></head><body>` +
+        `<div class="hdr"><p class="t1">Kontrak Manajemen Tahunan</p>` +
+        `<p class="t2">PT PLN (Persero) Pusat Manajemen Proyek</p>` +
+        `<p class="t3">Kantor Induk &mdash; Tahun ${year}</p>` +
+        `<p class="meta">Dicetak: ${printDate}</p></div>` +
+        `<table><colgroup>` +
+        `<col style="width:3%"><col style="width:20%"><col style="width:18%">` +
+        `<col style="width:6%"><col style="width:5%"><col style="width:13%"><col style="width:13%"><col style="width:12%">` +
+        `</colgroup><thead><tr>` +
+        `<th>No</th><th>INDIKATOR KINERJA</th><th>FORMULA</th>` +
+        `<th>SATUAN</th><th>BOBOT</th><th>TARGET SEM I</th><th>TARGET ${year}</th><th>PIC</th>` +
+        `</tr></thead><tbody>${body}</tbody></table>` +
+        `<div class="summ">Total KM: <b>${km.total}</b> &nbsp;|&nbsp; ` +
+        `Siap: <b>${km.readyCount}</b> &nbsp;|&nbsp; ` +
+        `Status: <b>${km.status === 'approved' ? 'Disahkan GM' : 'Menunggu Pengesahan GM'}</b></div>` +
+        `<div class="sign"><div class="sb"><p style="margin:0">General Manager,</p>` +
+        `<div class="sl">(__________________)<br/>General Manager PUSMANPRO</div></div></div></body></html>`;
+
+    } else {
+      // ── Landscape, format ringkas UPMK ──
+      const css = '@page{size:A4 landscape;margin:12mm}' +
+        'body{font-family:Arial,Helvetica,sans-serif;font-size:8pt;color:#000;margin:0}' +
+        '.hdr{text-align:center;margin-bottom:6pt;padding-bottom:6pt;border-bottom:2pt solid #000}' +
+        '.t1{font-size:12pt;font-weight:700;margin:0 0 2pt;text-transform:uppercase}' +
+        '.t2{font-size:10pt;font-weight:700;margin:0 0 2pt}.t3{font-size:9pt;margin:0 0 2pt}' +
+        '.meta{font-size:7.5pt;color:#444;margin:2pt 0}' +
+        'table{width:100%;border-collapse:collapse;font-size:7.5pt;table-layout:fixed}' +
+        'th{background:#1f3c6b;color:#fff;padding:5pt 3pt;border:1pt solid #000;text-align:center;word-break:break-word;font-weight:700;font-size:8pt}' +
+        'td{padding:3pt 3pt;border:0.5pt solid #777;vertical-align:top;word-break:break-word}' +
+        'tr.cat td{background:#1f3c6b;color:#fff;font-weight:700;font-size:8pt;padding:4pt 6pt;border:1pt solid #000}' +
+        '.num{text-align:center}.rt{text-align:right}.rw{text-align:right;font-weight:700}' +
+        '.summ{margin:6pt 0;padding:4pt 8pt;background:#f5f5f5;border:0.5pt solid #aaa;font-size:7.5pt}' +
+        '.sign{margin-top:24pt;display:flex;justify-content:flex-end}' +
+        '.sb{text-align:center;width:170pt}.sl{margin-top:46pt;border-top:0.5pt solid #333;padding-top:3pt;font-size:7.5pt}';
+      let n = 1;
+      const getUpmkOrd = (ind: string): number => {
+        const s = ind.toLowerCase();
+        if (s.includes('kajian supervisi')) return 10;
+        if (s.includes('persentase pelaksanaan')) return 20;
+        if (s.includes('kapasitas pembangkit')) return 30;
+        if (s.includes('kapasitas transmisi')) return 40;
+        if (s.includes('kapasitas gardu induk')) return 50;
+        if (s.includes('pengendalian nac') || s.includes('non allowable')) return 61;
+        if (s.includes('pengendalian') && s.includes('penggunaan anggaran')) return 62;
+        if (s.includes('pemenuhan pdn') || s.includes('pdn korporat')) return 70;
+        if (s.includes('evaluasi penyelesaian') || s.includes('penyelesaian proyek supervisi')) return 80;
+        if (s.includes('maturity level')) return 91;
+        if (s.includes('pengurang') && s.includes('kepatuhan')) return 92;
+        if (s.includes('tata kelola')) return 93;
+        return 999;
+      };
+      const buildUpmkGroupRows = (comps: KmBundleComp[]): string => {
+        const flat = comps.flatMap(c => (c.kpiItems ?? []).map(it => ({ it, bidang: c.bidang })));
+        const sorted = [...flat].sort((a, b) => getUpmkOrd(String(a.it['indikator'] ?? '')) - getUpmkOrd(String(b.it['indikator'] ?? '')));
+        let g6 = false, g9 = false, s6 = 0, s9 = 0;
+        const sl = (i: number) => String.fromCharCode(97 + i);
+        let rows = '';
+        for (const { it, bidang } of sorted) {
+          const ord = getUpmkOrd(String(it['indikator'] ?? ''));
+          const iG6 = ord === 61 || ord === 62;
+          const iG9 = ord === 91 || ord === 92 || ord === 93;
+          if (iG6 && !g6) {
+            rows += `<tr><td class="num">${n++}</td><td colspan="6" style="font-weight:700">Pengendalian Anggaran</td><td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+            g6 = true; s6 = 0;
+          }
+          if (iG9 && !g9) {
+            rows += `<tr><td class="num">${n++}</td><td colspan="6" style="font-weight:700">Kepatuhan, Maturity Level dan Tata Kelola Perusahaan</td><td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+            g9 = true; s9 = 0;
+          }
+          if (iG6) {
+            const si = String(it['indikator'] ?? '').replace(/^Pengendalian Anggaran\s*[-–]\s*/i, '');
+            rows += `<tr><td class="num" style="font-size:7pt">${sl(s6++)}.</td>` +
+              `<td style="padding-left:10pt">${si}</td>` +
+              `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
+              `<td class="num">${it['satuan'] ?? '—'}</td><td class="num">${it['bobot'] ?? '—'}</td>` +
+              `<td class="rt">${it['target'] ?? '—'}</td><td class="rw">${it['target2'] ?? '—'}</td>` +
+              `<td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+          } else if (iG9) {
+            const si = String(it['indikator'] ?? '').replace(/^Pengurang\s*[-–]\s*/i, '');
+            rows += `<tr><td class="num" style="font-size:7pt">${sl(s9++)}.</td>` +
+              `<td style="padding-left:10pt">${si}</td>` +
+              `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
+              `<td class="num">${it['satuan'] ?? '—'}</td><td class="num">${it['bobot'] ?? '—'}</td>` +
+              `<td class="rt">${it['target'] ?? '—'}</td><td class="rw">${it['target2'] ?? '—'}</td>` +
+              `<td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+          } else {
+            rows += `<tr><td class="num">${n++}</td><td>${it['indikator'] ?? '—'}</td>` +
+              `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
+              `<td class="num">${it['satuan'] ?? '—'}</td><td class="num">${it['bobot'] ?? '—'}</td>` +
+              `<td class="rt">${it['target'] ?? '—'}</td><td class="rw">${it['target2'] ?? '—'}</td>` +
+              `<td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+          }
+        }
+        if (rows === '') rows = `<tr><td class="num">—</td><td colspan="7" style="color:#999;font-style:italic">Tidak ada data KPI</td></tr>`;
+        return rows;
+      };
+      const groups = Object.entries(
+        km.components.reduce<Record<string, KmBundleComp[]>>((acc, c) => { (acc[c.unitCode] ??= []).push(c); return acc; }, {})
+      ).sort(([a], [b]) => a.localeCompare(b));
+      const body = groups.map(([unitCode, comps], gi) => {
+        n = 1;
+        return `<tr class="cat"><td colspan="8">${String.fromCharCode(65 + gi)}. ${(UNIT_NAMES[unitCode] ?? unitCode).toUpperCase()}</td></tr>` +
+          buildUpmkGroupRows(comps);
+      }).join('');
+      const colgroup = `<colgroup>` +
+        `<col style="width:3%"><col style="width:22%"><col style="width:18%">` +
+        `<col style="width:6%"><col style="width:5%"><col style="width:12%"><col style="width:12%"><col style="width:12%">` +
+        `</colgroup>`;
+      html = `<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8">` +
+        `<title>Kontrak Manajemen Tahunan — UPMK ${year}</title><style>${css}</style></head><body>` +
+        `<div class="hdr"><p class="t1">Kontrak Manajemen Tahunan</p>` +
+        `<p class="t2">PT PLN (Persero) Pusat Manajemen Proyek</p>` +
+        `<p class="t3">UPMK (Gabungan) &mdash; Tahun ${year}</p>` +
+        `<p class="meta">Dicetak: ${printDate}</p></div>` +
+        `<table>${colgroup}<thead><tr>` +
+        `<th>No</th><th>INDIKATOR KINERJA</th><th>FORMULA</th>` +
+        `<th>SATUAN</th><th>BOBOT</th><th>TARGET SEM I</th><th>TARGET ${year}</th><th>PIC</th>` +
+        `</tr></thead><tbody>${body}</tbody></table>` +
+        `<div class="summ">Total KM: <b>${km.total}</b> &nbsp;|&nbsp; ` +
+        `Siap: <b>${km.readyCount}</b> &nbsp;|&nbsp; ` +
+        `Status: <b>${km.status === 'approved' ? 'Disahkan GM' : 'Menunggu Pengesahan GM'}</b></div>` +
+        `<div class="sign"><div class="sb"><p style="margin:0">General Manager,</p>` +
+        `<div class="sl">(__________________)<br/>General Manager PUSMANPRO</div></div></div></body></html>`;
+    }
+
+    const w = window.open('', '_blank', scope === 'KP' ? 'width=850,height=1100' : 'width=1050,height=750');
+    if (!w) return;
+    w.document.write(html);
+    w.document.close();
+    w.onload = () => { w.focus(); w.print(); };
   };
 
   // Saat tiba dari notifikasi: tentukan kartu yang di-highlight & scroll ke sana.
@@ -779,6 +1241,13 @@ export function ApprovalsPage() {
               </tbody>
             </table>
           </div>
+          {user?.role === 'GM' && kmBundleKP.components.length > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', padding: 'var(--space-1) var(--space-3)' }}>
+              <button className="btn btn-ghost btn-sm" onClick={() => handlePrintKmBundle('KP')} title="Cetak / Print Preview KM Kantor Induk">
+                <Printer size={12} /> Cetak Preview
+              </button>
+            </div>
+          )}
           {user?.role === 'GM' && kmBundleKP.status !== 'approved' && (
             <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
               {kmBundleKP.components.some((c) => c.status === 'submitted') && (
@@ -889,6 +1358,13 @@ export function ApprovalsPage() {
               </tbody>
             </table>
           </div>
+          {user?.role === 'GM' && kmBundleUPMK.components.length > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', padding: 'var(--space-1) var(--space-3)' }}>
+              <button className="btn btn-ghost btn-sm" onClick={() => handlePrintKmBundle('UPMK')} title="Cetak / Print Preview KM UPMK">
+                <Printer size={12} /> Cetak Preview
+              </button>
+            </div>
+          )}
           {user?.role === 'GM' && kmBundleUPMK.status !== 'approved' && (
             <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
               {kmBundleUPMK.components.some((c) => c.status === 'submitted') && (
@@ -1156,6 +1632,13 @@ export function ApprovalsPage() {
               </tbody>
             </table>
           </div>
+          {user?.role === 'GM' && bundle.components.length > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', padding: 'var(--space-1) var(--space-3)' }}>
+              <button className="btn btn-ghost btn-sm" onClick={handlePrintRealBundle} title="Cetak / Print Preview Konsolidasi Realisasi">
+                <Printer size={12} /> Cetak Preview
+              </button>
+            </div>
+          )}
           {user?.role === 'GM' && bundle.status !== 'approved' && (
             <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
               {!bundle.canApprove && bundle.total > 0 && (
