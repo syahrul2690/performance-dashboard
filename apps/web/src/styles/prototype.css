@@ -23,6 +23,8 @@
   --color-brand: #125d72; /* SIMPP primary teal */
   --color-brand-hover: #017991; /* SIMPP blue-600 */
   --color-brand-tint: rgba(18, 93, 114, 0.1);
+  --color-brand-active: var(--color-brand-hover);
+  --color-brand-parent: var(--color-text-subtle);
   --color-success: #46bd0d; /* SIMPP success green */
   --color-success-tint: rgba(70, 189, 13, 0.12);
   --color-warning: #fba806; /* SIMPP yellow */
@@ -119,6 +121,8 @@
   --color-brand: #4fbfd5; /* brighter teal for dark contrast */
   --color-brand-hover: #6fd1e5;
   --color-brand-tint: rgba(79, 191, 213, 0.15);
+  --color-brand-active: var(--color-text);
+  --color-brand-parent: var(--color-text);
   --color-success-tint: rgba(70, 189, 13, 0.18);
   --color-warning-tint: rgba(251, 168, 6, 0.18);
   --color-danger-tint: rgba(236, 28, 36, 0.18);
@@ -483,11 +487,10 @@ a {
   transform: rotate(180deg);
 }
 
-.app[data-sidebar="collapsed"] .nav-section-label, 
+.app[data-sidebar="collapsed"] .nav-section-label,
 .app[data-sidebar="collapsed"] .nav-label {
   display: none;
 }
-
 
 .sidebar-overlay {
   display: none;
@@ -535,14 +538,16 @@ a {
   align-items: center;
   gap: var(--space-2);
   font-size: var(--text-sm);
-  color: var(--color-text);
   margin-left: var(--space-2);
-  opacity: 0.7;
+  /* opacity: 0.7; */
 }
 .breadcrumb-current {
-  color: var(--color-text);
+  color: var (--color-brand-active);
   font-weight: 600;
   opacity: 1;
+}
+.breadcrumb-prev {
+  color: var(--color-brand-parent);
 }
 .breadcrumb-sep {
   color: var(--color-text-muted);
@@ -1436,15 +1441,15 @@ a {
 .page-title {
   font-family: "Manrope", system-ui, sans-serif;
   font-size: var(--text-xl);
-  font-weight: 400;
+  font-weight: 600;
   color: var(--color-text);
   letter-spacing: -0.005em;
   line-height: 1.1;
 }
 .page-subtitle {
   color: var(--color-text-muted);
-  font-size: var(--text-sm);
-  margin-top: var(--space-1);
+  font-size: var(--text-md);
+  margin-top: var(--space-2);
 }
 .page-meta {
   display: flex;
@@ -1892,11 +1897,11 @@ a {
   background: var(--color-accent-tint);
 }
 .summary-hero-label {
-  font-size: var(--text-xs);
+  font-size: var(--text-base);
   color: var(--color-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  font-weight: 600;
+  font-weight: 400;
 }
 .summary-hero-value {
   font-family: "Manrope", system-ui, sans-serif;
@@ -2128,8 +2133,8 @@ a {
 }
 .card-title {
   font-family: "Manrope", system-ui, sans-serif;
-  font-size: var(--text-md);
-  font-weight: 400;
+  font-size: var(--text-lg);
+  font-weight: 600;
   color: var(--color-text);
   display: flex;
   align-items: center;
@@ -2915,8 +2920,11 @@ a {
 .data-table th[aria-sort="descending"] .sort-icon {
   transform: rotate(180deg);
 }
+.data-table th.num {
+  text-align: center;
+}
 .data-table td.num {
-  text-align: right;
+  text-align: center;
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
 }

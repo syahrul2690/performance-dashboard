@@ -52,7 +52,7 @@
   min-height: 0;
 }
 .card-header.compact .card-title {
-  font-size: var(--text-sm);
+  font-size: var(--text-lg);
 }
 
 /* Three col grid for cards */
@@ -138,7 +138,7 @@
   padding: var(--space-4) var(--space-5);
   border-bottom: 1px solid var(--color-border);
 }
-.card-title { font-size: var(--text-sm); font-weight: 700; color: var(--color-text); }
+.card-title { font-size: var(--text-lg); font-weight: 600; color: var(--color-text); }
 .card-footer { padding: var(--space-3) var(--space-5); border-top: 1px solid var(--color-border); }
 
 /* ----- Utility buttons (extend prototype .btn) ----- */
@@ -372,7 +372,7 @@ code {
 .num { text-align: right; font-variant-numeric: tabular-nums; }
 
 /* ----- Card title flex with icon ----- */
-.card-title { font-size: var(--text-sm); font-weight: 700; color: var(--color-text); display: flex; align-items: center; gap: var(--space-2); }
+.card-title { font-size: var(--text-sm); font-weight: 600; color: var(--color-text); display: flex; align-items: center; gap: var(--space-2); }
 .card-meta { font-size: var(--text-xs); color: var(--color-text-muted); }
 
 /* ----- Fold-up card header (clickable button) ----- */
