@@ -109,37 +109,31 @@ export function LoginPage() {
       <div className="login-body">
         <div className="login-brand-strip">
           <img
-            src="/brand/Logo_PLN.png"
+            src="/brand/logo-pln-simpp.svg"
+            width="185"
+            height="44"
             alt="PLN"
             className="login-brand-strip-pln"
-            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-          />
-          <span className="login-brand-strip-text">
-            PT PLN (Persero) PUSAT MANAJEMEN PROYEK
-          </span>
-          <img
-            src="/brand/logo_simpp_brand_data.png"
-            alt="SIMPP"
-            className="login-brand-strip-simpp"
-            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = "none";
+            }}
           />
         </div>
 
         <div className="login-panel">
           <div className="login-card">
             <h1 className="login-headline">Selamat Datang!</h1>
-            <p className="login-subline">
-              Masuk ke Dashboard Kinerja PT PLN (Persero) PUSMANPRO
-            </p>
 
-            <div className={`login-error-banner${error ? ' visible' : ''}`}>
+            <div className={`login-error-banner${error ? " visible" : ""}`}>
               <AlertCircle size={16} style={{ flexShrink: 0 }} />
               <span>{error}</span>
             </div>
 
-            <form onSubmit={handleSubmit}>
+            <form className="login-form" onSubmit={handleSubmit}>
               <div className="login-field">
-                <label className="login-label" htmlFor="login-email">Username</label>
+                <label className="login-label" htmlFor="login-email">
+                  Username
+                </label>
                 <div className="login-input-row">
                   <Mail size={18} className="login-input-icon" />
                   <input
@@ -157,12 +151,14 @@ export function LoginPage() {
               </div>
 
               <div className="login-field">
-                <label className="login-label" htmlFor="login-password">Kata Sandi</label>
+                <label className="login-label" htmlFor="login-password">
+                  Kata Sandi
+                </label>
                 <div className="login-input-row">
                   <Lock size={18} className="login-input-icon" />
                   <input
                     id="login-password"
-                    type={showPassword ? 'text' : 'password'}
+                    type={showPassword ? "text" : "password"}
                     className="login-input"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -174,8 +170,11 @@ export function LoginPage() {
                     type="button"
                     className="login-eye-btn"
                     onClick={() => setShowPassword((v) => !v)}
-                    aria-label={showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
-                  >
+                    aria-label={
+                      showPassword
+                        ? "Sembunyikan kata sandi"
+                        : "Tampilkan kata sandi"
+                    }>
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
@@ -189,8 +188,7 @@ export function LoginPage() {
                 <a
                   className="login-forgot"
                   href="#"
-                  onClick={(e) => e.preventDefault()}
-                >
+                  onClick={(e) => e.preventDefault()}>
                   Lupa kata sandi?
                 </a>
               </div>
@@ -201,23 +199,24 @@ export function LoginPage() {
                 ) : (
                   <LogIn size={18} className="login-btn-icon" />
                 )}
-                <span>{loading ? 'Memproses…' : 'Masuk'}</span>
+                <span>{loading ? "Memproses…" : "Masuk"}</span>
               </button>
             </form>
 
             <p className="login-register-hint">
               Belum memiliki akun?
-              <a href="#" onClick={(e) => e.preventDefault()}>Daftar disini</a>
+              <a href="#" onClick={(e) => e.preventDefault()}>
+                Daftar disini
+              </a>
             </p>
 
             <div className="login-hint">
               <button
                 type="button"
-                className={`login-hint-toggle${hintOpen ? ' open' : ''}`}
+                className={`login-hint-toggle${hintOpen ? " open" : ""}`}
                 aria-expanded={hintOpen}
-                onClick={() => setHintOpen((v) => !v)}
-              >
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                onClick={() => setHintOpen((v) => !v)}>
+                <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <KeyRound size={14} />
                   Akun Demo - klik untuk isi otomatis
                 </span>
@@ -225,29 +224,37 @@ export function LoginPage() {
                   size={14}
                   className="chevron"
                   style={{
-                    transition: 'transform 0.2s',
-                    transform: hintOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transition: "transform 0.2s",
+                    transform: hintOpen ? "rotate(180deg)" : "rotate(0deg)",
                   }}
                 />
               </button>
-              <div className={`login-hint-body${hintOpen ? ' open' : ''}`}>
+              <div className={`login-hint-body${hintOpen ? " open" : ""}`}>
                 <select
                   className="login-input"
                   aria-label="Pilih akun demo"
                   value={email}
-                  onChange={(e) => { if (e.target.value) fillDemo(e.target.value); }}
-                  style={{ width: '100%', padding: '10px 12px' }}
-                >
+                  onChange={(e) => {
+                    if (e.target.value) fillDemo(e.target.value);
+                  }}
+                  style={{ width: "100%", padding: "10px 12px" }}>
                   <option value="">— Pilih akun demo (isi otomatis) —</option>
                   {DEMO_GROUPS.map((g) => (
                     <optgroup key={g.label} label={g.label}>
                       {g.accounts.map((a) => (
-                        <option key={a.email} value={a.email}>{a.role} · {a.email.split('@')[0]}</option>
+                        <option key={a.email} value={a.email}>
+                          {a.role} · {a.email.split("@")[0]}
+                        </option>
                       ))}
                     </optgroup>
                   ))}
                 </select>
-                <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 8 }}>
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: "var(--color-text-muted)",
+                    marginTop: 8,
+                  }}>
                   Password semua akun demo: <code>{DEMO_PASSWORD}</code>
                 </div>
               </div>
@@ -265,15 +272,13 @@ export function LoginPage() {
       <aside className="login-illustration" aria-hidden="true">
         <div className="login-illustration-inner">
           <img
-            src="/brand/login_right_data.png"
+            src="/brand/login-ic.svg"
             alt="SIMPP"
             className="login-illustration-logo"
-            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = "none";
+            }}
           />
-          <h2 className="login-illustration-tagline">SIMPP</h2>
-          <p className="login-illustration-sub">
-            Sistem Informasi Monitoring Penugasan dan Pelaporan
-          </p>
         </div>
       </aside>
     </div>
