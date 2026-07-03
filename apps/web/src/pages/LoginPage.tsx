@@ -1,97 +1,131 @@
-import { useState, FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useState, FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import {
-  Mail, Lock, Eye, EyeOff, LogIn, KeyRound, ChevronDown, AlertCircle,
-} from 'lucide-react';
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  LogIn,
+  KeyRound,
+  ChevronDown,
+  AlertCircle,
+} from "lucide-react";
 
-const DEMO_PASSWORD = 'Pusmanpro@2026';
+const DEMO_PASSWORD = "Pusmanpro@2026";
 
 // Akun demo per role yang telah di-seed (Kantor Induk per bidang + UPMK + GM).
-const DEMO_GROUPS: Array<{ label: string; accounts: Array<{ role: string; email: string }> }> = [
+const DEMO_GROUPS: Array<{
+  label: string;
+  accounts: Array<{ role: string; email: string }>;
+}> = [
   {
-    label: 'Manajemen Puncak & Sistem',
+    label: "Manajemen Puncak & Sistem",
     accounts: [
-      { role: 'General Manager',  email: 'gm@pusmanpro.pln.co.id' },
-      { role: 'Super Admin',      email: 'superadmin@pusmanpro.pln.co.id' },
-      { role: 'Developer',        email: 'developer@pusmanpro.pln.co.id' },
+      { role: "General Manager", email: "gm@pusmanpro.pln.co.id" },
+      { role: "Super Admin", email: "superadmin@pusmanpro.pln.co.id" },
+      { role: "Developer", email: "developer@pusmanpro.pln.co.id" },
     ],
   },
   {
-    label: 'KI — Operasi Manajemen Proyek (OMP)',
+    label: "KI — Operasi Manajemen Proyek (OMP)",
     accounts: [
-      { role: 'Staff/PIC Kinerja', email: 'staff.officer@pusmanpro.pln.co.id' },
-      { role: 'ASMAN Elektromekanik', email: 'asman.em.omp@pusmanpro.pln.co.id' },
-      { role: 'ASMAN Jaringan', email: 'asman.jr.omp@pusmanpro.pln.co.id' },
-      { role: 'Manajer Operasi Pembangkit', email: 'man.pembangkit.omp@pusmanpro.pln.co.id' },
-      { role: 'Manajer Operasi Jaringan', email: 'man.jaringan.omp@pusmanpro.pln.co.id' },
-      { role: 'Senior Manajer OMP', email: 'sm.omp@pusmanpro.pln.co.id' },
+      { role: "Staff/PIC Kinerja", email: "staff.officer@pusmanpro.pln.co.id" },
+      {
+        role: "ASMAN Elektromekanik",
+        email: "asman.em.omp@pusmanpro.pln.co.id",
+      },
+      { role: "ASMAN Jaringan", email: "asman.jr.omp@pusmanpro.pln.co.id" },
+      {
+        role: "Manajer Operasi Pembangkit",
+        email: "man.pembangkit.omp@pusmanpro.pln.co.id",
+      },
+      {
+        role: "Manajer Operasi Jaringan",
+        email: "man.jaringan.omp@pusmanpro.pln.co.id",
+      },
+      { role: "Senior Manajer OMP", email: "sm.omp@pusmanpro.pln.co.id" },
     ],
   },
   {
-    label: 'KI — QA/QC',
+    label: "KI — QA/QC",
     accounts: [
-      { role: 'Staff/PIC Kinerja', email: 'staff.qaqc@pusmanpro.pln.co.id' },
-      { role: 'Manajer QA/QC Pembangkit', email: 'man.qaqc.pembangkit@pusmanpro.pln.co.id' },
-      { role: 'Manajer QA/QC Jaringan', email: 'man.qaqc.jaringan@pusmanpro.pln.co.id' },
-      { role: 'Senior Manajer QA/QC', email: 'sm.qaqc@pusmanpro.pln.co.id' },
+      { role: "Staff/PIC Kinerja", email: "staff.qaqc@pusmanpro.pln.co.id" },
+      {
+        role: "Manajer QA/QC Pembangkit",
+        email: "man.qaqc.pembangkit@pusmanpro.pln.co.id",
+      },
+      {
+        role: "Manajer QA/QC Jaringan",
+        email: "man.qaqc.jaringan@pusmanpro.pln.co.id",
+      },
+      { role: "Senior Manajer QA/QC", email: "sm.qaqc@pusmanpro.pln.co.id" },
     ],
   },
   {
-    label: 'KI — Perencanaan & Project Control (RPC)',
+    label: "KI — Perencanaan & Project Control (RPC)",
     accounts: [
-      { role: 'Staff/PIC Kinerja', email: 'staff.rpc@pusmanpro.pln.co.id' },
-      { role: 'Manajer Project Control', email: 'man.pc@pusmanpro.pln.co.id' },
-      { role: 'Manajer Perencanaan', email: 'man.perencanaan@pusmanpro.pln.co.id' },
-      { role: 'Senior Manajer RPC', email: 'sm.rpc@pusmanpro.pln.co.id' },
+      { role: "Staff/PIC Kinerja", email: "staff.rpc@pusmanpro.pln.co.id" },
+      { role: "Manajer Project Control", email: "man.pc@pusmanpro.pln.co.id" },
+      {
+        role: "Manajer Perencanaan",
+        email: "man.perencanaan@pusmanpro.pln.co.id",
+      },
+      { role: "Senior Manajer RPC", email: "sm.rpc@pusmanpro.pln.co.id" },
     ],
   },
   {
-    label: 'KI — Keuangan, Komunikasi & Umum (KKU)',
+    label: "KI — Keuangan, Komunikasi & Umum (KKU)",
     accounts: [
-      { role: 'Staff/PIC Kinerja', email: 'staff.kku@pusmanpro.pln.co.id' },
-      { role: 'Manajer Keuangan', email: 'man.keuangan@pusmanpro.pln.co.id' },
-      { role: 'Manajer Akuntansi', email: 'man.akuntansi@pusmanpro.pln.co.id' },
-      { role: 'Manajer Aset & Properti', email: 'man.aset@pusmanpro.pln.co.id' },
-      { role: 'Senior Manajer KKU', email: 'sm.kku@pusmanpro.pln.co.id' },
+      { role: "Staff/PIC Kinerja", email: "staff.kku@pusmanpro.pln.co.id" },
+      { role: "Manajer Keuangan", email: "man.keuangan@pusmanpro.pln.co.id" },
+      { role: "Manajer Akuntansi", email: "man.akuntansi@pusmanpro.pln.co.id" },
+      {
+        role: "Manajer Aset & Properti",
+        email: "man.aset@pusmanpro.pln.co.id",
+      },
+      { role: "Senior Manajer KKU", email: "sm.kku@pusmanpro.pln.co.id" },
     ],
   },
   {
-    label: 'KI — K3L & MRO',
+    label: "KI — K3L & MRO",
     accounts: [
-      { role: 'ASMAN K3L', email: 'asman.k3l@pusmanpro.pln.co.id' },
-      { role: 'ASMAN Manajemen Risiko & Kepatuhan', email: 'asman.mro@pusmanpro.pln.co.id' },
+      { role: "ASMAN K3L", email: "asman.k3l@pusmanpro.pln.co.id" },
+      {
+        role: "ASMAN Manajemen Risiko & Kepatuhan",
+        email: "asman.mro@pusmanpro.pln.co.id",
+      },
     ],
   },
-  ...(['1', '2', '3', '4', '5'].map((n) => ({
-    label: `UPMK ${['I', 'II', 'III', 'IV', 'V'][Number(n) - 1]}`,
+  ...["1", "2", "3", "4", "5"].map((n) => ({
+    label: `UPMK ${["I", "II", "III", "IV", "V"][Number(n) - 1]}`,
     accounts: [
-      { role: 'Staff Kinerja', email: `staff.upmk${n}@pusmanpro.pln.co.id` },
-      { role: 'ASMAN UPMK', email: `asman.upmk${n}@pusmanpro.pln.co.id` },
-      { role: 'Manajer (MUP)', email: `manajer.upmk${n}@pusmanpro.pln.co.id` },
+      { role: "Staff Kinerja", email: `staff.upmk${n}@pusmanpro.pln.co.id` },
+      { role: "ASMAN UPMK", email: `asman.upmk${n}@pusmanpro.pln.co.id` },
+      { role: "Manajer (MUP)", email: `manajer.upmk${n}@pusmanpro.pln.co.id` },
     ],
-  }))),
+  })),
 ];
 
 export function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [hintOpen, setHintOpen] = useState(false);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    setError('');
+    setError("");
     setLoading(true);
     try {
       await login(email, password);
-      navigate('/');
+      navigate("/");
     } catch {
-      setError('Email atau kata sandi salah.');
+      setError("Email atau kata sandi salah.");
     } finally {
       setLoading(false);
     }
@@ -100,7 +134,7 @@ export function LoginPage() {
   function fillDemo(demoEmail: string) {
     setEmail(demoEmail);
     setPassword(DEMO_PASSWORD);
-    setError('');
+    setError("");
   }
 
   return (
@@ -175,7 +209,21 @@ export function LoginPage() {
                         ? "Sembunyikan kata sandi"
                         : "Tampilkan kata sandi"
                     }>
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    {showPassword ? (
+                      <EyeOff
+                        size={20}
+                        color="var(--color-blue-eye)"
+                        strokeWidth={2}
+                        absoluteStrokeWidth
+                      />
+                    ) : (
+                      <Eye
+                        size={20}
+                        color="var(--color-blue-eye)"
+                        strokeWidth={2}
+                        absoluteStrokeWidth
+                      />
+                    )}
                   </button>
                 </div>
               </div>
@@ -194,11 +242,7 @@ export function LoginPage() {
               </div>
 
               <button type="submit" className="login-submit" disabled={loading}>
-                {loading ? (
-                  <span className="login-spinner" />
-                ) : (
-                  <LogIn size={18} className="login-btn-icon" />
-                )}
+                {loading && <span className="login-spinner" />}
                 <span>{loading ? "Memproses…" : "Masuk"}</span>
               </button>
             </form>

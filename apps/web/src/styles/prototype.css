@@ -33,7 +33,7 @@
   --color-danger-tint: rgba(236, 28, 36, 0.1);
   --color-info: #03a2b8; /* SIMPP cyan info */
   --color-info-tint: rgba(3, 162, 184, 0.12);
-
+  --color-blue-eye: #035b71;
   --color-sidebar-active: var(--color-surface);
 
   --chart-1: #125d72; /* teal primary */
@@ -3741,13 +3741,19 @@ a {
 
   aside.login-illustration {
     width: 60%;
-    display: flex
+    display: flex;
+  }
+}
+
+@media (min-width: 1280px) {
+  .login-panel {
+    left: 80px;
+    position: relative;
   }
 }
 
 .login-card {
   width: 100%;
-  max-width: 540px;
   background: transparent;
   border: none;
   border-radius: 0;
@@ -3794,8 +3800,8 @@ a {
   margin-bottom: 18px;
 }
 .login-label {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--text-base);
+  font-weight: 500;
   color: #125d72;
   letter-spacing: 0;
 }
@@ -3867,7 +3873,7 @@ a {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 22px;
-  font-size: 13px;
+  font-size: 14px;
 }
 .login-remember {
   display: flex;
