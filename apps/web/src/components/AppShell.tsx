@@ -21,7 +21,6 @@ import {
   LogOut,
   ChevronDown,
   Menu,
-  ChevronsLeft,
   Tv2,
   Search,
   Download,
@@ -442,7 +441,7 @@ export function AppShell() {
           {/* Notifications */}
           <div className="dropdown-anchor" ref={notifRef}>
             <button
-              className="icon-btn"
+              className="icon-btn icon-solid"
               aria-label="Notifikasi"
               aria-haspopup="true"
               aria-expanded={notifOpen}
@@ -498,10 +497,9 @@ export function AppShell() {
                   </div>
                 ))}
               </div>
-              <div className="dropdown-divider" />
-              <button className="dropdown-item">
-                <ExternalLink size={14} />
-                <span>Lihat semua notifikasi</span>
+
+              <button className="notif-clear">
+                <div className="notif-clear-text">Hapus Semua Notifikasi</div>
               </button>
             </div>
           </div>
@@ -553,7 +551,7 @@ export function AppShell() {
 
           {/* Theme toggle */}
           <button
-            className="icon-btn"
+            className="icon-btn icon-solid"
             aria-label="Ubah tema"
             onClick={toggleTheme}>
             {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
@@ -583,23 +581,23 @@ export function AppShell() {
                 </div>
               </div>
               <div className="dropdown-divider" />
-              <button className="dropdown-item">
+              {/* <button className="dropdown-item">
                 <User size={14} />
                 <span>Profil saya</span>
-              </button>
+              </button> */}
               <NavLink
                 to="/settings"
                 className="dropdown-item"
                 onClick={() => setUserMenuOpen(false)}>
                 <Settings size={14} />
-                <span>Pengaturan</span>
+                <span>Pengaturan Akun</span>
               </NavLink>
-              <button className="dropdown-item">
+              {/* <button className="dropdown-item">
                 <HelpCircle size={14} />
                 <span>Bantuan</span>
-              </button>
-              <div className="dropdown-divider" />
-              <button className="dropdown-item danger" onClick={handleLogout}>
+              </button> */}
+              {/* <div className="dropdown-divider" /> */}
+              <button className="dropdown-item" onClick={handleLogout}>
                 <LogOut size={14} />
                 <span>Keluar</span>
               </button>
