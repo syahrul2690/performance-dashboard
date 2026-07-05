@@ -173,6 +173,28 @@ export function AppShell() {
   const exportRef = useRef<HTMLDivElement>(null);
   const roleRef = useRef<HTMLDivElement>(null);
 
+  // Accordion state for collapsible nav sections.
+  // Lazy-init: any section containing the current active route starts open,
+  // so a hard refresh on a deep route doesn't hide the active item.
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>(
+    () => {
+      const initial: Record<string, boolean> = {};
+      NAV_ITEMS.forEach((section) => {
+        const isActive = section.submenus.some(
+          ({ to, end }) =>
+            location.pathname === to ||
+            (!end && to !== "/" && location.pathname.startsWith(to)),
+        );
+        if (isActive) initial[section.section] = true;
+      });
+      return initial;
+    },
+  );
+
+  const toggleSection = (key: string) => {
+    setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
   const currentPageName = ROUTE_NAMES[location.pathname] ?? "Dashboard";
   const effectiveRole = viewAs ?? user?.role ?? "STAFF";
   const avatarInitials =
@@ -213,7 +235,7 @@ export function AppShell() {
               src="/brand/logo-pln-simpp-white-ic.svg"
               alt="PLN"
               style={{
-                width: 160,
+                width: 196,
                 height: 44,
               }}
               onError={(e) => {
@@ -256,32 +278,55 @@ export function AppShell() {
                 (!end && to !== "/" && location.pathname.startsWith(to))
               );
             });
+
+            const sectionId = `nav-section-${section.section
+              .toLowerCase()
+              .replace(/\s+/g, "-")}`;
+            // Sections with only one submenu are always "open" (nothing to toggle)
+            const isOpen = hasMultipleSubmenus
+              ? !!openSections[section.section]
+              : true;
+
             return (
               <div key={section.section}>
-                <div
+                <button
+                  type="button"
                   className="nav-section"
                   aria-current={isSectionActive ? "page" : undefined}
-                  data-expandable={hasMultipleSubmenus ? "true" : undefined}>
+                  aria-expanded={hasMultipleSubmenus ? isOpen : undefined}
+                  aria-controls={hasMultipleSubmenus ? sectionId : undefined}
+                  disabled={!hasMultipleSubmenus}
+                  onClick={() =>
+                    hasMultipleSubmenus && toggleSection(section.section)
+                  }>
                   {showSectionIcon && <SectionIcon size={14} />}
                   <span className="nav-section-label">{section.section}</span>
-                </div>
-                <div className="nav-section-items">
-                  {visibleItems.map(({ to, label, icon: Icon, end }) => (
-                    <NavLink
-                      key={to}
-                      to={to}
-                      end={end}
-                      className="nav-item"
-                      aria-current={
-                        location.pathname === to ||
-                        (!end && location.pathname.startsWith(to) && to !== "/")
-                          ? "page"
-                          : undefined
-                      }
-                      title={collapsed ? label : undefined}>
-                      <span className="nav-label">{label}</span>
-                    </NavLink>
-                  ))}
+                </button>
+
+                <div
+                  id={sectionId}
+                  className="nav-section-collapse"
+                  data-open={isOpen}>
+                  <div className="nav-section-items">
+                    {visibleItems.map(({ to, label, icon: Icon, end }) => (
+                      <NavLink
+                        key={to}
+                        to={to}
+                        end={end}
+                        className="nav-item"
+                        aria-current={
+                          location.pathname === to ||
+                          (!end &&
+                            location.pathname.startsWith(to) &&
+                            to !== "/")
+                            ? "page"
+                            : undefined
+                        }
+                        title={collapsed ? label : undefined}>
+                        <span className="nav-label">{label}</span>
+                      </NavLink>
+                    ))}
+                  </div>
                 </div>
               </div>
             );
