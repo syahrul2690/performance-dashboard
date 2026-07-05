@@ -29,6 +29,8 @@
   --color-brand-parent: var(--color-text-subtle);
   --color-icon-solid: var(--color-text-subtle);
   --color-icon-bg: var(--color-border);
+  --color-pill-bg: #e1f3f6;
+  --color-pill: var(--color-brand-hover);
   --color-success: #46bd0d; /* SIMPP success green */
   --color-success-tint: rgba(70, 189, 13, 0.12);
   --color-warning: #fba806; /* SIMPP yellow */
@@ -66,7 +68,7 @@
   --text-lg: clamp(20px, 1.25rem, 20px);
   --text-xl: clamp(24px, 1.5rem, 24px);
 
-  --display-sm: clamp(24px, 2rem, 30px);
+  --display-sm: clamp(32px, 2rem, 32px);
   --display-md: clamp(32px, 2.6rem, 40px);
   --display-lg: clamp(40px, 3.4rem, 52px);
 
@@ -131,6 +133,8 @@
   --color-brand-parent: var(--color-text);
   --color-icon-solid: var(--color-text-subtle);
   --color-icon-bg: var(--color-border);
+  --color-pill-bg: var(--color-surface);
+  --color-pill: var(--color-text);
   --color-success-tint: rgba(70, 189, 13, 0.18);
   --color-warning-tint: rgba(251, 168, 6, 0.18);
   --color-danger-tint: rgba(236, 28, 36, 0.18);
@@ -1556,6 +1560,7 @@ a {
   overflow-y: auto;
   overflow-x: hidden;
   background: var(--color-bg);
+  font-family: "Manrope", system-ui, sans-serif;
 }
 .main-inner {
   max-width: var(--content-max);
@@ -1583,26 +1588,25 @@ a {
   line-height: 1.1;
 }
 .page-subtitle {
-  color: var(--color-text-muted);
-  font-size: var(--text-md);
+  color: var(--color-text-subtle);
+  font-size: var(--text-sm);
   margin-top: var(--space-2);
 }
 .page-meta {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
+  font-size: var(--text-sm);
 }
 .meta-pill {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  padding: 4px 10px;
-  background: var(--color-accent-tint);
-  color: var(--color-accent);
+  padding: 8px 26px;
+  background: var(--color-pill-bg);
+  color: var(--color-text);
   border-radius: var(--radius-full);
-  font-weight: 500;
+  font-weight: 600;
 }
 .meta-pill svg {
   width: 12px;
@@ -1882,7 +1886,7 @@ a {
   gap: 4px;
   padding: 2px 8px;
   border-radius: var(--radius-full);
-  font-size: var(--text-2xs);
+  font-size: var(--text-sm);
   font-weight: 600;
   letter-spacing: 0.02em;
 }
@@ -2035,13 +2039,12 @@ a {
 .summary-hero-label {
   font-size: var(--text-base);
   color: var(--color-text-muted);
-  text-transform: uppercase;
   letter-spacing: 0.06em;
-  font-weight: 400;
+  font-weight: 500;
 }
 .summary-hero-value {
-  font-family: "Manrope", system-ui, sans-serif;
-  font-size: var(--display-md);
+  font-size: var(--display-sm);
+  font-weight: 500;
   color: var(--color-text);
   line-height: 1;
   letter-spacing: -0.005em;
@@ -2266,6 +2269,9 @@ a {
   justify-content: space-between;
   gap: var(--space-3);
   flex-wrap: wrap;
+}
+.card-header:hover .status-pill {
+  border: 1px solid var(--color-pill);
 }
 .card-title {
   font-family: "Manrope", system-ui, sans-serif;
@@ -3007,10 +3013,14 @@ a {
   overflow-x: auto;
   overflow-y: hidden;
 }
+.table-wrap{
+  padding: 0 28px;
+}
 .data-table {
   width: 100%;
   border-collapse: collapse;
   font-size: var(--text-sm);
+  border: 1px solid var(--color-border);
 }
 .data-table thead {
   background: var(--color-surface-2);
