@@ -695,10 +695,10 @@ export function ExecutivePage() {
           </div>
           <KpiTable rows={allKpiRows} />
           {kepatuhan.length > 0 && (
-            <div style={{ borderTop: "1px solid var(--color-border)" }}>
+            <>
               <div
                 style={{
-                  padding: "var(--space-2) var(--space-4)",
+                  padding: "var(--space-2) var(--space-7)",
                   display: "flex",
                   alignItems: "center",
                   gap: "var(--space-2)",
@@ -764,7 +764,7 @@ export function ExecutivePage() {
                   </tbody>
                 </table>
               </div>
-            </div>
+            </>
           )}
         </FoldCard>
       )}
