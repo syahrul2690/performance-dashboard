@@ -1,77 +1,166 @@
-import { useState, useEffect, useRef } from 'react';
-import { NavLink, useNavigate, Outlet, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
-import { useNotif } from '../context/NotifContext';
-import { usePeriod } from '../context/PeriodContext';
+import { useState, useEffect, useRef } from "react";
+import { NavLink, useNavigate, Outlet, useLocation } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
+import { useNotif } from "../context/NotifContext";
+import { usePeriod } from "../context/PeriodContext";
 import {
-  LayoutDashboard, TrendingUp, Settings, Activity, Target,
-  Users, CheckSquare, AlertTriangle, FileText, ClipboardEdit,
-  Bell, Moon, Sun, LogOut, ChevronDown, Menu, ChevronsLeft,
-  Tv2, Search, Download, User, HelpCircle, FilePlus, LineChart,
-  FileSpreadsheet, Image, Printer, ExternalLink,
-  Workflow, Network, Leaf, MapPin, ShieldAlert,
-} from 'lucide-react';
+  LayoutDashboard,
+  TrendingUp,
+  Settings,
+  Activity,
+  Target,
+  Users,
+  CheckSquare,
+  AlertTriangle,
+  FileText,
+  ClipboardEdit,
+  Bell,
+  Moon,
+  Sun,
+  LogOut,
+  ChevronDown,
+  Menu,
+  ChevronsLeft,
+  Tv2,
+  Search,
+  Download,
+  User,
+  HelpCircle,
+  FilePlus,
+  LineChart,
+  FileSpreadsheet,
+  Image,
+  Printer,
+  ExternalLink,
+  Workflow,
+  Network,
+  Leaf,
+  MapPin,
+  ShieldAlert,
+} from "lucide-react";
 
 const NAV_ITEMS = [
   {
-    section: 'Aksi Saya', items: [
-      { to: '/approvals',      label: 'Persetujuan',             icon: CheckSquare },
-      { to: '/input-kontrak',  label: 'Input Kontrak Manajemen', icon: FileText,    hideForUpmk: true },
-      { to: '/input-realisasi',label: 'Input Realisasi Bulanan', icon: ClipboardEdit },
-    ]
+    section: "Aksi Saya",
+    items: [
+      { to: "/approvals", label: "Persetujuan", icon: CheckSquare },
+      {
+        to: "/input-kontrak",
+        label: "Input Kontrak Manajemen",
+        icon: FileText,
+        hideForUpmk: true,
+      },
+      {
+        to: "/input-realisasi",
+        label: "Input Realisasi Bulanan",
+        icon: ClipboardEdit,
+      },
+    ],
   },
   {
-    section: 'Dashboard', items: [
-      { to: '/',                  label: 'Executive Summary',      icon: LayoutDashboard, end: true },
-      { to: '/financial',         label: 'Cost & Capex',           icon: TrendingUp,      devOnly: true },
-      { to: '/operational',       label: 'Operational KPIs',       icon: Activity,        devOnly: true },
-      { to: '/proses-bisnis',     label: 'Proses Bisnis L2',       icon: Workflow,        devOnly: true },
-      { to: '/struktur-organisasi',label:'Struktur Organisasi',    icon: Network,         devOnly: true },
-      { to: '/gcg-esg',           label: 'GCG & ESG',              icon: Leaf,            devOnly: true },
-      { to: '/strategic',         label: 'Strategic Targets',      icon: Target,          devOnly: true },
-      { to: '/human-capital',     label: 'Human Capital',          icon: Users,           devOnly: true },
-      { to: '/risk',              label: 'Manajemen Risiko',       icon: AlertTriangle,   devOnly: true },
-      { to: '/peta',              label: 'Peta Geografis UPMK',   icon: MapPin,          devOnly: true },
-    ]
+    section: "Dashboard",
+    items: [
+      { to: "/", label: "Executive Summary", icon: LayoutDashboard, end: true },
+      {
+        to: "/financial",
+        label: "Cost & Capex",
+        icon: TrendingUp,
+        devOnly: true,
+      },
+      {
+        to: "/operational",
+        label: "Operational KPIs",
+        icon: Activity,
+        devOnly: true,
+      },
+      {
+        to: "/proses-bisnis",
+        label: "Proses Bisnis L2",
+        icon: Workflow,
+        devOnly: true,
+      },
+      {
+        to: "/struktur-organisasi",
+        label: "Struktur Organisasi",
+        icon: Network,
+        devOnly: true,
+      },
+      { to: "/gcg-esg", label: "GCG & ESG", icon: Leaf, devOnly: true },
+      {
+        to: "/strategic",
+        label: "Strategic Targets",
+        icon: Target,
+        devOnly: true,
+      },
+      {
+        to: "/human-capital",
+        label: "Human Capital",
+        icon: Users,
+        devOnly: true,
+      },
+      {
+        to: "/risk",
+        label: "Manajemen Risiko",
+        icon: AlertTriangle,
+        devOnly: true,
+      },
+      {
+        to: "/peta",
+        label: "Peta Geografis UPMK",
+        icon: MapPin,
+        devOnly: true,
+      },
+    ],
   },
   {
-    section: 'Pengaturan', items: [
-      { to: '/settings', label: 'Settings', icon: Settings },
-      { to: '/admin',    label: 'Admin Tools', icon: ShieldAlert, devOnly: true },
-    ]
+    section: "Pengaturan",
+    items: [
+      { to: "/settings", label: "Settings", icon: Settings },
+      { to: "/admin", label: "Admin Tools", icon: ShieldAlert, devOnly: true },
+    ],
   },
 ];
 
 const ROLE_LABELS: Record<string, string> = {
-  STAFF: 'Staff', ASMAN: 'Asman', MANAJER: 'Manajer',
-  SRMANAJER: 'Sr. Manajer', GM: 'General Manager',
-  SUPERADMIN: 'Super Admin', DEVELOPER: 'Developer',
+  STAFF: "Staff",
+  ASMAN: "Asman",
+  MANAJER: "Manajer",
+  SRMANAJER: "Sr. Manajer",
+  GM: "General Manager",
+  SUPERADMIN: "Super Admin",
+  DEVELOPER: "Developer",
 };
 
 const ROUTE_NAMES: Record<string, string> = {
-  '/': 'Executive Summary',
-  '/financial': 'Cost & Capex',
-  '/operational': 'Operational KPIs',
-  '/proses-bisnis': 'Proses Bisnis L2',
-  '/struktur-organisasi': 'Struktur Organisasi',
-  '/gcg-esg': 'GCG & ESG',
-  '/strategic': 'Strategic Targets',
-  '/human-capital': 'Human Capital',
-  '/risk': 'Manajemen Risiko',
-  '/peta': 'Peta Geografis UPMK',
-  '/approvals': 'Persetujuan',
-  '/input-realisasi': 'Input Realisasi',
-  '/input-kontrak': 'Input Kontrak Manajemen',
-  '/workflow-km/usulan': 'Proses Usulan KM',
-  '/workflow-km/realisasi': 'Proses Realisasi KM',
-  '/settings': 'Settings',
-  '/admin': 'Admin Tools',
+  "/": "Executive Summary",
+  "/financial": "Cost & Capex",
+  "/operational": "Operational KPIs",
+  "/proses-bisnis": "Proses Bisnis L2",
+  "/struktur-organisasi": "Struktur Organisasi",
+  "/gcg-esg": "GCG & ESG",
+  "/strategic": "Strategic Targets",
+  "/human-capital": "Human Capital",
+  "/risk": "Manajemen Risiko",
+  "/peta": "Peta Geografis UPMK",
+  "/approvals": "Persetujuan",
+  "/input-realisasi": "Input Realisasi",
+  "/input-kontrak": "Input Kontrak Manajemen",
+  "/workflow-km/usulan": "Proses Usulan KM",
+  "/workflow-km/realisasi": "Proses Realisasi KM",
+  "/settings": "Settings",
+  "/admin": "Admin Tools",
 };
 
 export function AppShell() {
   const { user, logout, viewAs, setViewAs } = useAuth();
-  const { periods, periodId, setPeriodId, mode: periodMode, setMode: setPeriodMode } = usePeriod();
+  const {
+    periods,
+    periodId,
+    setPeriodId,
+    mode: periodMode,
+    setMode: setPeriodMode,
+  } = usePeriod();
   const { theme, toggle: toggleTheme } = useTheme();
   const { items: notifs, unreadCount, markAllRead } = useNotif();
   const navigate = useNavigate();
@@ -87,24 +176,33 @@ export function AppShell() {
   const exportRef = useRef<HTMLDivElement>(null);
   const roleRef = useRef<HTMLDivElement>(null);
 
-  const currentPageName = ROUTE_NAMES[location.pathname] ?? 'Dashboard';
-  const effectiveRole = viewAs ?? user?.role ?? 'STAFF';
-  const avatarInitials = user?.name?.split(' ').map((w) => w[0]).slice(0, 2).join('') ?? '?';
+  const currentPageName = ROUTE_NAMES[location.pathname] ?? "Dashboard";
+  const effectiveRole = viewAs ?? user?.role ?? "STAFF";
+  const avatarInitials =
+    user?.name
+      ?.split(" ")
+      .map((w) => w[0])
+      .slice(0, 2)
+      .join("") ?? "?";
 
   const handleLogout = async () => {
     await logout();
-    navigate('/login');
+    navigate("/login");
   };
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
-      if (userRef.current && !userRef.current.contains(e.target as Node)) setUserMenuOpen(false);
-      if (exportRef.current && !exportRef.current.contains(e.target as Node)) setExportOpen(false);
-      if (roleRef.current && !roleRef.current.contains(e.target as Node)) setRoleMenuOpen(false);
+      if (notifRef.current && !notifRef.current.contains(e.target as Node))
+        setNotifOpen(false);
+      if (userRef.current && !userRef.current.contains(e.target as Node))
+        setUserMenuOpen(false);
+      if (exportRef.current && !exportRef.current.contains(e.target as Node))
+        setExportOpen(false);
+      if (roleRef.current && !roleRef.current.contains(e.target as Node))
+        setRoleMenuOpen(false);
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
   }, []);
 
   return (
@@ -112,27 +210,24 @@ export function AppShell() {
       {/* ==================== SIDEBAR ==================== */}
       <aside className="sidebar" aria-label="Navigasi utama">
         <div className="sidebar-brand">
-          <img
-            className="logo sidebar-brand-img"
-            src="/brand/Logo_PLN.png"
-            alt="PLN"
-            style={{
-              width: collapsed ? 48 : 52,
-              height: collapsed ? 48 : 52,
-              objectFit: "contain",
-              flexShrink: 0,
-              borderRadius: 10,
-              background: "var(--color-surface)",
-              padding: 4,
-              border: "1px solid var(--color-border)",
-            }}
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = "none";
-            }}
-          />
-          <div className="sidebar-brand-text">
-            <span className="sidebar-brand-name">SIMPP</span>
-            <span className="sidebar-brand-sub">PUSMANPRO Performance Hub</span>
+          {!collapsed && (
+            <img
+              className="logo sidebar-brand-img"
+              src="/brand/logo-pln-simpp-white-ic.svg"
+              alt="PLN"
+              style={{
+                width: 160,
+                height: 44,
+              }}
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = "none";
+              }}
+            />
+          )}
+          <div
+            className="sidebar-brand-text"
+            onClick={() => setCollapsed((v) => !v)}>
+            <Menu color="#FFFFFF" size={20} />
           </div>
         </div>
 

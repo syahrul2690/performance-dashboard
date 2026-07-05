@@ -263,14 +263,18 @@ a {
 .sidebar-brand {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-3);
   padding: var(--space-4) var(--space-5);
-  border-bottom: 1px solid var(--color-border);
   min-height: var(--topbar-h);
   height: var(--sidebar-brand-h);
   overflow: hidden;
   flex-shrink: 0;
   color: var(--color-accent);
+}
+
+.app[data-sidebar="collapsed"] .sidebar-brand {
+  justify-content: center;
 }
 .sidebar-brand .logo {
   width: 28px;
@@ -282,6 +286,7 @@ a {
   flex-direction: column;
   min-width: 0;
   overflow: hidden;
+  cursor: pointer;
   transition:
     opacity var(--tr-base),
     width var(--tr-base);
@@ -452,7 +457,6 @@ a {
   transition: transform var(--tr-base);
 }
 
-.app[data-sidebar="collapsed"] .sidebar-brand-text,
 .app[data-sidebar="collapsed"] .nav-label,
 .app[data-sidebar="collapsed"] .user-info,
 .app[data-sidebar="collapsed"] .nav-section-label,
