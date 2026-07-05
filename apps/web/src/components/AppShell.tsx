@@ -42,8 +42,8 @@ import {
 
 const NAV_ITEMS = [
   {
-    section: "Aksi Saya",
-    items: [
+    section: "Dashboard Kinerja",
+    submenus: [
       { to: "/approvals", label: "Persetujuan", icon: CheckSquare },
       {
         to: "/input-kontrak",
@@ -56,11 +56,6 @@ const NAV_ITEMS = [
         label: "Input Realisasi Bulanan",
         icon: ClipboardEdit,
       },
-    ],
-  },
-  {
-    section: "Dashboard",
-    items: [
       { to: "/", label: "Executive Summary", icon: LayoutDashboard, end: true },
       {
         to: "/financial",
@@ -112,10 +107,12 @@ const NAV_ITEMS = [
         devOnly: true,
       },
     ],
+    icon: LayoutDashboard,
   },
   {
     section: "Pengaturan",
-    items: [
+    icon: Settings,
+    submenus: [
       { to: "/settings", label: "Settings", icon: Settings },
       { to: "/admin", label: "Admin Tools", icon: ShieldAlert, devOnly: true },
     ],
@@ -238,68 +235,58 @@ export function AppShell() {
             // devOnly: hanya tampil untuk SUPERADMIN dan DEVELOPER
             const isPrivileged =
               user?.role === "SUPERADMIN" || user?.role === "DEVELOPER";
-            const visibleItems = section.items.filter((it) => {
+            const visibleItems = section.submenus.filter((it) => {
               const nav = it as { hideForUpmk?: boolean; devOnly?: boolean };
               if (isUpmkUser && nav.hideForUpmk) return false;
               if (nav.devOnly && !isPrivileged) return false;
               return true;
             });
             if (visibleItems.length === 0) return null;
+
+            const SectionIcon = (
+              section as { icon?: React.ComponentType<{ size?: number }> }
+            ).icon;
+            const hasMultipleSubmenus = section.submenus?.length > 1;
+            const showSectionIcon = hasMultipleSubmenus && SectionIcon;
+
+            // Cek apakah salah satu submenu di section ini sedang aktif
+            const isSectionActive = visibleItems.some(({ to, end }) => {
+              return (
+                location.pathname === to ||
+                (!end && to !== "/" && location.pathname.startsWith(to))
+              );
+            });
             return (
               <div key={section.section}>
-                <div className="nav-section-label">{section.section}</div>
-                {visibleItems.map(({ to, label, icon: Icon, end }) => (
-                  <NavLink
-                    key={to}
-                    to={to}
-                    end={end}
-                    className="nav-item"
-                    aria-current={
-                      location.pathname === to ||
-                      (!end && location.pathname.startsWith(to) && to !== "/")
-                        ? "page"
-                        : undefined
-                    }
-                    title={collapsed ? label : undefined}>
-                    <Icon size={18} className="nav-icon" />
-                    <span className="nav-label">{label}</span>
-                  </NavLink>
-                ))}
+                <div
+                  className="nav-section"
+                  aria-current={isSectionActive ? "page" : undefined}
+                  data-expandable={hasMultipleSubmenus ? "true" : undefined}>
+                  {showSectionIcon && <SectionIcon size={14} />}
+                  <span className="nav-section-label">{section.section}</span>
+                </div>
+                <div className="nav-section-items">
+                  {visibleItems.map(({ to, label, icon: Icon, end }) => (
+                    <NavLink
+                      key={to}
+                      to={to}
+                      end={end}
+                      className="nav-item"
+                      aria-current={
+                        location.pathname === to ||
+                        (!end && location.pathname.startsWith(to) && to !== "/")
+                          ? "page"
+                          : undefined
+                      }
+                      title={collapsed ? label : undefined}>
+                      <span className="nav-label">{label}</span>
+                    </NavLink>
+                  ))}
+                </div>
               </div>
             );
           })}
         </nav>
-
-        <div className="sidebar-footer">
-          <div
-            className="user-card"
-            role="button"
-            tabIndex={0}
-            aria-label="Profil pengguna">
-            <div className="user-avatar" aria-hidden="true">
-              {avatarInitials}
-            </div>
-            <div className="user-info">
-              <span className="user-name">{user?.name ?? "—"}</span>
-              <span className="user-role">
-                {ROLE_LABELS[user?.role ?? ""] ?? user?.role}
-              </span>
-            </div>
-          </div>
-          <button
-            className="sidebar-collapse-btn"
-            aria-label="Ciutkan atau perluas sidebar"
-            onClick={() => setCollapsed((v) => !v)}>
-            <ChevronsLeft
-              size={16}
-              style={{
-                transition: "transform 0.2s",
-                transform: collapsed ? "rotate(180deg)" : "none",
-              }}
-            />
-            <span className="sidebar-collapse-label">Ciutkan</span>
-          </button>
-        </div>
       </aside>
 
       <div className="sidebar-overlay" aria-hidden="true" />
