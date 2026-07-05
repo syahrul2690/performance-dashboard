@@ -90,7 +90,7 @@
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-md);
   margin-bottom: var(--space-6);
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
 }
 .status-banner.success {
   background: var(--color-success-tint);
