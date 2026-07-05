@@ -47,7 +47,7 @@
 
 /* Card header compact variant */
 .card-header.compact {
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-3) var(--space-7);
   min-height: 0;
 }
 .card-header.compact .card-title {
@@ -181,7 +181,7 @@
 .table-wrap { overflow-x: auto; }
 .data-table { width: 100%; border-collapse: collapse; font-size: var(--text-xs); }
 .data-table th {
-  background: var(--color-brand); padding: var(--space-7) var(--space-3);
+  background: var(--color-brand-hover); padding: var(--space-7) var(--space-3);
   text-align: left; font-weight: 700; font-size: var(--text-2xs);
   letter-spacing: 0.04em; text-transform: uppercase;
   color: var(--color-surface); border-bottom: 1px solid var(--color-border);
