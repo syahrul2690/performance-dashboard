@@ -181,10 +181,10 @@
 .table-wrap { overflow-x: auto; }
 .data-table { width: 100%; border-collapse: collapse; font-size: var(--text-xs); }
 .data-table th {
-  background: var(--color-brand-hover); padding: var(--space-7) var(--space-3);
+  background: var(--color-table-head); padding: var(--space-7) var(--space-3);
   text-align: left; font-weight: 700; font-size: var(--text-2xs);
   letter-spacing: 0.04em; text-transform: uppercase;
-  color: var(--color-surface); border-bottom: 1px solid var(--color-border);
+  color: var(--color-table-head-text); border-bottom: 1px solid var(--color-border);
   white-space: nowrap;
 }
 .data-table td {
