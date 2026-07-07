@@ -3064,20 +3064,13 @@ export function ApprovalsPage() {
                         <td style={{ fontWeight: 600 }}>
                           {UNIT_NAMES[c.unitCode] ?? c.unitCode}
                         </td>
-                        <td
-                          style={{
-                            fontSize: 11,
-                            color: "var(--color-text-muted)",
-                          }}>
-                          {c.bidang}
-                        </td>
+                        <td>{c.bidang}</td>
                         <td style={{ color: "var(--color-text-muted)" }}>
                           {c.submitter}
                         </td>
                         <td>
                           <span
-                            className={`status-pill ${c.status === "approved" ? "completed" : c.status === "ready" ? "at-risk" : "in-review"}`}
-                            style={{ fontSize: 10 }}>
+                            className={`status-pill ${c.status === "approved" ? "completed" : c.status === "ready" ? "at-risk" : "in-review"}`}>
                             {c.status === "ready"
                               ? "Siap (lolos SM RPC)"
                               : c.status === "approved"
@@ -3767,7 +3760,7 @@ export function ApprovalsPage() {
                               color:
                                 myCol === col.key
                                   ? "var(--color-accent)"
-                                  : "var(--color-text-muted)",
+                                  : "var(--color-text-sidebar-muted)",
                               marginTop: 2,
                               whiteSpace: "normal",
                               lineHeight: 1.3,
