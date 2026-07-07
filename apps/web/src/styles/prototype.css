@@ -41,6 +41,7 @@
   --color-info-tint: rgba(3, 162, 184, 0.12);
   --color-blue-eye: #035b71;
   --color-sidebar-active: var(--color-surface);
+  --color-table-head:var(--color-brand-hover)
 
   --chart-1: #125d72; /* teal primary */
   --chart-2: #f9af1c; /* orange secondary */
@@ -136,6 +137,7 @@
   --color-icon-bg: var(--color-border);
   --color-pill-bg: var(--color-surface);
   --color-pill: var(--color-text);
+  --color-table-head:var(--color-brand-hover)
   --color-success-tint: rgba(70, 189, 13, 0.18);
   --color-warning-tint: rgba(251, 168, 6, 0.18);
   --color-danger-tint: rgba(236, 28, 36, 0.18);
