@@ -50,7 +50,7 @@ function SlaBadge({ days }: { days?: number | null }) {
         display: "inline-flex",
         alignItems: "center",
         gap: 4,
-        fontSize: 10,
+        fontSize: 14,
         fontWeight: 700,
         color,
         background: bg,
@@ -58,7 +58,7 @@ function SlaBadge({ days }: { days?: number | null }) {
         borderRadius: 8,
         whiteSpace: "nowrap",
       }}>
-      <Timer size={11} />
+      <Timer size={14} />
       {overdue
         ? `Telat ${Math.abs(days)} hari`
         : days === 0
@@ -1700,7 +1700,9 @@ export function ApprovalsPage() {
               />
             </div>
           ) : (
-            <div className="table-wrap">
+            <div
+              className="table-wrap"
+              style={{ paddingBottom: "var(--space-7)" }}>
               <div className="table-scroll">
                 <table className="data-table compact">
                   <thead>
@@ -1770,10 +1772,10 @@ export function ApprovalsPage() {
                                     key={idx}
                                     title={ksteps[idx]?.label}
                                     style={{
-                                      width: 16,
-                                      height: 16,
+                                      width: 24,
+                                      height: 24,
                                       borderRadius: "50%",
-                                      fontSize: 8,
+                                      fontSize: 12,
                                       fontWeight: 700,
                                       display: "flex",
                                       alignItems: "center",
@@ -1795,9 +1797,10 @@ export function ApprovalsPage() {
                               </div>
                               <div
                                 style={{
-                                  fontSize: 10,
+                                  fontSize: 12,
                                   color: "var(--color-accent)",
                                   fontWeight: 600,
+                                  paddingTop: 4,
                                 }}>
                                 Langkah {kci}/{ksteps.length - 1}:{" "}
                                 {kk.stepLabel ?? ksteps[kci]?.label ?? "—"}
@@ -1835,7 +1838,7 @@ export function ApprovalsPage() {
                                   <textarea
                                     className="form-textarea"
                                     style={{
-                                      fontSize: "var(--text-xs)",
+                                      fontSize: "var(--text-sm)",
                                       minHeight: 48,
                                     }}
                                     placeholder="Catatan/komentar (wajib untuk setiap keputusan)"
@@ -1918,18 +1921,26 @@ export function ApprovalsPage() {
                                     flexWrap: "wrap",
                                   }}>
                                   <button
-                                    className="btn btn-secondary btn-sm"
+                                    className="btn btn-secondary btn-md"
                                     onClick={() => {
                                       setKmTarget(k.id);
                                       setKmNote("");
                                     }}>
                                     <Clock size={12} /> Tinjau
                                   </button>
+
                                   <button
                                     className="btn btn-ghost btn-md"
-                                    onClick={() => startEditKm(k)}
+                                    onClick={() =>
+                                      kmExpanded && kmEditId
+                                        ? setKmEditId(null)
+                                        : startEditKm(k)
+                                    }
                                     title="Edit KPI items pada tahap Anda">
-                                    <Pencil size={12} /> Edit
+                                    <Pencil size={12} />{" "}
+                                    {kmExpanded && kmEditId
+                                      ? "Batal Edit"
+                                      : "Edit"}
                                   </button>
                                 </div>
                               )}
@@ -1943,41 +1954,33 @@ export function ApprovalsPage() {
                                   background: "var(--color-surface-2)",
                                   padding: 0,
                                 }}>
-                                <div
-                                  style={{
-                                    display: "flex",
-                                    justifyContent: "flex-end",
-                                    gap: "var(--space-2)",
-                                    padding: "var(--space-2) var(--space-3)",
-                                  }}>
-                                  {kmEditId === k.id ? (
-                                    <>
-                                      <button
-                                        className="btn btn-md"
-                                        style={{
-                                          background: "var(--color-success)",
-                                          color: "#fff",
-                                        }}
-                                        disabled={kmBusy}
-                                        onClick={() => saveEditKm(k)}>
-                                        <CheckCircle size={12} /> Simpan KPI
-                                      </button>
-                                      <button
-                                        className="btn btn-ghost btn-md"
-                                        onClick={() => setKmEditId(null)}>
-                                        Batal Edit
-                                      </button>
-                                    </>
-                                  ) : (
-                                    <button
-                                      className="btn btn-secondary btn-md"
-                                      onClick={() => startEditKm(k)}>
-                                      <Pencil size={12} /> Edit
-                                    </button>
-                                  )}
-                                </div>
+                                {kmEditId && (
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      justifyContent: "flex-end",
+                                      gap: "var(--space-2)",
+                                      padding: "var(--space-2) var(--space-3)",
+                                    }}>
+                                    {kmEditId === k.id && (
+                                      <>
+                                        <button
+                                          className="btn btn-md"
+                                          style={{
+                                            background: "var(--color-success)",
+                                            color: "#fff",
+                                          }}
+                                          disabled={kmBusy}
+                                          onClick={() => saveEditKm(k)}>
+                                          <CheckCircle size={12} /> Simpan KPI
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+                                )}
+
                                 <table
-                                  className="data-table compact"
+                                  className="data-table table-expanded"
                                   style={{ margin: 0 }}>
                                   <thead>
                                     <tr>
@@ -1986,8 +1989,8 @@ export function ApprovalsPage() {
                                       <th>Formula</th>
                                       <th>Satuan</th>
                                       <th className="num">Bobot</th>
-                                      <th>Target Sem I</th>
-                                      <th>{`Target Tahun ${new Date().getFullYear()}`}</th>
+                                      <th className="num">Target Sem I</th>
+                                      <th className="num">{`Target Tahun ${new Date().getFullYear()}`}</th>
                                     </tr>
                                   </thead>
                                   <tbody>
@@ -2013,13 +2016,15 @@ export function ApprovalsPage() {
                                           <td
                                             style={{
                                               fontWeight: editing
-                                                ? 700
+                                                ? 600
                                                 : undefined,
-                                            }}>
+                                              fontSize: 14,
+                                            }}
+                                            className="num">
                                             {editing ? (
                                               <input
                                                 type="text"
-                                                className="form-input form-input-sm"
+                                                className="form-input form-input-sm var(--text-base)"
                                                 style={{ width: 90 }}
                                                 value={String(
                                                   kmEditItems[idx]?.target ??
@@ -2046,9 +2051,10 @@ export function ApprovalsPage() {
                                           <td
                                             style={{
                                               fontWeight: editing
-                                                ? 700
+                                                ? 600
                                                 : undefined,
-                                            }}>
+                                            }}
+                                            className="num">
                                             {editing ? (
                                               <input
                                                 type="text"
@@ -2202,7 +2208,7 @@ export function ApprovalsPage() {
                               </strong>
                             </div>
                             <table
-                              className="data-table compact"
+                              className="data-table table-expanded "
                               style={{ margin: 0 }}>
                               <thead>
                                 <tr>
@@ -2211,8 +2217,8 @@ export function ApprovalsPage() {
                                   <th>Formula</th>
                                   <th>Satuan</th>
                                   <th className="num">Bobot</th>
-                                  <th>Target Sem I</th>
-                                  <th>{`Target ${new Date().getFullYear()}`}</th>
+                                  <th className="num">Target Sem I</th>
+                                  <th className="num">{`Target ${new Date().getFullYear()}`}</th>
                                 </tr>
                               </thead>
                               <tbody>
@@ -2223,8 +2229,8 @@ export function ApprovalsPage() {
                                     <td>{it.formula}</td>
                                     <td>{it.satuan}</td>
                                     <td className="num">{it.bobot}</td>
-                                    <td>{it.target}</td>
-                                    <td>{it.target2}</td>
+                                    <td className="num">{it.target}</td>
+                                    <td className="num">{it.target2}</td>
                                   </tr>
                                 ))}
                               </tbody>
@@ -2514,22 +2520,30 @@ export function ApprovalsPage() {
                                             <th>Formula</th>
                                             <th>Satuan</th>
                                             <th className="num">Bobot</th>
-                                            <th>Target Sem I</th>
-                                            <th>{`Target ${new Date().getFullYear()}`}</th>
+                                            <th className="num">
+                                              Target Sem I
+                                            </th>
+                                            <th className="num">{`Target ${new Date().getFullYear()}`}</th>
                                           </tr>
                                         </thead>
                                         <tbody>
                                           {(c.kpiItems ?? []).map((it, idx) => (
                                             <tr key={idx}>
-                                              <td>{idx + 1}</td>
+                                              <td className="var(--text-sm)">
+                                                {idx + 1}
+                                              </td>
                                               <td>{it.indikator}</td>
                                               <td>{it.formula}</td>
                                               <td>{it.satuan}</td>
                                               <td className="num">
                                                 {it.bobot}
                                               </td>
-                                              <td>{it.target}</td>
-                                              <td>{it.target2}</td>
+                                              <td className="num">
+                                                {it.target}
+                                              </td>
+                                              <td className="num var(--text-sm)">
+                                                {it.target2}
+                                              </td>
                                             </tr>
                                           ))}
                                         </tbody>
@@ -2751,9 +2765,10 @@ export function ApprovalsPage() {
                               </div>
                               <div
                                 style={{
-                                  fontSize: 10,
+                                  fontSize: 12,
                                   color: "var(--color-info)",
                                   fontWeight: 600,
+                                  paddingTop: 4,
                                 }}>
                                 Langkah {ci}/{stepCount - 1}:{" "}
                                 {rr.stepLabel ?? steps[ci]?.label ?? "—"}
@@ -3523,8 +3538,7 @@ export function ApprovalsPage() {
                       </td>
                       <td>
                         <span
-                          className={`status-pill ${DOC_STATUS_PILL[d.status] ?? "in-review"}`}
-                         >
+                          className={`status-pill ${DOC_STATUS_PILL[d.status] ?? "in-review"}`}>
                           {DOC_STATUS_LABEL[d.status] ?? d.status}
                         </span>
                       </td>
@@ -3609,7 +3623,7 @@ export function ApprovalsPage() {
             {myCol && (
               <div
                 style={{
-                  margin: "var(--space-4) var(--space-4) 0",
+                  margin: "var(--space-4) var(--space-7) 0",
                   padding: "var(--space-3) var(--space-4)",
                   borderRadius: "var(--radius-md)",
                   background: "var(--color-accent-tint)",
@@ -3620,7 +3634,7 @@ export function ApprovalsPage() {
                 }}>
                 <div
                   style={{
-                    fontSize: 10,
+                    fontSize: 12,
                     fontWeight: 700,
                     color: "var(--color-accent)",
                     textTransform: "uppercase",
@@ -3628,21 +3642,21 @@ export function ApprovalsPage() {
                   }}>
                   Peran Anda dalam Workflow
                 </div>
-                <div style={{ fontSize: "var(--text-sm)", fontWeight: 700 }}>
+                <div style={{ fontSize: "var(--text-base)", fontWeight: 700 }}>
                   {RACI_COL_LABEL[myCol]}
                 </div>
                 <div
                   style={{
-                    fontSize: "var(--text-xs)",
+                    fontSize: "var(--text-sm)",
                     color: "var(--color-text-muted)",
                   }}>
                   {RACI_COL_TANGGUNG[myCol]}
                 </div>
                 <div
                   style={{
-                    fontSize: 10,
+                    fontSize: 12,
                     color: "var(--color-text-subtle)",
-                    marginTop: 2,
+                    marginTop: 6,
                   }}>
                   Kolom yang disorot (🔵) pada tabel di bawah menunjukkan posisi
                   Anda dalam matriks.
@@ -3654,8 +3668,8 @@ export function ApprovalsPage() {
                 display: "flex",
                 gap: "var(--space-3)",
                 flexWrap: "wrap",
-                padding: "var(--space-3) var(--space-4)",
-                fontSize: 10,
+                padding: "var(--space-3) var(--space-7)",
+                fontSize: 12,
               }}>
               {[
                 [
@@ -3723,9 +3737,9 @@ export function ApprovalsPage() {
                       <th style={{ minWidth: 220 }}>Aktivitas</th>
                       <th
                         style={{
-                          fontSize: 9,
-                          color: "var(--color-text-muted)",
-                          fontWeight: 500,
+                          fontSize: 14,
+                          color: "#e5e7eb",
+                          fontWeight: 600,
                           whiteSpace: "nowrap",
                           textAlign: "center",
                         }}>
@@ -3750,18 +3764,18 @@ export function ApprovalsPage() {
                                 ? "2px solid var(--color-accent)"
                                 : undefined,
                           }}>
-                          <div style={{ fontWeight: 700, fontSize: 11 }}>
+                          <div style={{ fontWeight: 700, fontSize: 14 }}>
                             {myCol === col.key ? "🔵 " : ""}
                             {col.label}
                           </div>
                           <div
                             style={{
-                              fontSize: 9,
-                              fontWeight: 400,
+                              fontSize: 12,
+                              fontWeight: 500,
                               color:
                                 myCol === col.key
                                   ? "var(--color-accent)"
-                                  : "var(--color-text-subtle)",
+                                  : "var(--color-text-muted)",
                               marginTop: 2,
                               whiteSpace: "normal",
                               lineHeight: 1.3,
@@ -3778,7 +3792,7 @@ export function ApprovalsPage() {
                         <td
                           style={{
                             fontWeight: 500,
-                            fontSize: "var(--text-xs)",
+                            fontSize: "var(--text-sm)",
                           }}>
                           {row.activity}
                         </td>
@@ -3786,10 +3800,10 @@ export function ApprovalsPage() {
                           style={{ textAlign: "center", whiteSpace: "nowrap" }}>
                           <span
                             style={{
-                              fontSize: 9,
+                              fontSize: 12,
                               background: "var(--color-surface-2)",
                               color: "var(--color-text-muted)",
-                              padding: "1px 6px",
+                              padding: "2px 6px",
                               borderRadius: 8,
                             }}>
                             {row.scope}
@@ -3837,8 +3851,8 @@ export function ApprovalsPage() {
             </div>
             <div
               style={{
-                padding: "var(--space-3) var(--space-4)",
-                fontSize: 10,
+                padding: "var(--space-3) var(--space-7)",
+                fontSize: 12,
                 color: "var(--color-text-subtle)",
                 borderTop: "1px solid var(--color-border)",
                 lineHeight: 1.7,

@@ -29,7 +29,7 @@
   --color-brand-parent: var(--color-text-subtle);
   --color-icon-solid: var(--color-text-subtle);
   --color-icon-bg: var(--color-border);
-  --color-pill-bg: #e1f3f6;
+  --color-text-muted: var(--color-text-sidebar-muted) --color-pill-bg: #e1f3f6;
   --color-pill: var(--color-brand-hover);
   --color-success: #46bd0d; /* SIMPP success green */
   --color-success-tint: rgba(70, 189, 13, 0.12);
@@ -1362,7 +1362,7 @@ a {
   color-scheme: light;
 }
 .form-input:focus {
-  border-color: var(--color-accent);
+  border-color: var(--color-text-muted);
 }
 
 /* =========================================================
@@ -3102,6 +3102,11 @@ a {
 .data-table tbody tr.row-clickable {
   cursor: pointer;
 }
+
+.table-expanded th {
+  padding: var(--space-4) var(--space-3) !important;
+}
+
 .table-pagination {
   display: flex;
   align-items: center;
