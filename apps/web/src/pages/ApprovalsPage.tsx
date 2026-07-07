@@ -251,7 +251,7 @@ function ApprovalTimeline({ history }: { history: unknown }) {
     return (
       <div
         style={{
-          fontSize: 11,
+          fontSize: 14,
           color: "var(--color-text-muted)",
           padding: "var(--space-3)",
         }}>
@@ -272,13 +272,13 @@ function ApprovalTimeline({ history }: { history: unknown }) {
           style={{
             display: "flex",
             gap: "var(--space-3)",
-            fontSize: 11,
+            fontSize: 14,
             alignItems: "flex-start",
           }}>
           <MessageSquare
-            size={12}
+            size={14}
             style={{
-              marginTop: 2,
+              marginTop: 4,
               color: "var(--color-text-muted)",
               flexShrink: 0,
             }}
@@ -289,7 +289,7 @@ function ApprovalTimeline({ history }: { history: unknown }) {
               {e.actor ?? "—"}
               {e.role ? (
                 <span
-                  style={{ color: "var(--color-text-muted)", fontWeight: 400 }}>
+                  style={{ color: "var(--color-text-muted)", fontWeight: 500 }}>
                   {" "}
                   ({e.role})
                 </span>
@@ -298,7 +298,8 @@ function ApprovalTimeline({ history }: { history: unknown }) {
                 <span
                   style={{
                     color: "var(--color-text-subtle)",
-                    fontWeight: 400,
+                    fontWeight: 500,
+                    fontSize: 12,
                   }}>
                   {" "}
                   ·{" "}
@@ -3486,7 +3487,7 @@ export function ApprovalsPage() {
                         {d.status === "approved" ? (
                           <span
                             style={{
-                              fontSize: 10,
+                              fontSize: 14,
                               color: "var(--color-success)",
                               fontWeight: 600,
                             }}>
@@ -3495,7 +3496,7 @@ export function ApprovalsPage() {
                         ) : d.status === "ready" ? (
                           <span
                             style={{
-                              fontSize: 10,
+                              fontSize: 14,
                               color: "var(--color-warning)",
                               fontWeight: 600,
                             }}>
@@ -3504,7 +3505,7 @@ export function ApprovalsPage() {
                         ) : d.status === "rejected" ? (
                           <span
                             style={{
-                              fontSize: 10,
+                              fontSize: 14,
                               color: "var(--color-danger)",
                             }}>
                             Dikembalikan
@@ -3512,7 +3513,7 @@ export function ApprovalsPage() {
                         ) : (
                           <span
                             style={{
-                              fontSize: 10,
+                              fontSize: 14,
                               color: "var(--color-accent)",
                               fontWeight: 600,
                             }}>
@@ -3523,7 +3524,7 @@ export function ApprovalsPage() {
                       <td>
                         <span
                           className={`status-pill ${DOC_STATUS_PILL[d.status] ?? "in-review"}`}
-                          style={{ fontSize: 10 }}>
+                         >
                           {DOC_STATUS_LABEL[d.status] ?? d.status}
                         </span>
                       </td>
@@ -3533,7 +3534,8 @@ export function ApprovalsPage() {
                             d.status === "approved"
                               ? "var(--color-success)"
                               : "var(--color-text-muted)",
-                          fontSize: 11,
+                          fontSize: 14,
+                          fontWeight: 500,
                         }}>
                         {nextApproverLabel(d.status, d.stepLabel)}
                       </td>
