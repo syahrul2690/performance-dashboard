@@ -2661,7 +2661,9 @@ export function ApprovalsPage() {
               />
             </div>
           ) : (
-            <div className="table-wrap">
+            <div
+              className="table-wrap"
+              style={{ paddingBottom: "var(--space-7)" }}>
               <div className="table-scroll">
                 <table className="data-table compact">
                   <thead>
@@ -2695,11 +2697,7 @@ export function ApprovalsPage() {
                             <td style={{ fontWeight: 600 }}>
                               {UNIT_NAMES[rl.unitCode] ?? rl.unitCode}
                             </td>
-                            <td
-                              style={{
-                                fontSize: 11,
-                                color: "var(--color-text-muted)",
-                              }}>
+                            <td>
                               {(rl as RealisasiKinerja & { bidang?: string })
                                 .bidang ?? "—"}
                             </td>
@@ -2740,10 +2738,10 @@ export function ApprovalsPage() {
                                     key={idx}
                                     title={steps[idx]?.label}
                                     style={{
-                                      width: 16,
-                                      height: 16,
+                                      width: 24,
+                                      height: 24,
                                       borderRadius: "50%",
-                                      fontSize: 8,
+                                      fontSize: 12,
                                       fontWeight: 700,
                                       display: "flex",
                                       alignItems: "center",
@@ -2899,9 +2897,16 @@ export function ApprovalsPage() {
                                   </button>
                                   <button
                                     className="btn btn-ghost btn-md"
-                                    onClick={() => startEditReal(rl)}
+                                    onClick={() =>
+                                      realExpanded && realEditId
+                                        ? setRealEditId(null)
+                                        : startEditReal(rl)
+                                    }
                                     title="Edit nilai realisasi pada tahap Anda">
-                                    <Pencil size={12} /> Edit Nilai
+                                    <Pencil size={12} />{" "}
+                                    {realExpanded && realEditId
+                                      ? "Batal Edit"
+                                      : "Edit Nilai"}
                                   </button>
                                 </div>
                               )}
@@ -2915,42 +2920,29 @@ export function ApprovalsPage() {
                                   background: "var(--color-surface-2)",
                                   padding: 0,
                                 }}>
-                                <div
-                                  style={{
-                                    display: "flex",
-                                    justifyContent: "flex-end",
-                                    gap: "var(--space-2)",
-                                    padding: "var(--space-2) var(--space-3)",
-                                  }}>
-                                  {realEditId === rl.id ? (
-                                    <>
-                                      <button
-                                        className="btn btn-md"
-                                        style={{
-                                          background: "var(--color-success)",
-                                          color: "#fff",
-                                        }}
-                                        disabled={realBusy}
-                                        onClick={() => saveEditReal(rl)}>
-                                        <CheckCircle size={12} /> Simpan Nilai
-                                      </button>
-                                      <button
-                                        className="btn btn-ghost btn-md"
-                                        onClick={() => setRealEditId(null)}>
-                                        Batal Edit
-                                      </button>
-                                    </>
-                                  ) : (
+                                {realEditId === rl.id && (
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      justifyContent: "flex-end",
+                                      gap: "var(--space-2)",
+                                      padding: "var(--space-2) var(--space-3)",
+                                    }}>
                                     <button
-                                      className="btn btn-secondary btn-md"
-                                      onClick={() => startEditReal(rl)}
-                                      title="Edit nilai realisasi pada tahap Anda">
-                                      <Pencil size={12} /> Edit Nilai
+                                      className="btn btn-md"
+                                      style={{
+                                        background: "var(--color-success)",
+                                        color: "#fff",
+                                      }}
+                                      disabled={realBusy}
+                                      onClick={() => saveEditReal(rl)}>
+                                      <CheckCircle size={12} /> Simpan Nilai
                                     </button>
-                                  )}
-                                </div>
+                                  </div>
+                                )}
+
                                 <table
-                                  className="data-table compact"
+                                  className="data-table table-expanded"
                                   style={{ margin: 0 }}>
                                   <thead>
                                     <tr>
