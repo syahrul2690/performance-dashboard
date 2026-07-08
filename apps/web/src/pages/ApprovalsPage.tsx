@@ -514,7 +514,7 @@ export function ApprovalsPage() {
       if (s.includes('pemenuhan pdn') || s.includes('pdn korporat')) return 70;
       if (s.includes('evaluasi penyelesaian') || s.includes('penyelesaian proyek supervisi')) return 80;
       if (s.includes('maturity level')) return 91;
-      if (s.includes('pengurang') && s.includes('kepatuhan')) return 92;
+      if (s.includes('kepatuhan')) return 92;
       if (s.includes('tata kelola')) return 93;
       return 999;
     };
@@ -544,7 +544,9 @@ export function ApprovalsPage() {
           uG9 = true; uS9 = 0;
         }
         if (iG6) {
-          const si = String(it['indikator'] ?? '').replace(/^Pengendalian Anggaran\s*[-–]\s*/i, '');
+          const si = String(it['indikator'] ?? '')
+            .replace(/^Pengendalian Anggaran\s*[-–]\s*/i, '')
+            .replace(/^[a-c]\.\s*/i, '');
           body += `<tr><td class="num" style="font-size:7pt">${slU(uS6++)}.</td>` +
             `<td style="padding-left:10pt">${si}</td>` +
             `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
@@ -552,7 +554,9 @@ export function ApprovalsPage() {
             `<td class="rt">${it['target'] ?? '—'}</td><td class="rw">${it['realisasi'] ?? '—'}</td>` +
             `<td class="num" style="font-size:7pt">${bidang}</td></tr>`;
         } else if (iG9) {
-          const si = String(it['indikator'] ?? '').replace(/^Pengurang\s*[-–]\s*/i, '');
+          const si = String(it['indikator'] ?? '')
+            .replace(/^Pengurang\s*[-–]\s*/i, '')
+            .replace(/^[a-c]\.\s*/i, '');
           body += `<tr><td class="num" style="font-size:7pt">${slU(uS9++)}.</td>` +
             `<td style="padding-left:10pt">${si}</td>` +
             `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
@@ -754,7 +758,7 @@ export function ApprovalsPage() {
         if (s.includes('pemenuhan pdn') || s.includes('pdn korporat')) return 70;
         if (s.includes('evaluasi penyelesaian') || s.includes('penyelesaian proyek supervisi')) return 80;
         if (s.includes('maturity level')) return 91;
-        if (s.includes('pengurang') && s.includes('kepatuhan')) return 92;
+        if (s.includes('kepatuhan')) return 92;
         if (s.includes('tata kelola')) return 93;
         return 999;
       };
@@ -777,7 +781,9 @@ export function ApprovalsPage() {
             g9 = true; s9 = 0;
           }
           if (iG6) {
-            const si = String(it['indikator'] ?? '').replace(/^Pengendalian Anggaran\s*[-–]\s*/i, '');
+            const si = String(it['indikator'] ?? '')
+              .replace(/^Pengendalian Anggaran\s*[-–]\s*/i, '')
+              .replace(/^[a-c]\.\s*/i, '');
             rows += `<tr><td class="num" style="font-size:7pt">${sl(s6++)}.</td>` +
               `<td style="padding-left:10pt">${si}</td>` +
               `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
@@ -785,7 +791,9 @@ export function ApprovalsPage() {
               `<td class="rt">${it['target'] ?? '—'}</td><td class="rw">${it['target2'] ?? '—'}</td>` +
               `<td class="num" style="font-size:7pt">${bidang}</td></tr>`;
           } else if (iG9) {
-            const si = String(it['indikator'] ?? '').replace(/^Pengurang\s*[-–]\s*/i, '');
+            const si = String(it['indikator'] ?? '')
+              .replace(/^Pengurang\s*[-–]\s*/i, '')
+              .replace(/^[a-c]\.\s*/i, '');
             rows += `<tr><td class="num" style="font-size:7pt">${sl(s9++)}.</td>` +
               `<td style="padding-left:10pt">${si}</td>` +
               `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
