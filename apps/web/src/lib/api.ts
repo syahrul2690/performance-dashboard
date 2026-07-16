@@ -191,6 +191,26 @@ export const inputKontrak = {
     api.get('/input-kontrak/template/download', { responseType: 'blob' }).then((r) => r.data as Blob),
 };
 
+export type KpiAssignmentInput = {
+  unitCode: string; bidang: string; holder?: string; bobotKm?: string; target?: string; target2?: string;
+  persenAgregasi?: number;
+};
+export const kpiMaster = {
+  list: (year?: string, kmType?: 'draft' | 'final') =>
+    api.get('/kpi-master', { params: { year, kmType } }).then((r) => r.data),
+  getById: (id: string) => api.get(`/kpi-master/${id}`).then((r) => r.data),
+  save: (dto: {
+    id?: string; kmType?: 'draft' | 'final'; indikator: string; formula?: string;
+    satuan?: string; targetParent?: string; assignments: KpiAssignmentInput[];
+    defaultCheckerIds?: string[]; defaultApproverId?: string;
+  }) => api.post('/kpi-master/save', dto).then((r) => r.data),
+  delete: (id: string) => api.delete(`/kpi-master/${id}`).then((r) => r.data),
+  rollup: (id: string, periodId?: string) =>
+    api.get(`/kpi-master/${id}/rollup`, { params: { periodId } }).then((r) => r.data),
+  defaultsForKm: (kmId: string) =>
+    api.get(`/kpi-master/defaults-for-km/${kmId}`).then((r) => r.data as { checkerIds: string[]; approverId: string | null }),
+};
+
 export const notifications = {
   list: () => api.get('/notifications').then((r) => r.data),
   markRead: (id: string) => api.post(`/notifications/${id}/read`),

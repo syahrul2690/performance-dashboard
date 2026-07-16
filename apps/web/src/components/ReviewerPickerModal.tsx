@@ -25,25 +25,39 @@ type Props = {
   fetchCandidates: () => Promise<{ checkers: ReviewerCandidate[]; approvers: ReviewerCandidate[] }>;
   onConfirm: (checkerIds: string[], approverId: string) => void;
   onCancel: () => void;
+  // Pre-fill dari default KPI Master (Fase C) — submitter tetap bisa mengubahnya.
+  initialCheckerIds?: string[];
+  initialApproverId?: string;
 };
 
-export default function ReviewerPickerModal({ open, title, busy, fetchCandidates, onConfirm, onCancel }: Props) {
+export default function ReviewerPickerModal({ open, title, busy, fetchCandidates, onConfirm, onCancel, initialCheckerIds, initialApproverId }: Props) {
   const [checkers, setCheckers] = useState<ReviewerCandidate[]>([]);
   const [approvers, setApprovers] = useState<ReviewerCandidate[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [order, setOrder] = useState<string[]>([]); // checker ids in review order
   const [approverId, setApproverId] = useState('');
+  const [prefilled, setPrefilled] = useState(false);
 
   useEffect(() => {
     if (!open) return;
-    setOrder([]); setApproverId(''); setLoadErr(null);
+    setOrder([]); setApproverId(''); setLoadErr(null); setPrefilled(false);
     setLoading(true);
     fetchCandidates()
       .then((d) => { setCheckers(d.checkers ?? []); setApprovers(d.approvers ?? []); })
       .catch((e) => setLoadErr((e as Error)?.message ?? 'Gagal memuat kandidat reviewer'))
       .finally(() => setLoading(false));
   }, [open, fetchCandidates]);
+
+  // Pre-fill dari default KPI Master setelah kandidat termuat (hanya sekali per pembukaan).
+  useEffect(() => {
+    if (!open || loading || prefilled) return;
+    if (checkers.length === 0 && approvers.length === 0) return;
+    const validCheckerIds = (initialCheckerIds ?? []).filter((id) => checkers.some((c) => c.id === id));
+    if (validCheckerIds.length > 0) setOrder(validCheckerIds);
+    if (initialApproverId && approvers.some((a) => a.id === initialApproverId)) setApproverId(initialApproverId);
+    setPrefilled(true);
+  }, [open, loading, prefilled, checkers, approvers, initialCheckerIds, initialApproverId]);
 
   if (!open) return null;
 
@@ -83,6 +97,11 @@ export default function ReviewerPickerModal({ open, title, busy, fetchCandidates
             Tentukan <b>Checker</b> (berurutan; ASMAN/Manajer) lalu satu <b>Approver</b> (Senior Manajer/GM).
             Dokumen mengalir: Anda → Checker 1 → Checker 2 → … → Approver → konsolidasi GM.
           </p>
+          {prefilled && (order.length > 0 || approverId) && (
+            <div style={{ margin: '0 0 var(--space-3)', padding: '6px 10px', background: 'var(--color-accent-tint, #eaf0fb)', borderRadius: 6, fontSize: 11, color: 'var(--color-accent, #1f3c6b)' }}>
+              Terisi otomatis dari default KPI Master — Anda tetap bisa mengubahnya.
+            </div>
+          )}
 
           {loading && <div style={{ padding: 'var(--space-4)', textAlign: 'center', color: 'var(--color-text-muted)' }}>Memuat kandidat…</div>}
           {loadErr && <div style={{ padding: 'var(--space-3)', color: 'var(--color-danger, #c00)', fontSize: 13 }}>{loadErr}</div>}

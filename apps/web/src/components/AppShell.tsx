@@ -10,7 +10,7 @@ import {
   Bell, Moon, Sun, LogOut, ChevronDown, Menu, ChevronsLeft,
   Tv2, Search, Download, User, HelpCircle, FilePlus, LineChart,
   FileSpreadsheet, Image, Printer, ExternalLink,
-  Workflow, Network, Leaf, MapPin, ShieldAlert,
+  Workflow, Network, Leaf, MapPin, ShieldAlert, Layers,
 } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -18,6 +18,7 @@ const NAV_ITEMS = [
     section: 'Aksi Saya', items: [
       { to: '/approvals',      label: 'Persetujuan',             icon: CheckSquare },
       { to: '/input-kontrak',  label: 'Input Kontrak Manajemen', icon: FileText,    hideForUpmk: true },
+      { to: '/kpi-master',     label: 'KPI Master',              icon: Layers,      hideForUpmk: true },
       { to: '/input-realisasi',label: 'Input Realisasi Bulanan', icon: ClipboardEdit },
     ]
   },
@@ -63,6 +64,7 @@ const ROUTE_NAMES: Record<string, string> = {
   '/approvals': 'Persetujuan',
   '/input-realisasi': 'Input Realisasi',
   '/input-kontrak': 'Input Kontrak Manajemen',
+  '/kpi-master': 'KPI Master',
   '/workflow-km/usulan': 'Proses Usulan KM',
   '/workflow-km/realisasi': 'Proses Realisasi KM',
   '/settings': 'Settings',

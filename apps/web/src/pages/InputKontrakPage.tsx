@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, Fragment } from 'react';
-import { inputKontrak } from '../lib/api';
+import { inputKontrak, kpiMaster } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { FileText, Plus, Trash2, Send, CheckCircle, Edit2, X, Upload, AlertCircle, Download, FileCheck2, ChevronDown } from 'lucide-react';
 import { SkeletonTable, EmptyState, ErrorState } from '../components/LoadState';
@@ -50,6 +50,7 @@ export function InputKontrakPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submitTargetId, setSubmitTargetId] = useState<string | null>(null);
+  const [defaultReviewers, setDefaultReviewers] = useState<{ checkerIds: string[]; approverId: string | null }>({ checkerIds: [], approverId: null });
   const [notice, setNotice] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -159,8 +160,16 @@ export function InputKontrakPage() {
   };
 
   // Kirim membuka picker reviewer; pengiriman sebenarnya di handleConfirmSubmit.
-  const handleSubmit = (id: string) => {
+  // Sebelum membuka picker, ambil default checker/approver dari KPI Master (Fase C)
+  // bila dokumen ini hasil fan-out — picker akan pre-fill, submitter tetap bisa mengubah.
+  const handleSubmit = async (id: string) => {
     setSubmitTargetId(id);
+    try {
+      const d = await kpiMaster.defaultsForKm(id);
+      setDefaultReviewers(d);
+    } catch {
+      setDefaultReviewers({ checkerIds: [], approverId: null });
+    }
   };
 
   const handleConfirmSubmit = async (checkerIds: string[], approverId: string) => {
@@ -677,6 +686,8 @@ export function InputKontrakPage() {
         fetchCandidates={inputKontrak.reviewerCandidates}
         onConfirm={handleConfirmSubmit}
         onCancel={() => setSubmitTargetId(null)}
+        initialCheckerIds={defaultReviewers.checkerIds}
+        initialApproverId={defaultReviewers.approverId ?? undefined}
       />
     </div>
   );
