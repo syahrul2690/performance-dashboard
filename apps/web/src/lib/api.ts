@@ -124,10 +124,12 @@ export const workflowKm = {
 export const inputRealisasi = {
   history: (unitCode?: string, periodId?: string) =>
     api.get('/input-realisasi/history', { params: { unitCode, periodId } }).then((r) => r.data),
-  submit: (unitCode: string, bidang: string, values: Record<string, unknown>, periodId?: string) =>
-    api.put('/input-realisasi/submit', { unitCode, bidang, values, periodId }).then((r) => r.data),
+  submit: (unitCode: string, bidang: string, values: Record<string, unknown>, checkerIds: string[], approverId: string, periodId?: string) =>
+    api.put('/input-realisasi/submit', { unitCode, bidang, values, checkerIds, approverId, periodId }).then((r) => r.data),
   reviewList: () =>
     api.get('/input-realisasi/review/list').then((r) => r.data),
+  reviewerCandidates: () =>
+    api.get('/input-realisasi/reviewer-candidates').then((r) => r.data),
   review: (id: string, action: 'approve' | 'reject', note?: string, returnTo?: 'konseptor' | 'previous') =>
     api.post(`/input-realisasi/${id}/review`, { action, note, returnTo }).then((r) => r.data),
   updateValues: (id: string, values: Record<string, unknown>) =>
@@ -149,8 +151,8 @@ export const inputRealisasi = {
 };
 
 export const inputKontrak = {
-  list: (unitCode?: string, periodId?: string) =>
-    api.get('/input-kontrak', { params: { unitCode, periodId } }).then((r) => r.data),
+  list: (unitCode?: string, periodId?: string, kmType?: 'draft' | 'final') =>
+    api.get('/input-kontrak', { params: { unitCode, periodId, kmType } }).then((r) => r.data),
   getById: (id: string) =>
     api.get(`/input-kontrak/${id}`).then((r) => r.data),
   save: (
@@ -159,22 +161,25 @@ export const inputKontrak = {
     holder: string,
     kpiItems: Record<string, unknown>[],
     id?: string,
+    kmType: 'draft' | 'final' = 'draft',
   ) =>
-    api.post('/input-kontrak/save', { id, unitCode, bidang, holder, kpiItems }).then((r) => r.data),
-  submit: (id: string) =>
-    api.post(`/input-kontrak/${id}/submit`).then((r) => r.data),
+    api.post('/input-kontrak/save', { id, unitCode, bidang, holder, kpiItems, kmType }).then((r) => r.data),
+  submit: (id: string, checkerIds: string[], approverId: string) =>
+    api.post(`/input-kontrak/${id}/submit`, { checkerIds, approverId }).then((r) => r.data),
   delete: (id: string) =>
     api.delete(`/input-kontrak/${id}`).then((r) => r.data),
   reviewList: () =>
     api.get('/input-kontrak/review/list').then((r) => r.data),
-  approved: (unitCode?: string, year?: string) =>
-    api.get('/input-kontrak/approved', { params: { unitCode, year } }).then((r) => r.data),
+  reviewerCandidates: () =>
+    api.get('/input-kontrak/reviewer-candidates').then((r) => r.data),
+  approved: (unitCode?: string, year?: string, kmType?: 'draft' | 'final') =>
+    api.get('/input-kontrak/approved', { params: { unitCode, year, kmType } }).then((r) => r.data),
   review: (id: string, action: 'approve' | 'reject', note?: string, returnTo?: 'konseptor' | 'previous') =>
     api.post(`/input-kontrak/${id}/review`, { action, note, returnTo }).then((r) => r.data),
-  bundle: (scope: 'KP' | 'UPMK' = 'KP', year?: string) =>
-    api.get('/input-kontrak/bundle', { params: { scope, year } }).then((r) => r.data),
-  reviewBundle: (scope: 'KP' | 'UPMK', action: 'approve' | 'reject', note: string, year?: string) =>
-    api.post('/input-kontrak/bundle/review', { scope, action, note, year }).then((r) => r.data),
+  bundle: (scope: 'KP' | 'UPMK' = 'KP', year?: string, kmType: 'draft' | 'final' = 'draft') =>
+    api.get('/input-kontrak/bundle', { params: { scope, year, kmType } }).then((r) => r.data),
+  reviewBundle: (scope: 'KP' | 'UPMK', action: 'approve' | 'reject', note: string, year?: string, kmType: 'draft' | 'final' = 'draft') =>
+    api.post('/input-kontrak/bundle/review', { scope, action, note, year, kmType }).then((r) => r.data),
   updateValues: (id: string, kpiItems: Record<string, unknown>[]) =>
     api.patch(`/input-kontrak/${id}/values`, { kpiItems }).then((r) => r.data),
   uploadExcel: (file: File) => {
@@ -210,6 +215,14 @@ export const kinerja = {
 
 export const admin = {
   resetTestData: () => api.delete('/admin/reset-test-data').then((r) => r.data),
+  togglePeriodWindow: (periodId: string, enabled: boolean) =>
+    api.patch(`/admin/periods/${periodId}/window-override`, { enabled }).then((r) => r.data),
+  setKmReference: (periodId: string, kmReference: 'draft' | 'final') =>
+    api.patch(`/admin/periods/${periodId}/km-reference`, { kmReference }).then((r) => r.data),
+  whatsappLogs: () => api.get('/admin/whatsapp-sim/logs').then((r) => r.data),
+  whatsappPreview: (periodId: string) =>
+    api.get('/admin/whatsapp-sim/preview', { params: { periodId } }).then((r) => r.data),
+  whatsappRun: () => api.post('/admin/whatsapp-sim/run').then((r) => r.data),
 };
 
 export default api;

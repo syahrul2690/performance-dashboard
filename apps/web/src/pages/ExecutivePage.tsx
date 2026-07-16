@@ -4,7 +4,7 @@ import { usePeriod } from '../context/PeriodContext';
 import {
   BarChart3, LineChart, Trophy, Layers, TrendingUp, ShieldCheck,
   Compass, Cpu, Leaf, Users, GitBranch, ClipboardList, HardHat, CheckCircle2,
-  ChevronDown, Target, ShieldAlert, ClipboardCheck,
+  ChevronDown, Target, ShieldAlert, ClipboardCheck, GitCompare,
 } from 'lucide-react';
 import { UnitTrendChart } from '../components/UnitTrendChart';
 import { SkeletonKpiCards, SkeletonChart, SkeletonTable, EmptyState, ErrorState } from '../components/LoadState';
@@ -147,6 +147,7 @@ export function ExecutivePage() {
 
   const scoreColor = gaugeValue >= 100 ? 'var(--color-success)' : gaugeValue >= 90 ? 'var(--color-warning)' : 'var(--color-danger)';
   const currentYear = new Date().getFullYear();
+  const selfAssessmentAccuracy = d.selfAssessmentAccuracy;
 
   // Operational data derivations
   const od = (opData?.data ?? {}) as Record<string, unknown>;
@@ -438,6 +439,29 @@ export function ExecutivePage() {
           <UnitTrendChart trend={d.unitTrend as Record<string, unknown>} />
         </div>
       </FoldCard>
+
+      {/* Akurasi Self-Assessment UPMK — selisih self-assessment (dikunci saat submit) vs hasil evaluasi RPC */}
+      {selfAssessmentAccuracy && selfAssessmentAccuracy.unitsWithData > 0 && (
+        <FoldCard
+          title="Akurasi Self-Assessment UPMK"
+          icon={<GitCompare size={14} />}
+          right={
+            <span className={`status-pill ${selfAssessmentAccuracy.status === 'akurat' ? 'completed' : selfAssessmentAccuracy.status === 'perlu-perhatian' ? 'at-risk' : 'delayed'}`} style={{ fontWeight: 700 }}>
+              {selfAssessmentAccuracy.status === 'akurat' ? '✓ Akurat' : selfAssessmentAccuracy.status === 'perlu-perhatian' ? '⚠ Perlu Perhatian' : '✗ Signifikan'}
+            </span>
+          }
+        >
+          <div style={{ padding: 'var(--space-4)' }}>
+            <div className="summary-hero-card" style={{ maxWidth: 320 }}>
+              <div className="summary-hero-label">Rata-rata Selisih Nilai (|gap|)</div>
+              <div className="summary-hero-value">{fmt(selfAssessmentAccuracy.avgGap)}</div>
+              <div className="summary-hero-meta">
+                Dari {selfAssessmentAccuracy.unitsWithData} unit UPMK · self-assessment vs hasil evaluasi berjenjang s.d. SM RPC
+              </div>
+            </div>
+          </div>
+        </FoldCard>
+      )}
 
       {/* Pencapaian Kinerja Per Unit — tabel dengan kolom Target */}
       {ranking && ranking.length > 0 && (

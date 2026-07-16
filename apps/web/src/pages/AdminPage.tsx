@@ -1,13 +1,63 @@
-import { useState } from 'react';
-import { ShieldAlert, Trash2, CheckCircle, AlertCircle, Database } from 'lucide-react';
+import { Fragment, useEffect, useState } from 'react';
+import { ShieldAlert, Trash2, CheckCircle, AlertCircle, Database, MessageCircle, PlayCircle, Eye } from 'lucide-react';
 import { admin } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { usePeriod } from '../context/PeriodContext';
 import { Navigate } from 'react-router-dom';
+
+type WhatsappLog = {
+  id: string; periodId: string; recipientName: string; phone: string | null;
+  templateType: string; message: string; pendingCount: number; forced: boolean; createdAt: string;
+};
+type WhatsappPreviewItem = {
+  recipientId: string; recipientName: string; phone: string | null;
+  items: Array<{ unitCode: string; bidang: string }>; message: string;
+};
 
 export function AdminPage() {
   const { user } = useAuth();
+  const { periodId } = usePeriod();
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  const [waLogs, setWaLogs] = useState<WhatsappLog[]>([]);
+  const [waPreview, setWaPreview] = useState<WhatsappPreviewItem[]>([]);
+  const [waBusy, setWaBusy] = useState(false);
+  const [waPreviewOpen, setWaPreviewOpen] = useState<string | null>(null);
+  const [waLogOpen, setWaLogOpen] = useState<string | null>(null);
+
+  const loadWaLogs = () => admin.whatsappLogs().then((d) => setWaLogs(d as WhatsappLog[])).catch(() => {});
+  const loadWaPreview = () => {
+    if (!periodId) return;
+    admin.whatsappPreview(periodId).then((d) => setWaPreview(d as WhatsappPreviewItem[])).catch(() => {});
+  };
+
+  useEffect(() => {
+    if (user?.role !== 'SUPERADMIN' && user?.role !== 'DEVELOPER') return;
+    loadWaLogs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.role]);
+
+  useEffect(() => {
+    if (user?.role !== 'SUPERADMIN' && user?.role !== 'DEVELOPER') return;
+    loadWaPreview();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [periodId, user?.role]);
+
+  const handleRunWhatsappSim = async () => {
+    setWaBusy(true);
+    try {
+      const res = await admin.whatsappRun();
+      setResult({ ok: true, msg: `Simulasi dijalankan: ${res.remindersSent} pesan dari ${res.periodsChecked} periode terbuka.` });
+      loadWaLogs();
+      loadWaPreview();
+    } catch (e) {
+      const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Gagal menjalankan simulasi';
+      setResult({ ok: false, msg });
+    } finally {
+      setWaBusy(false);
+    }
+  };
 
   if (user?.role !== 'SUPERADMIN' && user?.role !== 'DEVELOPER') {
     return <Navigate to="/" replace />;
@@ -110,6 +160,102 @@ export function AdminPage() {
             <Trash2 size={15} />
             {loading ? 'Mereset…' : 'Reset Semua Data Testing'}
           </button>
+        </div>
+      </div>
+
+      <div className="card" style={{ borderLeft: '4px solid var(--color-success, #16a34a)', maxWidth: 720, marginTop: 'var(--space-4)' }}>
+        <div className="card-header compact">
+          <div className="card-title"><MessageCircle size={14} /> Simulasi Notifikasi WhatsApp</div>
+        </div>
+        <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', margin: 0 }}>
+            Pengingat otomatis ke <b>Checker</b> yang punya realisasi KPI menunggu tinjauan, dikirim setiap 3 hari
+            selama window pengisian (tgl 25 – tgl 5) terbuka. Belum terhubung provider nyata — hanya mencatat
+            pesan yang <i>akan</i> dikirim untuk validasi konten sebelum integrasi produksi (mis. Fonnte/WA Business API).
+          </p>
+
+          <div>
+            <button className="btn btn-primary" onClick={handleRunWhatsappSim} disabled={waBusy}>
+              <PlayCircle size={15} /> {waBusy ? 'Menjalankan…' : 'Jalankan Simulasi Sekarang'}
+            </button>
+          </div>
+
+          {/* Preview: apa yang akan dikirim untuk periode yang sedang dipilih */}
+          <div>
+            <div style={{ fontSize: 'var(--text-xs)', fontWeight: 700, marginBottom: 'var(--space-2)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Eye size={13} /> Preview — Periode Terpilih ({waPreview.reduce((s, p) => s + p.items.length, 0)} dokumen pending)
+            </div>
+            {waPreview.length === 0 ? (
+              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>Tidak ada Checker dengan dokumen pending pada periode ini.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {waPreview.map((p) => (
+                  <div key={p.recipientId} style={{ border: '1px solid var(--color-border, #e5e5e5)', borderRadius: 6 }}>
+                    <button
+                      onClick={() => setWaPreviewOpen(waPreviewOpen === p.recipientId ? null : p.recipientId)}
+                      style={{ width: '100%', textAlign: 'left', padding: '8px 10px', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 12, display: 'flex', justifyContent: 'space-between' }}
+                    >
+                      <span><b>{p.recipientName}</b> {p.phone ? `· ${p.phone}` : '· (nomor belum diisi)'}</span>
+                      <span style={{ color: 'var(--color-text-muted)' }}>{p.items.length} dokumen</span>
+                    </button>
+                    {waPreviewOpen === p.recipientId && (
+                      <pre style={{ margin: 0, padding: '8px 10px', borderTop: '1px solid var(--color-border-subtle, #eee)', fontSize: 11, whiteSpace: 'pre-wrap', fontFamily: 'inherit', background: 'var(--color-surface-1, #f7f7f8)' }}>
+                        {p.message}
+                      </pre>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Log simulasi terkirim */}
+          <div>
+            <div style={{ fontSize: 'var(--text-xs)', fontWeight: 700, marginBottom: 'var(--space-2)' }}>Riwayat Simulasi ({waLogs.length})</div>
+            {waLogs.length === 0 ? (
+              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>Belum ada simulasi yang tercatat.</div>
+            ) : (
+              <table style={{ width: '100%', fontSize: 'var(--text-xs)', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: 'left', padding: '4px 8px', borderBottom: '1px solid var(--color-border)' }}>Waktu</th>
+                    <th style={{ textAlign: 'left', padding: '4px 8px', borderBottom: '1px solid var(--color-border)' }}>Penerima</th>
+                    <th style={{ textAlign: 'left', padding: '4px 8px', borderBottom: '1px solid var(--color-border)' }}>Dokumen</th>
+                    <th style={{ textAlign: 'left', padding: '4px 8px', borderBottom: '1px solid var(--color-border)' }}>Sumber</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {waLogs.map((l) => (
+                    <Fragment key={l.id}>
+                      <tr>
+                        <td style={{ padding: '4px 8px', borderBottom: '1px solid var(--color-border-subtle)', whiteSpace: 'nowrap' }}>
+                          {new Date(l.createdAt).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        </td>
+                        <td style={{ padding: '4px 8px', borderBottom: '1px solid var(--color-border-subtle)' }}>{l.recipientName}</td>
+                        <td style={{ padding: '4px 8px', borderBottom: '1px solid var(--color-border-subtle)' }}>{l.pendingCount}</td>
+                        <td style={{ padding: '4px 8px', borderBottom: '1px solid var(--color-border-subtle)' }}>{l.forced ? 'Manual' : 'Terjadwal'}</td>
+                        <td style={{ padding: '4px 8px', borderBottom: '1px solid var(--color-border-subtle)' }}>
+                          <button className="btn btn-ghost btn-sm" onClick={() => setWaLogOpen(waLogOpen === l.id ? null : l.id)}>
+                            {waLogOpen === l.id ? 'Tutup' : 'Lihat pesan'}
+                          </button>
+                        </td>
+                      </tr>
+                      {waLogOpen === l.id && (
+                        <tr>
+                          <td colSpan={5} style={{ padding: 0, borderBottom: '1px solid var(--color-border-subtle)' }}>
+                            <pre style={{ margin: 0, padding: '8px 10px', fontSize: 11, whiteSpace: 'pre-wrap', fontFamily: 'inherit', background: 'var(--color-surface-1, #f7f7f8)' }}>
+                              {l.message}
+                            </pre>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
         </div>
       </div>
     </div>

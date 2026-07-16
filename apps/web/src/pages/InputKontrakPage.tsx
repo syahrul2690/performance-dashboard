@@ -3,6 +3,7 @@ import { inputKontrak } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { FileText, Plus, Trash2, Send, CheckCircle, Edit2, X, Upload, AlertCircle, Download, FileCheck2, ChevronDown } from 'lucide-react';
 import { SkeletonTable, EmptyState, ErrorState } from '../components/LoadState';
+import ReviewerPickerModal from '../components/ReviewerPickerModal';
 import type { KontrakManajemen } from '../lib/types';
 
 type KpiItem = {
@@ -38,6 +39,9 @@ const STATUS_PILL: Record<string, string> = {
 
 export function InputKontrakPage() {
   const { user } = useAuth();
+  // Draft dan Final adalah dua dokumen KM independen — tab ini menentukan mana yang
+  // sedang dikelola (list, create, submit) sekaligus.
+  const [kmTypeFilter, setKmTypeFilter] = useState<'draft' | 'final'>('draft');
   const [kontrakList, setKontrakList] = useState<KontrakManajemen[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,6 +49,7 @@ export function InputKontrakPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [submitTargetId, setSubmitTargetId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -69,19 +74,19 @@ export function InputKontrakPage() {
   useEffect(() => {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedUnit]);
+  }, [selectedUnit, kmTypeFilter]);
 
-  // Registri KM disahkan (lintas unit) — dimuat sekali.
+  // Registri KM disahkan (lintas unit) — mengikuti tab Draft/Final aktif.
   useEffect(() => {
-    inputKontrak.approved().then((d) => setApprovedList(d as KontrakManajemen[])).catch(() => {});
-  }, [submitted]);
+    inputKontrak.approved(undefined, undefined, kmTypeFilter).then((d) => setApprovedList(d as KontrakManajemen[])).catch(() => {});
+  }, [submitted, kmTypeFilter]);
 
   const loadData = async () => {
     try {
       // GM filter by selected unit; others load all KMs so self-created cross-unit KMs (e.g. UPMK KM by Staff RPC) are always visible.
       // filterKm handles display scoping.
       const unitFilter = user?.role === 'GM' ? selectedUnit : undefined;
-      const data = await inputKontrak.list(unitFilter);
+      const data = await inputKontrak.list(unitFilter, undefined, kmTypeFilter);
       setKontrakList(data as KontrakManajemen[]);
     } catch (e) {
       setError((e as Error)?.message ?? 'Gagal memuat data');
@@ -139,6 +144,7 @@ export function InputKontrakPage() {
         formUnit, bidang.trim(), holder.trim(),
         kpiItems as unknown as Record<string, unknown>[],
         editingId ?? undefined,
+        kmTypeFilter,
       );
       setSubmitted(true);
       setSelectedUnit(formUnit); // tampilkan unit yang baru dibuat di daftar
@@ -152,15 +158,23 @@ export function InputKontrakPage() {
     }
   };
 
-  const handleSubmit = async (id: string) => {
+  // Kirim membuka picker reviewer; pengiriman sebenarnya di handleConfirmSubmit.
+  const handleSubmit = (id: string) => {
+    setSubmitTargetId(id);
+  };
+
+  const handleConfirmSubmit = async (checkerIds: string[], approverId: string) => {
+    if (!submitTargetId) return;
     setSubmitting(true);
     try {
-      await inputKontrak.submit(id);
+      await inputKontrak.submit(submitTargetId, checkerIds, approverId);
+      setSubmitTargetId(null);
       setSubmitted(true);
       await loadData();
       setTimeout(() => setSubmitted(false), 3000);
     } catch (e) {
-      setError((e as Error)?.message ?? 'Gagal mengirim');
+      const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? (e as Error)?.message ?? 'Gagal mengirim';
+      setError(msg);
     } finally {
       setSubmitting(false);
     }
@@ -281,6 +295,27 @@ export function InputKontrakPage() {
 
   return (
     <div className="page input-kontrak-page">
+      {/* Tab KM Draft / KM Final — dua dokumen independen dengan alur & bundle masing-masing */}
+      <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }}>
+        <button
+          className={`btn ${kmTypeFilter === 'draft' ? 'btn-primary' : 'btn-ghost'}`}
+          onClick={() => { setKmTypeFilter('draft'); resetForm(); }}
+        >
+          KM Draft
+        </button>
+        <button
+          className={`btn ${kmTypeFilter === 'final' ? 'btn-primary' : 'btn-ghost'}`}
+          onClick={() => { setKmTypeFilter('final'); resetForm(); }}
+        >
+          KM Final
+        </button>
+        <span style={{ alignSelf: 'center', fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+          {kmTypeFilter === 'draft'
+            ? 'Acuan target awal tahun, sebelum disahkan Direksi.'
+            : 'Acuan resmi setelah disahkan Direksi (di luar sistem).'}
+        </span>
+      </div>
+
       {/* Header Card */}
       <div className="card" style={{ marginBottom: 'var(--space-6)', borderLeft: '4px solid var(--color-accent)' }}>
         <div className="card-body" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
@@ -288,7 +323,9 @@ export function InputKontrakPage() {
             <FileText size={24} color="var(--color-accent)" />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 700 }}>Input Kontrak Manajemen Tahun {CURRENT_YEAR}</div>
+            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 700 }}>
+              Input Kontrak Manajemen {kmTypeFilter === 'draft' ? 'Draft' : 'Final'} Tahun {CURRENT_YEAR}
+            </div>
             <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
               <span>Unit:</span>
               {canSelectUnit ? (
@@ -632,6 +669,15 @@ export function InputKontrakPage() {
           </div>
         )}
       </div>
+
+      <ReviewerPickerModal
+        open={submitTargetId !== null}
+        title="Alur Reviewer Kontrak Manajemen"
+        busy={submitting}
+        fetchCandidates={inputKontrak.reviewerCandidates}
+        onConfirm={handleConfirmSubmit}
+        onCancel={() => setSubmitTargetId(null)}
+      />
     </div>
   );
 }

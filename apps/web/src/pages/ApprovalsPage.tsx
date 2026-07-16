@@ -1,11 +1,11 @@
 import { useEffect, useState, Fragment, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { approvals as approvalsApi, inputKontrak, inputRealisasi, meta as metaApi } from '../lib/api';
+import { approvals as approvalsApi, inputKontrak, inputRealisasi, meta as metaApi, admin } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { usePeriod } from '../context/PeriodContext';
 import { useNotif } from '../context/NotifContext';
 import type { Report, KontrakManajemen, RealisasiKinerja } from '../lib/types';
-import { CheckCircle, XCircle, Clock, CalendarClock, FileText, UsersRound, FileSignature, ChevronDown, ClipboardCheck, Timer, MessageSquare, Pencil, Layers, Printer } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, CalendarClock, FileText, UsersRound, FileSignature, ChevronDown, ClipboardCheck, Timer, MessageSquare, Pencil, Layers, Printer, Unlock, Lock } from 'lucide-react';
 import { SkeletonTable, EmptyState, ErrorState } from '../components/LoadState';
 
 // Badge SLA approval (Task 6): hari tersisa hingga deadline tahap berjalan.
@@ -272,7 +272,34 @@ export function ApprovalsPage() {
   const [docExpanded, setDocExpanded] = useState<string | null>(null);
 
   // B4: Bundle konsolidasi realisasi periode (persetujuan GM sekali).
-  const { periodId } = usePeriod();
+  const { periodId, periods, refreshPeriods } = usePeriod();
+  const [windowBusy, setWindowBusy] = useState(false);
+  const selectedPeriodForWindow = periods.find((p) => p.id === periodId);
+  const handleToggleWindow = async (enabled: boolean) => {
+    if (!periodId) return;
+    setWindowBusy(true);
+    try {
+      await admin.togglePeriodWindow(periodId, enabled);
+      await refreshPeriods();
+    } catch (e) {
+      alert((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Gagal mengubah window pengisian');
+    } finally {
+      setWindowBusy(false);
+    }
+  };
+  const [kmRefBusy, setKmRefBusy] = useState(false);
+  const handleSetKmReference = async (kmReference: 'draft' | 'final') => {
+    if (!periodId) return;
+    setKmRefBusy(true);
+    try {
+      await admin.setKmReference(periodId, kmReference);
+      await refreshPeriods();
+    } catch (e) {
+      alert((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Gagal mengubah acuan KM');
+    } finally {
+      setKmRefBusy(false);
+    }
+  };
   type BundleData = {
     period?: { label?: string } | null; status: string; total: number; readyCount: number; canApprove: boolean;
     components: Array<{ id: string; unitCode: string; bidang: string; status: string; submitter: string; values?: unknown }>;
@@ -298,9 +325,11 @@ export function ApprovalsPage() {
   const [kmBundleExpanded, setKmBundleExpanded] = useState<string | null>(null);
   const [upmkGroupExpanded, setUpmkGroupExpanded] = useState<string | null>(null);
   const [upmkRealGroupExpanded, setUpmkRealGroupExpanded] = useState<string | null>(null);
+  // Draft dan Final adalah dua bundle KM independen — tab ini menentukan mana yang ditinjau GM.
+  const [kmBundleType, setKmBundleType] = useState<'draft' | 'final'>('draft');
   const loadKmBundle = () => {
-    inputKontrak.bundle('KP').then((d) => setKmBundleKP(d as KmBundleData)).catch(() => { });
-    inputKontrak.bundle('UPMK').then((d) => setKmBundleUPMK(d as KmBundleData)).catch(() => { });
+    inputKontrak.bundle('KP', undefined, kmBundleType).then((d) => setKmBundleKP(d as KmBundleData)).catch(() => { });
+    inputKontrak.bundle('UPMK', undefined, kmBundleType).then((d) => setKmBundleUPMK(d as KmBundleData)).catch(() => { });
   };
 
   const load = () => {
@@ -334,13 +363,13 @@ export function ApprovalsPage() {
   };
 
   useEffect(() => { load(); loadKm(); loadReal(); loadDocs(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { loadBundle(); loadKmBundle(); }, [periodId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { loadBundle(); loadKmBundle(); }, [periodId, kmBundleType]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleKmBundleKPReview = async (action: 'approve' | 'reject') => {
     if (!kmBundleKPNote.trim()) { alert('Catatan/komentar wajib diisi'); return; }
     setKmBundleKPBusy(true);
     try {
-      await inputKontrak.reviewBundle('KP', action, kmBundleKPNote);
+      await inputKontrak.reviewBundle('KP', action, kmBundleKPNote, undefined, kmBundleType);
       setKmBundleKPNote('');
       loadKmBundle(); loadKm(); refreshNotif();
     } catch (e) {
@@ -353,7 +382,7 @@ export function ApprovalsPage() {
     if (!kmBundleUPMKNote.trim()) { alert('Catatan/komentar wajib diisi'); return; }
     setKmBundleUPMKBusy(true);
     try {
-      await inputKontrak.reviewBundle('UPMK', action, kmBundleUPMKNote);
+      await inputKontrak.reviewBundle('UPMK', action, kmBundleUPMKNote, undefined, kmBundleType);
       setKmBundleUPMKNote('');
       loadKmBundle(); loadKm(); refreshNotif();
     } catch (e) {
@@ -1190,6 +1219,23 @@ export function ApprovalsPage() {
       )}
 
       {/* Bundle Konsolidasi KM Tahunan — persetujuan akhir GM */}
+      {/* Tab KM Draft / KM Final — bundle & konsolidasi terpisah untuk masing-masing tipe */}
+      {canReview && (
+        <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)', alignItems: 'center' }}>
+          <button
+            className={`btn btn-sm ${kmBundleType === 'draft' ? 'btn-primary' : 'btn-ghost'}`}
+            onClick={() => setKmBundleType('draft')}
+          >
+            Bundle KM Draft
+          </button>
+          <button
+            className={`btn btn-sm ${kmBundleType === 'final' ? 'btn-primary' : 'btn-ghost'}`}
+            onClick={() => setKmBundleType('final')}
+          >
+            Bundle KM Final
+          </button>
+        </div>
+      )}
       {/* === Card 1: Bundle KM Kantor Induk === */}
       {canReview && kmBundleKP && (
         <FoldCard
@@ -1197,7 +1243,7 @@ export function ApprovalsPage() {
           highlight={highlight === 'kmbundle'}
           accent="var(--color-accent)"
           icon={<Layers size={14} />}
-          title={`Konsolidasi KM Tahunan — Kantor Induk${kmBundleKP.year ? ' ' + kmBundleKP.year : ''}`}
+          title={`Konsolidasi KM ${kmBundleType === 'draft' ? 'Draft' : 'Final'} Tahunan — Kantor Induk${kmBundleKP.year ? ' ' + kmBundleKP.year : ''}`}
           right={kmBundleKP.status === 'approved' ? <span className="status-pill completed" style={{ fontWeight: 700 }}>Disahkan GM</span> : <span className="status-pill" style={{ fontWeight: 700 }}>{kmBundleKP.readyCount}/{kmBundleKP.total} siap</span>}
         >
           <div className="table-wrap">
@@ -1288,7 +1334,7 @@ export function ApprovalsPage() {
           id="card-km-bundle-upmk"
           accent="var(--color-accent)"
           icon={<Layers size={14} />}
-          title={`Konsolidasi KM Tahunan — UPMK${kmBundleUPMK.year ? ' ' + kmBundleUPMK.year : ''}`}
+          title={`Konsolidasi KM ${kmBundleType === 'draft' ? 'Draft' : 'Final'} Tahunan — UPMK${kmBundleUPMK.year ? ' ' + kmBundleUPMK.year : ''}`}
           right={kmBundleUPMK.status === 'approved' ? <span className="status-pill completed" style={{ fontWeight: 700 }}>Disahkan GM</span> : <span className="status-pill" style={{ fontWeight: 700 }}>{kmBundleUPMK.readyCount}/{kmBundleUPMK.total} siap</span>}
         >
           <div className="table-wrap">
@@ -1562,6 +1608,88 @@ export function ApprovalsPage() {
               </table>
             </div>
           )}
+        </FoldCard>
+      )}
+
+      {/* Kontrol Window Pengisian Realisasi — GM dapat membuka window secara manual di luar jadwal tgl 25-5 */}
+      {isGM && selectedPeriodForWindow?.fillWindow && (
+        <FoldCard
+          id="card-window-control"
+          accent="var(--color-warning, #d97706)"
+          icon={<Unlock size={14} />}
+          title={`Window Pengisian Realisasi — ${selectedPeriodForWindow.label}`}
+          defaultOpen={!selectedPeriodForWindow.fillWindow.isOpen}
+          right={
+            <span className={`status-pill ${selectedPeriodForWindow.fillWindow.isOpen ? 'at-risk' : 'delayed'}`} style={{ fontWeight: 700 }}>
+              {selectedPeriodForWindow.fillWindow.isOpen
+                ? (selectedPeriodForWindow.fillWindow.overrideActive ? 'Dibuka manual' : 'Terbuka')
+                : 'Tertutup'}
+            </span>
+          }
+        >
+          <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+            <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
+              Jadwal normal: <b>{new Date(selectedPeriodForWindow.fillWindow.start).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}</b> s.d. <b>{new Date(selectedPeriodForWindow.fillWindow.end).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}</b>.
+              Di luar jadwal ini, Staff/ASMAN tidak dapat mengirim realisasi kecuali dibuka manual di sini.
+            </p>
+            {selectedPeriodForWindow.fillWindow.overrideActive && (
+              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-warning)' }}>
+                Dibuka manual oleh <b>{selectedPeriodForWindow.overrideBy ?? '—'}</b>
+                {selectedPeriodForWindow.overrideAt ? ` pada ${new Date(selectedPeriodForWindow.overrideAt).toLocaleString('id-ID')}` : ''}.
+              </div>
+            )}
+            <div>
+              {selectedPeriodForWindow.windowOverride ? (
+                <button className="btn btn-secondary" disabled={windowBusy} onClick={() => handleToggleWindow(false)}>
+                  <Lock size={14} /> {windowBusy ? 'Memproses…' : 'Kembalikan ke Jadwal Normal'}
+                </button>
+              ) : (
+                <button className="btn btn-primary" disabled={windowBusy} onClick={() => handleToggleWindow(true)}>
+                  <Unlock size={14} /> {windowBusy ? 'Memproses…' : 'Buka Window Sekarang'}
+                </button>
+              )}
+            </div>
+          </div>
+        </FoldCard>
+      )}
+
+      {/* Kontrol Acuan Aktif KM — GM menentukan KM Draft atau KM Final yang jadi acuan realisasi periode ini */}
+      {isGM && selectedPeriodForWindow && (
+        <FoldCard
+          id="card-km-reference-control"
+          accent="var(--color-brand, #125D72)"
+          icon={<FileSignature size={14} />}
+          title={`Acuan KM untuk Realisasi — ${selectedPeriodForWindow.label}`}
+          defaultOpen={false}
+          right={
+            <span className="status-pill at-risk" style={{ fontWeight: 700 }}>
+              {selectedPeriodForWindow.kmReference === 'final' ? 'KM Final' : 'KM Draft'}
+            </span>
+          }
+        >
+          <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+            <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
+              Menentukan KM mana yang jadi acuan indikator saat unit mengisi realisasi periode ini.
+              Default: Jan-Jun memakai <b>KM Draft</b>, Jul-Des memakai <b>KM Final</b> (setelah disahkan Direksi).
+              Jika KM Final belum disahkan/masih berubah, kembalikan acuan ke Draft di sini.
+            </p>
+            <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+              <button
+                className={`btn ${selectedPeriodForWindow.kmReference !== 'final' ? 'btn-primary' : 'btn-secondary'}`}
+                disabled={kmRefBusy || selectedPeriodForWindow.kmReference !== 'final'}
+                onClick={() => handleSetKmReference('draft')}
+              >
+                {kmRefBusy ? 'Memproses…' : 'Pakai KM Draft'}
+              </button>
+              <button
+                className={`btn ${selectedPeriodForWindow.kmReference === 'final' ? 'btn-primary' : 'btn-secondary'}`}
+                disabled={kmRefBusy || selectedPeriodForWindow.kmReference === 'final'}
+                onClick={() => handleSetKmReference('final')}
+              >
+                {kmRefBusy ? 'Memproses…' : 'Pakai KM Final'}
+              </button>
+            </div>
+          </div>
         </FoldCard>
       )}
 

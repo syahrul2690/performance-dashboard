@@ -15,6 +15,7 @@ class SaveDto {
   @IsString() bidang: string;
   @IsString() holder: string;
   @IsArray() kpiItems: Record<string, unknown>[];
+  @IsOptional() @IsIn(['draft', 'final']) kmType?: string;
 }
 
 class ReviewDto {
@@ -27,11 +28,17 @@ class UpdateKpiItemsDto {
   @IsArray() kpiItems: object[];
 }
 
+class SubmitDto {
+  @IsArray() @IsString({ each: true }) checkerIds: string[];
+  @IsString() approverId: string;
+}
+
 class BundleReviewDto {
   @IsIn(['approve', 'reject']) action: 'approve' | 'reject';
   @IsIn(['KP', 'UPMK']) scope: 'KP' | 'UPMK';
   @IsString() note: string;
   @IsOptional() @IsString() year?: string;
+  @IsOptional() @IsIn(['draft', 'final']) kmType?: string;
 }
 
 @UseGuards(JwtAuthGuard)
@@ -40,8 +47,8 @@ export class InputKontrakController {
   constructor(private svc: InputKontrakService) {}
 
   @Get()
-  list(@Query('unitCode') unitCode?: string, @Query('periodId') periodId?: string) {
-    return this.svc.getList(unitCode, periodId);
+  list(@Query('unitCode') unitCode?: string, @Query('periodId') periodId?: string, @Query('kmType') kmType?: string) {
+    return this.svc.getList(unitCode, periodId, kmType);
   }
 
   @Get('review/list')
@@ -49,19 +56,24 @@ export class InputKontrakController {
     return this.svc.getReviewList(user);
   }
 
+  @Get('reviewer-candidates')
+  reviewerCandidates() {
+    return this.svc.getReviewerCandidates();
+  }
+
   @Get('approved')
-  approved(@Query('unitCode') unitCode?: string, @Query('year') year?: string) {
-    return this.svc.getApproved(unitCode, year);
+  approved(@Query('unitCode') unitCode?: string, @Query('year') year?: string, @Query('kmType') kmType?: string) {
+    return this.svc.getApproved(unitCode, year, kmType);
   }
 
   @Get('bundle')
-  bundle(@Query('scope') scope: 'KP' | 'UPMK' = 'KP', @Query('year') year?: string) {
-    return this.svc.getBundle(scope, year);
+  bundle(@Query('scope') scope: 'KP' | 'UPMK' = 'KP', @Query('year') year?: string, @Query('kmType') kmType: string = 'draft') {
+    return this.svc.getBundle(scope, year, kmType);
   }
 
   @Post('bundle/review')
   reviewBundle(@CurrentUser() user: User, @Body() dto: BundleReviewDto) {
-    return this.svc.reviewBundle(user, dto.scope, dto.action, dto.note, dto.year);
+    return this.svc.reviewBundle(user, dto.scope, dto.action, dto.note, dto.year, dto.kmType ?? 'draft');
   }
 
   @Get(':id')
@@ -71,7 +83,7 @@ export class InputKontrakController {
 
   @Post('save')
   save(@CurrentUser() user: User, @Body() dto: SaveDto) {
-    return this.svc.save(user, dto.id, dto.unitCode, dto.bidang, dto.holder, dto.kpiItems);
+    return this.svc.save(user, dto.id, dto.unitCode, dto.bidang, dto.holder, dto.kpiItems, dto.kmType ?? 'draft');
   }
 
   @Post('upload')
@@ -91,8 +103,8 @@ export class InputKontrakController {
   }
 
   @Post(':id/submit')
-  submit(@CurrentUser() user: User, @Param('id') id: string) {
-    return this.svc.submit(user, id);
+  submit(@CurrentUser() user: User, @Param('id') id: string, @Body() dto: SubmitDto) {
+    return this.svc.submit(user, id, dto.checkerIds, dto.approverId);
   }
 
   @Patch(':id/values')
