@@ -130,8 +130,8 @@ export function AdminPage() {
                 ['Audit Log', 'audit_logs'],
               ].map(([label, table]) => (
                 <tr key={table}>
-                  <td style={{ padding: '4px 8px', borderBottom: '1px solid var(--color-border-subtle)' }}>{label}</td>
-                  <td style={{ padding: '4px 8px', borderBottom: '1px solid var(--color-border-subtle)', color: 'var(--color-danger)', fontWeight: 600, fontSize: 10 }}>AKAN DIHAPUS</td>
+                  <td style={{ padding: '4px 8px', borderBottom: '1px solid var(--color-border)' }}>{label}</td>
+                  <td style={{ padding: '4px 8px', borderBottom: '1px solid var(--color-border)', color: 'var(--color-danger)', fontWeight: 600, fontSize: 10 }}>AKAN DIHAPUS</td>
                 </tr>
               ))}
               {[
@@ -140,8 +140,8 @@ export function AdminPage() {
                 ['Data Referensi', 'role_variants, dll.'],
               ].map(([label, table]) => (
                 <tr key={table}>
-                  <td style={{ padding: '4px 8px', borderBottom: '1px solid var(--color-border-subtle)' }}>{label}</td>
-                  <td style={{ padding: '4px 8px', borderBottom: '1px solid var(--color-border-subtle)', color: 'var(--color-success)', fontWeight: 600, fontSize: 10 }}>AMAN</td>
+                  <td style={{ padding: '4px 8px', borderBottom: '1px solid var(--color-border)' }}>{label}</td>
+                  <td style={{ padding: '4px 8px', borderBottom: '1px solid var(--color-border)', color: 'var(--color-success)', fontWeight: 600, fontSize: 10 }}>AMAN</td>
                 </tr>
               ))}
             </tbody>
@@ -199,7 +199,7 @@ export function AdminPage() {
                       <span style={{ color: 'var(--color-text-muted)' }}>{p.items.length} dokumen</span>
                     </button>
                     {waPreviewOpen === p.recipientId && (
-                      <pre style={{ margin: 0, padding: '8px 10px', borderTop: '1px solid var(--color-border-subtle, #eee)', fontSize: 11, whiteSpace: 'pre-wrap', fontFamily: 'inherit', background: 'var(--color-surface-1, #f7f7f8)' }}>
+                      <pre style={{ margin: 0, padding: '8px 10px', borderTop: '1px solid var(--color-border)', fontSize: 11, whiteSpace: 'pre-wrap', fontFamily: 'inherit', background: 'var(--color-surface-2)', color: 'var(--color-text)' }}>
                         {p.message}
                       </pre>
                     )}
@@ -229,13 +229,13 @@ export function AdminPage() {
                   {waLogs.map((l) => (
                     <Fragment key={l.id}>
                       <tr>
-                        <td style={{ padding: '4px 8px', borderBottom: '1px solid var(--color-border-subtle)', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '4px 8px', borderBottom: '1px solid var(--color-border)', whiteSpace: 'nowrap' }}>
                           {new Date(l.createdAt).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                         </td>
-                        <td style={{ padding: '4px 8px', borderBottom: '1px solid var(--color-border-subtle)' }}>{l.recipientName}</td>
-                        <td style={{ padding: '4px 8px', borderBottom: '1px solid var(--color-border-subtle)' }}>{l.pendingCount}</td>
-                        <td style={{ padding: '4px 8px', borderBottom: '1px solid var(--color-border-subtle)' }}>{l.forced ? 'Manual' : 'Terjadwal'}</td>
-                        <td style={{ padding: '4px 8px', borderBottom: '1px solid var(--color-border-subtle)' }}>
+                        <td style={{ padding: '4px 8px', borderBottom: '1px solid var(--color-border)' }}>{l.recipientName}</td>
+                        <td style={{ padding: '4px 8px', borderBottom: '1px solid var(--color-border)' }}>{l.pendingCount}</td>
+                        <td style={{ padding: '4px 8px', borderBottom: '1px solid var(--color-border)' }}>{l.forced ? 'Manual' : 'Terjadwal'}</td>
+                        <td style={{ padding: '4px 8px', borderBottom: '1px solid var(--color-border)' }}>
                           <button className="btn btn-ghost btn-sm" onClick={() => setWaLogOpen(waLogOpen === l.id ? null : l.id)}>
                             {waLogOpen === l.id ? 'Tutup' : 'Lihat pesan'}
                           </button>
@@ -243,8 +243,8 @@ export function AdminPage() {
                       </tr>
                       {waLogOpen === l.id && (
                         <tr>
-                          <td colSpan={5} style={{ padding: 0, borderBottom: '1px solid var(--color-border-subtle)' }}>
-                            <pre style={{ margin: 0, padding: '8px 10px', fontSize: 11, whiteSpace: 'pre-wrap', fontFamily: 'inherit', background: 'var(--color-surface-1, #f7f7f8)' }}>
+                          <td colSpan={5} style={{ padding: 0, borderBottom: '1px solid var(--color-border)' }}>
+                            <pre style={{ margin: 0, padding: '8px 10px', fontSize: 11, whiteSpace: 'pre-wrap', fontFamily: 'inherit', background: 'var(--color-surface-2)', color: 'var(--color-text)' }}>
                               {l.message}
                             </pre>
                           </td>

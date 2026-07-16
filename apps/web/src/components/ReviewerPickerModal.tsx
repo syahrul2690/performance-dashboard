@@ -85,26 +85,26 @@ export default function ReviewerPickerModal({ open, title, busy, fetchCandidates
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{ background: 'var(--color-surface-0, #fff)', borderRadius: 'var(--radius-lg, 10px)', width: 'min(680px, 100%)', maxHeight: '88vh', overflow: 'auto', boxShadow: '0 12px 40px rgba(0,0,0,.25)' }}
+        style={{ background: 'var(--color-surface)', color: 'var(--color-text)', borderRadius: 'var(--radius-lg, 10px)', width: 'min(680px, 100%)', maxHeight: '88vh', overflow: 'auto', boxShadow: '0 12px 40px rgba(0,0,0,.25)' }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--space-4)', borderBottom: '1px solid var(--color-border, #e5e5e5)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--space-4)', borderBottom: '1px solid var(--color-border)' }}>
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>{title ?? 'Pilih Alur Reviewer'}</h3>
           <button className="btn btn-ghost btn-sm" onClick={onCancel} aria-label="Tutup"><X size={16} /></button>
         </div>
 
         <div style={{ padding: 'var(--space-4)' }}>
-          <p style={{ margin: '0 0 var(--space-3)', fontSize: 12, color: 'var(--color-text-muted, #666)' }}>
+          <p style={{ margin: '0 0 var(--space-3)', fontSize: 12, color: 'var(--color-text-muted)' }}>
             Tentukan <b>Checker</b> (berurutan; ASMAN/Manajer) lalu satu <b>Approver</b> (Senior Manajer/GM).
             Dokumen mengalir: Anda → Checker 1 → Checker 2 → … → Approver → konsolidasi GM.
           </p>
           {prefilled && (order.length > 0 || approverId) && (
-            <div style={{ margin: '0 0 var(--space-3)', padding: '6px 10px', background: 'var(--color-accent-tint, #eaf0fb)', borderRadius: 6, fontSize: 11, color: 'var(--color-accent, #1f3c6b)' }}>
+            <div style={{ margin: '0 0 var(--space-3)', padding: '6px 10px', background: 'var(--color-accent-tint)', borderRadius: 6, fontSize: 11, color: 'var(--color-accent)' }}>
               Terisi otomatis dari default KPI Master — Anda tetap bisa mengubahnya.
             </div>
           )}
 
           {loading && <div style={{ padding: 'var(--space-4)', textAlign: 'center', color: 'var(--color-text-muted)' }}>Memuat kandidat…</div>}
-          {loadErr && <div style={{ padding: 'var(--space-3)', color: 'var(--color-danger, #c00)', fontSize: 13 }}>{loadErr}</div>}
+          {loadErr && <div style={{ padding: 'var(--space-3)', color: 'var(--color-danger)', fontSize: 13 }}>{loadErr}</div>}
 
           {!loading && !loadErr && (
             <>
@@ -118,7 +118,7 @@ export default function ReviewerPickerModal({ open, title, busy, fetchCandidates
                     const c = byId(id);
                     if (!c) return null;
                     return (
-                      <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: 'var(--color-surface-1, #f5f6f8)', borderRadius: 6, marginBottom: 4 }}>
+                      <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: 'var(--color-surface-2)', borderRadius: 6, marginBottom: 4 }}>
                         <span style={{ fontWeight: 700, minWidth: 18 }}>{i + 1}.</span>
                         <span style={{ flex: 1, fontSize: 13 }}>{c.name} <span style={{ color: 'var(--color-text-muted)', fontSize: 11 }}>· {desc(c)}</span></span>
                         <button className="btn btn-ghost btn-sm" disabled={i === 0} onClick={() => move(id, -1)} aria-label="Naik"><ArrowUp size={13} /></button>
@@ -140,7 +140,7 @@ export default function ReviewerPickerModal({ open, title, busy, fetchCandidates
                       <button
                         key={c.id}
                         onClick={() => toggleChecker(c.id)}
-                        style={{ textAlign: 'left', padding: '8px 10px', borderRadius: 6, border: `1px solid ${picked ? 'var(--color-primary, #1f3c6b)' : 'var(--color-border, #e0e0e0)'}`, background: picked ? 'var(--color-primary-soft, #eaf0fb)' : 'var(--color-surface-0, #fff)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
+                        style={{ textAlign: 'left', padding: '8px 10px', borderRadius: 6, border: `1px solid ${picked ? 'var(--color-accent)' : 'var(--color-border)'}`, background: picked ? 'var(--color-accent-tint)' : 'var(--color-surface)', color: 'var(--color-text)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
                       >
                         <span style={{ width: 16 }}>{picked && <Check size={14} />}</span>
                         <span style={{ fontSize: 13 }}>{c.name}<br /><span style={{ color: 'var(--color-text-muted)', fontSize: 11 }}>{desc(c)}</span></span>
@@ -167,7 +167,7 @@ export default function ReviewerPickerModal({ open, title, busy, fetchCandidates
           )}
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)', padding: 'var(--space-4)', borderTop: '1px solid var(--color-border, #e5e5e5)' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)', padding: 'var(--space-4)', borderTop: '1px solid var(--color-border)' }}>
           <button className="btn btn-ghost" onClick={onCancel} disabled={busy}>Batal</button>
           <button className="btn btn-primary" onClick={() => onConfirm(order, approverId)} disabled={!canConfirm}>
             {busy ? 'Mengirim…' : 'Kirim untuk Review'}

@@ -1357,7 +1357,7 @@ export function ApprovalsPage() {
                   const aggregateCls = allApproved ? 'completed' : allReady ? 'at-risk' : anySubmitted ? 'in-review' : '';
                   return (
                     <Fragment key={unitCode}>
-                      <tr style={{ background: 'var(--color-surface-1)' }}>
+                      <tr style={{ background: 'var(--color-surface-2)' }}>
                         <td colSpan={2} style={{ fontWeight: 700 }}>
                           <button className="btn btn-ghost btn-sm" style={{ gap: 'var(--space-1)' }} onClick={() => setUpmkGroupExpanded(isOpen ? null : unitCode)}>
                             <ChevronDown size={12} style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform .2s', flexShrink: 0 }} />
@@ -1740,7 +1740,7 @@ export function ApprovalsPage() {
                   const aggrCls      = allApproved ? 'completed' : allReady ? 'at-risk' : anySubmitted ? 'in-review' : '';
                   return (
                     <Fragment key={unitCode}>
-                      <tr style={{ background: 'var(--color-surface-1)' }}>
+                      <tr style={{ background: 'var(--color-surface-2)' }}>
                         <td colSpan={2} style={{ fontWeight: 700 }}>
                           <button className="btn btn-ghost btn-sm" style={{ gap: 'var(--space-1)' }} onClick={() => setUpmkRealGroupExpanded(isOpen ? null : unitCode)}>
                             <ChevronDown size={12} style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform .2s', flexShrink: 0 }} />
