@@ -24,6 +24,7 @@ export interface SaveMasterInput {
   assignments: AssignmentInput[];
   defaultCheckerIds?: string[]; // default alur reviewer (Fase C) — diwariskan ke picker submit
   defaultApproverId?: string;
+  aggregationMethod?: string; // 'weighted' | 'sum' (Fase E) — dipilih per-KPI
 }
 
 // Item yang disebar (fan-out) ke kpiItems dokumen KM. Bentuknya kompatibel dengan
@@ -86,10 +87,13 @@ export class KpiMasterService {
     return this.withVersionFlags(m, activePeriod?.yearMonth);
   }
 
-  // Rollup: gulung realisasi tiap assignment (child) menjadi nilai parent, memakai
-  // rata-rata tertimbang persenAgregasi (Σ=100%). Realisasi diambil dari InputRealisasi
-  // yang APPROVED pada periode terkait — dicari item dengan masterKpiId yang cocok
-  // (masterKpiId ikut tersalin ke realisasi karena fan-out menyisipkannya di kpiItems KM).
+  // Rollup: gulung realisasi tiap assignment (child) menjadi nilai parent. Realisasi
+  // diambil dari InputRealisasi yang APPROVED pada periode terkait — dicari item dengan
+  // masterKpiId yang cocok (masterKpiId ikut tersalin ke realisasi karena fan-out
+  // menyisipkannya di kpiItems KM). Metode agregasi (Fase E) dipilih per-KPI:
+  //   'weighted' — rata-rata tertimbang pakai persenAgregasi (Σ=100% jadi syarat lengkap).
+  //   'sum'      — jumlah polos tiap kontribusi (cocok utk KPI penalti/pengurang lintas
+  //                bidang); tidak ada syarat Σ=100%, selalu dianggap "lengkap".
   async getRollup(id: string, periodId?: string) {
     const master = await this.getById(id);
     const period = periodId
@@ -103,6 +107,7 @@ export class KpiMasterService {
       return Number.isFinite(n) ? n : 0;
     };
     const r2 = (n: number) => Math.round(n * 100) / 100;
+    const isSum = master.aggregationMethod === 'sum';
 
     const totalPersen = r2(master.assignments.reduce((s, a) => s + a.persenAgregasi, 0));
     let nilaiParent = 0;
@@ -118,7 +123,7 @@ export class KpiMasterService {
       const values = (record?.values ?? {}) as Record<string, Record<string, unknown>>;
       const item = Object.values(values).find((it) => it['masterKpiId'] === master.id);
       const realisasi = item ? num(item['realisasi']) : null;
-      const kontribusi = realisasi != null ? r2((realisasi * a.persenAgregasi) / 100) : 0;
+      const kontribusi = realisasi == null ? 0 : isSum ? r2(realisasi) : r2((realisasi * a.persenAgregasi) / 100);
       nilaiParent += kontribusi;
       breakdown.push({
         unitCode: a.unitCode, bidang: a.bidang, persenAgregasi: a.persenAgregasi,
@@ -129,8 +134,9 @@ export class KpiMasterService {
     return {
       masterId: master.id, indikator: master.indikator, targetParent: master.targetParent,
       periodId: period.id, periodLabel: period.label,
+      aggregationMethod: master.aggregationMethod,
       totalPersen, nilaiParent: r2(nilaiParent),
-      isFullyConfigured: Math.abs(totalPersen - 100) < 0.01,
+      isFullyConfigured: isSum || Math.abs(totalPersen - 100) < 0.01,
       breakdown,
     };
   }
@@ -152,12 +158,16 @@ export class KpiMasterService {
       if (keys.has(k)) throw new BadRequestException(`Assignment ganda untuk ${a.unitCode} — ${a.bidang}`);
       keys.add(k);
     }
-    // Bobot agregasi (persenAgregasi): bila DIISI (ada nilai > 0), total seluruh
-    // assignment WAJIB tepat 100%. Bila semua 0 (belum dikonfigurasi RPC), lewati validasi.
-    const totalPersen = dto.assignments.reduce((s, a) => s + (Number(a.persenAgregasi) || 0), 0);
-    const anyPersenSet = dto.assignments.some((a) => Number(a.persenAgregasi) > 0);
-    if (anyPersenSet && Math.abs(totalPersen - 100) > 0.01) {
-      throw new BadRequestException(`Total bobot agregasi harus 100%, saat ini ${totalPersen}%`);
+    // Metode agregasi (Fase E) — dipilih per-KPI. 'sum' = jumlah polos tiap kontribusi
+    // (KPI penalti/pengurang, tanpa syarat Σ=100%). 'weighted' = rata-rata tertimbang
+    // pakai persenAgregasi (Σ=100% wajib bila diisi) — perilaku Fase B, default.
+    const aggregationMethod = dto.aggregationMethod === 'sum' ? 'sum' : 'weighted';
+    if (aggregationMethod === 'weighted') {
+      const totalPersen = dto.assignments.reduce((s, a) => s + (Number(a.persenAgregasi) || 0), 0);
+      const anyPersenSet = dto.assignments.some((a) => Number(a.persenAgregasi) > 0);
+      if (anyPersenSet && Math.abs(totalPersen - 100) > 0.01) {
+        throw new BadRequestException(`Total bobot agregasi harus 100%, saat ini ${totalPersen}%`);
+      }
     }
 
     // Default alur reviewer (Fase C): opsional — bila diisi, harus resolve ke user aktif
@@ -208,7 +218,7 @@ export class KpiMasterService {
           where: { id: dto.id },
           data: {
             indikator: dto.indikator.trim(), formula: dto.formula ?? '', satuan: dto.satuan ?? '',
-            targetParent: dto.targetParent ?? '', kmType, defaultCheckerIds, defaultApproverId,
+            targetParent: dto.targetParent ?? '', kmType, defaultCheckerIds, defaultApproverId, aggregationMethod,
           },
         });
         await this.prisma.kpiAssignment.deleteMany({ where: { kpiMasterId: master.id } });
@@ -221,7 +231,7 @@ export class KpiMasterService {
           data: {
             year: nextPeriod.yearMonth.slice(0, 4), kmType, indikator: dto.indikator.trim(), formula: dto.formula ?? '',
             satuan: dto.satuan ?? '', targetParent: dto.targetParent ?? '', createdBy: user.name, createdById: user.id,
-            defaultCheckerIds, defaultApproverId,
+            defaultCheckerIds, defaultApproverId, aggregationMethod,
             effectiveMonth: nextMonth, version: existing.version + 1, previousVersionId: existing.id,
           },
         });
@@ -233,7 +243,7 @@ export class KpiMasterService {
         data: {
           year: activePeriod.yearMonth.slice(0, 4), kmType, indikator: dto.indikator.trim(), formula: dto.formula ?? '',
           satuan: dto.satuan ?? '', targetParent: dto.targetParent ?? '', createdBy: user.name, createdById: user.id,
-          defaultCheckerIds, defaultApproverId, effectiveMonth: activePeriod.yearMonth, version: 1,
+          defaultCheckerIds, defaultApproverId, aggregationMethod, effectiveMonth: activePeriod.yearMonth, version: 1,
         },
       });
       targetPeriodId = activePeriod.id;

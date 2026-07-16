@@ -28,11 +28,13 @@ type KpiMasterRow = {
   defaultCheckerIds: string[]; defaultApproverId: string | null;
   effectiveMonth: string; version: number; status: string; previousVersionId: string | null;
   isPending: boolean; isCurrent: boolean;
+  aggregationMethod: 'weighted' | 'sum';
 };
 const ROLE_LABEL: Record<string, string> = { ASMAN: 'ASMAN', MANAJER: 'Manajer', SRMANAJER: 'Senior Manajer', GM: 'General Manager' };
 type RollupBreakdown = { unitCode: string; bidang: string; persenAgregasi: number; realisasi: number | null; kontribusi: number; hasData: boolean };
 type Rollup = {
   masterId: string; indikator: string; targetParent: string; periodId: string; periodLabel: string;
+  aggregationMethod: 'weighted' | 'sum';
   totalPersen: number; nilaiParent: number; isFullyConfigured: boolean; breakdown: RollupBreakdown[];
 };
 
@@ -56,6 +58,7 @@ export function KpiMasterPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingIsPending, setEditingIsPending] = useState(false);
   const [kmType, setKmType] = useState<'draft' | 'final'>('draft');
+  const [aggregationMethod, setAggregationMethod] = useState<'weighted' | 'sum'>('weighted');
   const [indikator, setIndikator] = useState('');
   const [formula, setFormula] = useState('');
   const [satuan, setSatuan] = useState('');
@@ -97,13 +100,15 @@ export function KpiMasterPage() {
   useEffect(() => { load(); }, []);
 
   const resetForm = () => {
-    setEditingId(null); setEditingIsPending(false); setKmType('draft'); setIndikator(''); setFormula(''); setSatuan('');
+    setEditingId(null); setEditingIsPending(false); setKmType('draft'); setAggregationMethod('weighted');
+    setIndikator(''); setFormula(''); setSatuan('');
     setTargetParent(''); setAssignments([emptyAssignment()]); setFormError(null); setShowForm(false);
     setDefaultCheckerOrder([]); setDefaultApproverId('');
   };
 
   const handleEdit = (m: KpiMasterRow) => {
-    setEditingId(m.id); setKmType(m.kmType); setIndikator(m.indikator); setFormula(m.formula);
+    setEditingId(m.id); setKmType(m.kmType); setAggregationMethod(m.aggregationMethod ?? 'weighted');
+    setIndikator(m.indikator); setFormula(m.formula);
     setSatuan(m.satuan); setTargetParent(m.targetParent);
     setDefaultCheckerOrder(m.defaultCheckerIds ?? []); setDefaultApproverId(m.defaultApproverId ?? '');
     setAssignments(m.assignments.map((a) => ({
@@ -143,15 +148,16 @@ export function KpiMasterPage() {
       if (keys.has(k)) { setFormError(`Assignment ganda: ${UNIT_NAMES[a.unitCode]} — ${a.bidang}`); return; }
       keys.add(k);
     }
-    // Bobot agregasi: bila diisi (ada nilai > 0), total harus tepat 100%.
-    if (anyPersenSet && Math.abs(totalPersenForm - 100) > 0.01) {
+    // Bobot agregasi: hanya berlaku utk metode 'weighted' — bila diisi (ada nilai > 0),
+    // total harus tepat 100%. Metode 'sum' (KPI penalti) tidak punya syarat ini.
+    if (aggregationMethod === 'weighted' && anyPersenSet && Math.abs(totalPersenForm - 100) > 0.01) {
       setFormError(`Total bobot agregasi harus 100%, saat ini ${totalPersenForm}%.`);
       return;
     }
     setFormError(null); setBusy(true);
     try {
       await kpiMaster.save({
-        id: editingId ?? undefined, kmType, indikator: indikator.trim(), formula, satuan, targetParent, assignments,
+        id: editingId ?? undefined, kmType, aggregationMethod, indikator: indikator.trim(), formula, satuan, targetParent, assignments,
         defaultCheckerIds: defaultCheckerOrder, defaultApproverId: defaultApproverId || undefined,
       });
       setSubmitted(true);
@@ -224,7 +230,7 @@ export function KpiMasterPage() {
           <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
             {formError && (<div className="status-banner danger" style={{ margin: 0 }}><AlertCircle size={16} /> {formError}</div>)}
             {editingId && !editingIsPending && (
-              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-warning)', background: 'var(--color-warning-tint, #fff8e1)', padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-md)' }}>
+              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-warning)', background: 'var(--color-warning-tint)', padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-md)' }}>
                 <AlertCircle size={13} style={{ verticalAlign: -2, marginRight: 4 }} />
                 KPI ini sedang <b>berlaku pada periode berjalan</b>. Perubahan tidak akan mengubah data periode ini —
                 sistem akan membuat <b>versi baru</b> yang berlaku mulai bulan berikutnya.
@@ -263,6 +269,13 @@ export function KpiMasterPage() {
                 <input className="form-input" value={targetParent} onChange={(e) => setTargetParent(e.target.value)} placeholder="Target keseluruhan" />
               </div>
             </div>
+            <div>
+              <label className="form-label">Metode Agregasi</label>
+              <select className="form-input" value={aggregationMethod} onChange={(e) => setAggregationMethod(e.target.value as 'weighted' | 'sum')}>
+                <option value="weighted">Rata-rata Tertimbang (KPI positif — pakai Bobot Agregasi %, total 100%)</option>
+                <option value="sum">Jumlah / SUM (KPI penalti-pengurang — tanpa syarat 100%)</option>
+              </select>
+            </div>
 
             {/* Assignments */}
             <div>
@@ -271,7 +284,11 @@ export function KpiMasterPage() {
                 <button className="btn btn-ghost btn-sm" onClick={addAssignment}><Plus size={14} /> Tambah Assignment</button>
               </div>
               <p style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-muted)', margin: '0 0 var(--space-2)' }}>
-                <b>Bobot Agregasi</b>: persentase kontribusi realisasi tiap unit/bidang ke nilai KPI parent (rollup). Kosongkan semua bila belum dikonfigurasi, atau isi hingga total tepat 100%.
+                {aggregationMethod === 'weighted' ? (
+                  <><b>Bobot Agregasi</b>: persentase kontribusi realisasi tiap unit/bidang ke nilai KPI parent (rollup). Kosongkan semua bila belum dikonfigurasi, atau isi hingga total tepat 100%.</>
+                ) : (
+                  <>Metode <b>SUM</b>: nilai parent = jumlah polos realisasi tiap unit/bidang (cocok untuk KPI penalti/pengurang lintas bidang). Tidak perlu Bobot Agregasi.</>
+                )}
               </p>
               <div className="table-wrap">
                 <table className="data-table compact">
@@ -279,7 +296,8 @@ export function KpiMasterPage() {
                     <tr>
                       <th>Unit</th><th>Bidang</th><th>Penanggung Jawab</th>
                       <th className="num">Bobot KM</th><th>Target Sem I</th><th>Target {CURRENT_YEAR}</th>
-                      <th className="num">Bobot Agregasi (%)</th><th style={{ width: 40 }} />
+                      {aggregationMethod === 'weighted' && <th className="num">Bobot Agregasi (%)</th>}
+                      <th style={{ width: 40 }} />
                     </tr>
                   </thead>
                   <tbody>
@@ -299,19 +317,21 @@ export function KpiMasterPage() {
                         <td><input className="form-input form-input-sm" style={{ textAlign: 'center' }} value={a.bobotKm} onChange={(e) => updateAssignment(i, 'bobotKm', e.target.value)} placeholder="poin" /></td>
                         <td><input className="form-input form-input-sm" value={a.target} onChange={(e) => updateAssignment(i, 'target', e.target.value)} placeholder="Target Sem I" /></td>
                         <td><input className="form-input form-input-sm" value={a.target2} onChange={(e) => updateAssignment(i, 'target2', e.target.value)} placeholder="Target tahun" /></td>
-                        <td>
-                          <input
-                            type="number" min={0} max={100} step={1}
-                            className="form-input form-input-sm" style={{ textAlign: 'center' }}
-                            value={a.persenAgregasi || ''} onChange={(e) => updatePersen(i, e.target.value)} placeholder="0"
-                          />
-                        </td>
+                        {aggregationMethod === 'weighted' && (
+                          <td>
+                            <input
+                              type="number" min={0} max={100} step={1}
+                              className="form-input form-input-sm" style={{ textAlign: 'center' }}
+                              value={a.persenAgregasi || ''} onChange={(e) => updatePersen(i, e.target.value)} placeholder="0"
+                            />
+                          </td>
+                        )}
                         <td>
                           <button className="btn btn-ghost btn-sm" disabled={assignments.length <= 1} onClick={() => removeAssignment(i)} style={{ color: 'var(--color-danger)' }}><Trash2 size={13} /></button>
                         </td>
                       </tr>
                     ))}
-                    {anyPersenSet && (
+                    {aggregationMethod === 'weighted' && anyPersenSet && (
                       <tr style={{ background: 'var(--color-surface-2)' }}>
                         <td colSpan={6} style={{ textAlign: 'right', fontWeight: 700, fontSize: 'var(--text-xs)' }}>Total Bobot Agregasi:</td>
                         <td className="num" style={{ fontWeight: 700, color: Math.abs(totalPersenForm - 100) < 0.01 ? 'var(--color-success)' : 'var(--color-danger)' }}>
@@ -338,7 +358,7 @@ export function KpiMasterPage() {
                     const c = reviewerCandidates.checkers.find((x) => x.id === id);
                     if (!c) return null;
                     return (
-                      <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 8px', background: 'var(--color-surface-1, #f5f6f8)', borderRadius: 6, marginBottom: 4, fontSize: 12 }}>
+                      <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 8px', background: 'var(--color-surface-2)', borderRadius: 6, marginBottom: 4, fontSize: 12 }}>
                         <span style={{ fontWeight: 700, minWidth: 16 }}>{i + 1}.</span>
                         <span style={{ flex: 1 }}>{c.name} <span style={{ color: 'var(--color-text-muted)', fontSize: 10 }}>· {candDesc(c)}</span></span>
                         <button className="btn btn-ghost btn-sm" disabled={i === 0} onClick={() => moveDefaultChecker(id, -1)}><ArrowUp size={12} /></button>
@@ -358,7 +378,7 @@ export function KpiMasterPage() {
                       return (
                         <button
                           key={c.id} type="button" onClick={() => toggleDefaultChecker(c.id)}
-                          style={{ textAlign: 'left', padding: '5px 8px', borderRadius: 6, border: `1px solid ${picked ? 'var(--color-primary, #1f3c6b)' : 'var(--color-border, #e0e0e0)'}`, background: picked ? 'var(--color-primary-soft, #eaf0fb)' : 'var(--color-surface-0, #fff)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}
+                          style={{ textAlign: 'left', padding: '5px 8px', borderRadius: 6, border: `1px solid ${picked ? 'var(--color-accent)' : 'var(--color-border)'}`, background: picked ? 'var(--color-accent-tint)' : 'var(--color-surface)', color: 'var(--color-text)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}
                         >
                           <span style={{ width: 14 }}>{picked && <Check size={12} />}</span>
                           <span>{c.name} <span style={{ color: 'var(--color-text-muted)', fontSize: 10 }}>· {candDesc(c)}</span></span>
@@ -410,7 +430,14 @@ export function KpiMasterPage() {
                 {masters.map((m) => (
                   <Fragment key={m.id}>
                     <tr>
-                      <td style={{ fontWeight: 600 }}>{m.indikator}</td>
+                      <td style={{ fontWeight: 600 }}>
+                        {m.indikator}
+                        {m.aggregationMethod === 'sum' && (
+                          <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, color: 'var(--color-text-muted)', border: '1px solid var(--color-border)', borderRadius: 4, padding: '1px 4px' }} title="Metode agregasi: SUM (jumlah polos)">
+                            Σ SUM
+                          </span>
+                        )}
+                      </td>
                       <td><span className={`status-pill ${m.kmType === 'final' ? 'completed' : 'at-risk'}`} style={{ fontSize: 10 }}>{m.kmType === 'final' ? 'Final' : 'Draft'}</span></td>
                       <td>
                         <span className={`status-pill ${m.isPending ? 'in-review' : 'completed'}`} style={{ fontSize: 10 }} title={`Berlaku mulai ${m.effectiveMonth}`}>
@@ -445,7 +472,7 @@ export function KpiMasterPage() {
                         <td colSpan={7} style={{ background: 'var(--color-surface-2)', padding: 0 }}>
                           <table className="data-table compact" style={{ margin: 0 }}>
                             <thead>
-                              <tr><th>Unit</th><th>Bidang</th><th>PJ</th><th className="num">Bobot KM</th><th>Target Sem I</th><th>Target {CURRENT_YEAR}</th><th className="num">Bobot Agregasi</th></tr>
+                              <tr><th>Unit</th><th>Bidang</th><th>PJ</th><th className="num">Bobot KM</th><th>Target Sem I</th><th>Target {CURRENT_YEAR}</th><th className="num">{m.aggregationMethod === 'sum' ? 'Metode' : 'Bobot Agregasi'}</th></tr>
                             </thead>
                             <tbody>
                               {m.assignments.map((a) => (
@@ -456,14 +483,14 @@ export function KpiMasterPage() {
                                   <td className="num">{a.bobotKm || '—'}</td>
                                   <td>{a.target || '—'}</td>
                                   <td>{a.target2 || '—'}</td>
-                                  <td className="num">{a.persenAgregasi ? `${a.persenAgregasi}%` : '—'}</td>
+                                  <td className="num">{m.aggregationMethod === 'sum' ? 'SUM' : (a.persenAgregasi ? `${a.persenAgregasi}%` : '—')}</td>
                                 </tr>
                               ))}
                             </tbody>
                           </table>
 
                           {/* Rollup: nilai parent hasil agregasi realisasi children */}
-                          <div style={{ padding: 'var(--space-3)', borderTop: '1px solid var(--color-border, #e5e5e5)' }}>
+                          <div style={{ padding: 'var(--space-3)', borderTop: '1px solid var(--color-border)' }}>
                             <div style={{ fontSize: 'var(--text-xs)', fontWeight: 700, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
                               <PieChart size={13} /> Rollup Nilai Parent
                             </div>

@@ -454,6 +454,11 @@ model KpiMaster {
   version           Int      @default(1)
   previousVersionId String?
 
+  // Metode agregasi (Fase E) — dipilih per-KPI: 'weighted' = rata-rata tertimbang pakai
+  // persenAgregasi (Σ=100%, cocok utk KPI positif); 'sum' = jumlah polos tiap kontribusi
+  // (cocok utk KPI penalti/pengurang, tanpa syarat Σ=100%).
+  aggregationMethod String @default("weighted") // 'weighted' | 'sum'
+
   assignments  KpiAssignment[]
 
   @@index([year, kmType])

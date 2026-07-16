@@ -26,6 +26,7 @@ class SaveMasterDto {
   @IsArray() @ValidateNested({ each: true }) @Type(() => AssignmentDto) assignments: AssignmentDto[];
   @IsOptional() @IsArray() @IsString({ each: true }) defaultCheckerIds?: string[];
   @IsOptional() @IsString() defaultApproverId?: string;
+  @IsOptional() @IsIn(['weighted', 'sum']) aggregationMethod?: string;
 }
 
 @UseGuards(JwtAuthGuard)

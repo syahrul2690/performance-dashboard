@@ -203,6 +203,7 @@ export const kpiMaster = {
     id?: string; kmType?: 'draft' | 'final'; indikator: string; formula?: string;
     satuan?: string; targetParent?: string; assignments: KpiAssignmentInput[];
     defaultCheckerIds?: string[]; defaultApproverId?: string;
+    aggregationMethod?: 'weighted' | 'sum';
   }) => api.post('/kpi-master/save', dto).then((r) => r.data),
   delete: (id: string) => api.delete(`/kpi-master/${id}`).then((r) => r.data),
   rollup: (id: string, periodId?: string) =>
