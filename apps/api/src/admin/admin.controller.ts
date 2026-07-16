@@ -8,6 +8,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { getFillWindowStatus } from '../common/period-window';
 import { WhatsappSimService } from '../whatsapp/whatsapp.service';
+import { KpiMasterService } from '../kpi-master/kpi-master.service';
 
 class WindowOverrideDto {
   @IsBoolean() enabled: boolean;
@@ -21,7 +22,7 @@ class KmReferenceDto {
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.SUPERADMIN, Role.DEVELOPER)
 export class AdminController {
-  constructor(private prisma: PrismaService, private whatsapp: WhatsappSimService) {}
+  constructor(private prisma: PrismaService, private whatsapp: WhatsappSimService, private kpiMaster: KpiMasterService) {}
 
   @Delete('reset-test-data')
   async resetTestData(@CurrentUser() user: User) {
@@ -110,5 +111,17 @@ export class AdminController {
       },
     });
     return result;
+  }
+
+  // ===== Fase F: Backfill dokumen KM legacy → KPI Master =====
+
+  @Get('backfill-kpi-master/preview')
+  previewBackfillKpiMaster() {
+    return this.kpiMaster.previewBackfill();
+  }
+
+  @Post('backfill-kpi-master/run')
+  async runBackfillKpiMaster(@CurrentUser() user: User) {
+    return this.kpiMaster.runBackfill(user);
   }
 }

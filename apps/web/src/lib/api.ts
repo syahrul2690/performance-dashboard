@@ -244,6 +244,8 @@ export const admin = {
   whatsappPreview: (periodId: string) =>
     api.get('/admin/whatsapp-sim/preview', { params: { periodId } }).then((r) => r.data),
   whatsappRun: () => api.post('/admin/whatsapp-sim/run').then((r) => r.data),
+  backfillKpiMasterPreview: () => api.get('/admin/backfill-kpi-master/preview').then((r) => r.data),
+  backfillKpiMasterRun: () => api.post('/admin/backfill-kpi-master/run').then((r) => r.data),
 };
 
 export default api;

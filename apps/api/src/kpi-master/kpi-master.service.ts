@@ -35,6 +35,9 @@ type FannedItem = {
   bobot: string; target: string; target2: string;
 };
 
+// Item KM legacy dikumpulkan utk backfill (Fase F) — belum bertag masterKpiId.
+type BackfillGroupItem = { docId: string; unitCode: string; bidang: string; item: Record<string, unknown> };
+
 @Injectable()
 export class KpiMasterService {
   constructor(
@@ -383,5 +386,132 @@ export class KpiMasterService {
   // Helper konstanta role (dipakai controller bila perlu guard tambahan).
   static isAuthor(user: User): boolean {
     return user.unit === 'KP' && (user.role === Role.STAFF || user.role === Role.GM);
+  }
+
+  // ===== Fase F: Backfill dokumen KM legacy → KPI Master =====
+  // Dokumen KM lama (authoring manual Input KM) menyimpan kpiItems TANPA masterKpiId.
+  // Backfill mengelompokkan item-item ini by (kmType, indikator) lalu membuat satu
+  // KpiMaster + satu KpiAssignment per (unitCode,bidang) yang memuat indikator tsb —
+  // definisi (formula/satuan) diambil dari kemunculan PERTAMA; variasi bobot/target per
+  // (unit,bidang) tetap tersimpan di assignment masing-masing. HANYA menambahkan tag
+  // masterKpiId pada item existing (additive) — field lain & status dokumen tidak disentuh,
+  // sehingga dokumen submitted/approved aman ikut ditandai tanpa mengubah nilai apa pun.
+  // Idempoten: item yang sudah bertag masterKpiId dilewati, sehingga backfill boleh
+  // dijalankan berulang tanpa membuat master duplikat.
+  private async collectBackfillGroups() {
+    const docs = await this.prisma.kontrakManajemen.findMany({
+      orderBy: [{ submittedAt: 'asc' }],
+    });
+
+    const groups = new Map<string, BackfillGroupItem[]>();
+
+    for (const doc of docs) {
+      const items = (Array.isArray(doc.kpiItems) ? doc.kpiItems : []) as Record<string, unknown>[];
+      for (const item of items) {
+        const indikator = typeof item['indikator'] === 'string' ? item['indikator'].trim() : '';
+        if (!indikator) continue;
+        if (item['masterKpiId']) continue; // sudah ditag (backfill sebelumnya atau KPI Master)
+        const key = `${doc.kmType}||${indikator}`;
+        const arr = groups.get(key) ?? [];
+        arr.push({ docId: doc.id, unitCode: doc.unitCode, bidang: doc.bidang, item });
+        groups.set(key, arr);
+      }
+    }
+    return groups;
+  }
+
+  private summarizeGroups(groups: Map<string, BackfillGroupItem[]>) {
+    const details: Array<{ kmType: string; indikator: string; assignmentCount: number; docCount: number }> = [];
+    let assignmentsTotal = 0;
+    let docsToTag = 0;
+    for (const [key, entries] of groups) {
+      const [kmType, indikator] = key.split('||');
+      const distinctAssignments = new Set(entries.map((e) => `${e.unitCode}||${e.bidang}`));
+      details.push({ kmType, indikator, assignmentCount: distinctAssignments.size, docCount: entries.length });
+      assignmentsTotal += distinctAssignments.size;
+      docsToTag += entries.length;
+    }
+    details.sort((a, b) => a.indikator.localeCompare(b.indikator));
+    return { groupCount: groups.size, mastersToCreate: groups.size, assignmentsTotal, docsToTag, details };
+  }
+
+  async previewBackfill() {
+    const groups = await this.collectBackfillGroups();
+    return this.summarizeGroups(groups);
+  }
+
+  async runBackfill(user: User) {
+    const groups = await this.collectBackfillGroups();
+    const activePeriod = await this.prisma.period.findFirst({ where: { isActive: true } });
+    if (!activePeriod) throw new BadRequestException('Tidak ada periode aktif');
+
+    let mastersCreated = 0;
+    let assignmentsCreated = 0;
+    let docsTagged = 0;
+
+    for (const [key, entries] of groups) {
+      const [kmType, indikator] = key.split('||');
+      const first = entries[0].item; // kemunculan pertama -> definisi master
+      const formula = typeof first['formula'] === 'string' ? first['formula'] : '';
+      const satuan = typeof first['satuan'] === 'string' ? first['satuan'] : '';
+
+      // Satu assignment per (unitCode,bidang) — bobot/target ambil kemunculan pertama pasangan tsb.
+      const byPair = new Map<string, BackfillGroupItem>();
+      for (const e of entries) {
+        const pairKey = `${e.unitCode}||${e.bidang}`;
+        if (!byPair.has(pairKey)) byPair.set(pairKey, e);
+      }
+
+      const master = await this.prisma.kpiMaster.create({
+        data: {
+          year: activePeriod.yearMonth.slice(0, 4), kmType, indikator, formula, satuan,
+          targetParent: '', createdBy: user.name, createdById: user.id,
+          effectiveMonth: activePeriod.yearMonth, version: 1, status: 'active',
+        },
+      });
+      mastersCreated++;
+
+      await this.prisma.kpiAssignment.createMany({
+        data: Array.from(byPair.values()).map((e) => ({
+          kpiMasterId: master.id, unitCode: e.unitCode, bidang: e.bidang,
+          bobotKm: typeof e.item['bobot'] === 'string' ? e.item['bobot'] : '',
+          target: typeof e.item['target'] === 'string' ? e.item['target'] : '',
+          target2: typeof e.item['target2'] === 'string' ? e.item['target2'] : '',
+        })),
+      });
+      assignmentsCreated += byPair.size;
+
+      // Tag masterKpiId pada SEMUA dokumen (semua periode/status) yang memuat indikator ini —
+      // hanya menambah field masterKpiId, field lain & status dokumen tidak disentuh.
+      const docIds = Array.from(new Set(entries.map((e) => e.docId)));
+      for (const docId of docIds) {
+        const doc = await this.prisma.kontrakManajemen.findUnique({ where: { id: docId } });
+        if (!doc) continue;
+        const items = (Array.isArray(doc.kpiItems) ? doc.kpiItems : []) as Record<string, unknown>[];
+        let changed = false;
+        const tagged = items.map((it) => {
+          const itIndikator = typeof it['indikator'] === 'string' ? it['indikator'].trim() : '';
+          if (itIndikator === indikator && !it['masterKpiId']) {
+            changed = true;
+            return { ...it, masterKpiId: master.id };
+          }
+          return it;
+        });
+        if (changed) {
+          await this.prisma.kontrakManajemen.update({ where: { id: doc.id }, data: { kpiItems: tagged as object } });
+          docsTagged++;
+        }
+      }
+    }
+
+    await this.prisma.auditLog.create({
+      data: {
+        actor: user.name, userId: user.id, action: 'kpi_master.backfill',
+        entity: 'KpiMaster',
+        note: `Backfill KM legacy: ${mastersCreated} KPI Master dibuat, ${assignmentsCreated} assignment, ${docsTagged} dokumen KM ditandai`,
+      },
+    });
+
+    return { mastersCreated, assignmentsCreated, docsTagged };
   }
 }

@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState } from 'react';
-import { ShieldAlert, Trash2, CheckCircle, AlertCircle, Database, MessageCircle, PlayCircle, Eye } from 'lucide-react';
+import { ShieldAlert, Trash2, CheckCircle, AlertCircle, Database, MessageCircle, PlayCircle, Eye, GitMerge } from 'lucide-react';
 import { admin } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { usePeriod } from '../context/PeriodContext';
@@ -13,6 +13,11 @@ type WhatsappPreviewItem = {
   recipientId: string; recipientName: string; phone: string | null;
   items: Array<{ unitCode: string; bidang: string }>; message: string;
 };
+type BackfillPreview = {
+  groupCount: number; mastersToCreate: number; assignmentsTotal: number; docsToTag: number;
+  details: Array<{ kmType: string; indikator: string; assignmentCount: number; docCount: number }>;
+};
+type BackfillResult = { mastersCreated: number; assignmentsCreated: number; docsTagged: number };
 
 export function AdminPage() {
   const { user } = useAuth();
@@ -25,6 +30,11 @@ export function AdminPage() {
   const [waBusy, setWaBusy] = useState(false);
   const [waPreviewOpen, setWaPreviewOpen] = useState<string | null>(null);
   const [waLogOpen, setWaLogOpen] = useState<string | null>(null);
+
+  const [bfPreview, setBfPreview] = useState<BackfillPreview | null>(null);
+  const [bfBusy, setBfBusy] = useState(false);
+  const [bfResult, setBfResult] = useState<BackfillResult | null>(null);
+  const [bfError, setBfError] = useState<string | null>(null);
 
   const loadWaLogs = () => admin.whatsappLogs().then((d) => setWaLogs(d as WhatsappLog[])).catch(() => {});
   const loadWaPreview = () => {
@@ -43,6 +53,39 @@ export function AdminPage() {
     loadWaPreview();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [periodId, user?.role]);
+
+  const loadBackfillPreview = () => {
+    setBfError(null);
+    admin.backfillKpiMasterPreview()
+      .then((d) => setBfPreview(d as BackfillPreview))
+      .catch((e) => setBfError((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Gagal memuat preview backfill'));
+  };
+
+  useEffect(() => {
+    if (user?.role !== 'SUPERADMIN' && user?.role !== 'DEVELOPER') return;
+    loadBackfillPreview();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.role]);
+
+  const handleRunBackfill = async () => {
+    if (!bfPreview || bfPreview.groupCount === 0) return;
+    const confirmed = window.confirm(
+      `Backfill akan membuat ${bfPreview.mastersToCreate} KPI Master baru (${bfPreview.assignmentsTotal} assignment) dan menandai ${bfPreview.docsToTag} dokumen KM legacy dengan tautan masterKpiId.\n\nNilai/status dokumen tidak berubah — hanya penautan. Lanjutkan?`
+    );
+    if (!confirmed) return;
+    setBfBusy(true);
+    setBfResult(null);
+    setBfError(null);
+    try {
+      const res = await admin.backfillKpiMasterRun();
+      setBfResult(res as BackfillResult);
+      loadBackfillPreview();
+    } catch (e) {
+      setBfError((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Backfill gagal');
+    } finally {
+      setBfBusy(false);
+    }
+  };
 
   const handleRunWhatsappSim = async () => {
     setWaBusy(true);
@@ -256,6 +299,77 @@ export function AdminPage() {
               </table>
             )}
           </div>
+        </div>
+      </div>
+
+      <div className="card" style={{ borderLeft: '4px solid var(--color-accent)', maxWidth: 720, marginTop: 'var(--space-4)' }}>
+        <div className="card-header compact">
+          <div className="card-title"><GitMerge size={14} /> Backfill KPI Master (Fase F)</div>
+        </div>
+        <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', margin: 0 }}>
+            Ubah dokumen KM lama (dibuat manual via Input KM, belum memiliki KPI Master parent)
+            menjadi definisi <b>KPI Master</b> + assignment per unit/bidang. Indikator yang sama pada
+            beberapa unit/bidang otomatis digabung jadi satu KPI dengan banyak assignment. Hanya
+            menandai (tag) item existing — nilai, status, dan alur dokumen <b>tidak diubah</b>.
+          </p>
+
+          {bfError && (
+            <div className="status-banner danger" style={{ fontSize: 'var(--text-xs)' }}>
+              <AlertCircle size={14} /> {bfError}
+            </div>
+          )}
+
+          {bfResult && (
+            <div className="status-banner success" style={{ fontSize: 'var(--text-xs)' }}>
+              <CheckCircle size={14} />
+              Selesai: {bfResult.mastersCreated} KPI Master dibuat, {bfResult.assignmentsCreated} assignment, {bfResult.docsTagged} dokumen ditandai.
+            </div>
+          )}
+
+          {!bfPreview ? (
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>Memuat preview…</div>
+          ) : bfPreview.groupCount === 0 ? (
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+              Tidak ada dokumen KM legacy yang perlu di-backfill — semua indikator sudah memiliki KPI Master parent.
+            </div>
+          ) : (
+            <>
+              <div style={{ fontSize: 'var(--text-xs)', fontWeight: 700 }}>
+                Preview (dry-run) — {bfPreview.mastersToCreate} KPI Master baru, {bfPreview.assignmentsTotal} assignment, {bfPreview.docsToTag} dokumen akan ditandai
+              </div>
+              <div style={{ maxHeight: 260, overflowY: 'auto' }}>
+                <table style={{ width: '100%', fontSize: 'var(--text-xs)', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: 'left', padding: '4px 8px', borderBottom: '1px solid var(--color-border)', color: 'var(--color-text-muted)' }}>Indikator</th>
+                      <th style={{ textAlign: 'left', padding: '4px 8px', borderBottom: '1px solid var(--color-border)', color: 'var(--color-text-muted)' }}>Tipe KM</th>
+                      <th style={{ textAlign: 'right', padding: '4px 8px', borderBottom: '1px solid var(--color-border)', color: 'var(--color-text-muted)' }}>Assignment</th>
+                      <th style={{ textAlign: 'right', padding: '4px 8px', borderBottom: '1px solid var(--color-border)', color: 'var(--color-text-muted)' }}>Dokumen</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bfPreview.details.map((d, i) => (
+                      <tr key={i}>
+                        <td style={{ padding: '4px 8px', borderBottom: '1px solid var(--color-border)' }}>{d.indikator}</td>
+                        <td style={{ padding: '4px 8px', borderBottom: '1px solid var(--color-border)' }}>{d.kmType === 'final' ? 'Final' : 'Draft'}</td>
+                        <td className="num" style={{ padding: '4px 8px', borderBottom: '1px solid var(--color-border)' }}>{d.assignmentCount}</td>
+                        <td className="num" style={{ padding: '4px 8px', borderBottom: '1px solid var(--color-border)' }}>{d.docCount}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <button
+                className="btn btn-primary"
+                onClick={handleRunBackfill}
+                disabled={bfBusy}
+                style={{ alignSelf: 'flex-start' }}
+              >
+                <GitMerge size={15} /> {bfBusy ? 'Menjalankan backfill…' : `Backfill ${bfPreview.mastersToCreate} KPI Master`}
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>
