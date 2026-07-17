@@ -17,8 +17,7 @@ const NAV_ITEMS = [
   {
     section: 'Aksi Saya', items: [
       { to: '/approvals',      label: 'Persetujuan',             icon: CheckSquare },
-      { to: '/input-kontrak',  label: 'Input Kontrak Manajemen', icon: FileText,    hideForUpmk: true },
-      { to: '/kpi-master',     label: 'KPI Master',              icon: Layers,      hideForUpmk: true },
+      { to: '/kpi-master',     label: 'Manajemen KPI',           icon: Layers,      hideForUpmk: true },
       { to: '/input-realisasi',label: 'Input Realisasi Bulanan', icon: ClipboardEdit },
     ]
   },
@@ -63,8 +62,8 @@ const ROUTE_NAMES: Record<string, string> = {
   '/peta': 'Peta Geografis UPMK',
   '/approvals': 'Persetujuan',
   '/input-realisasi': 'Input Realisasi',
-  '/input-kontrak': 'Input Kontrak Manajemen',
-  '/kpi-master': 'KPI Master',
+  '/input-kontrak': 'Manajemen KPI',
+  '/kpi-master': 'Manajemen KPI',
   '/workflow-km/usulan': 'Proses Usulan KM',
   '/workflow-km/realisasi': 'Proses Realisasi KM',
   '/settings': 'Settings',

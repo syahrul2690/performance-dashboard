@@ -3,7 +3,6 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { PrismaService } from '../prisma/prisma.service';
 import { Role, User } from '@prisma/client';
-import * as XLSX from 'xlsx';
 import {
   Step, stepMatches, stepRecipientWhere, slaRemainingDays, uname,
   buildReviewerSteps, validateReviewerSelection, CHECKER_ROLES, APPROVER_ROLES,
@@ -419,100 +418,5 @@ export class InputKontrakService {
     await this.prisma.auditLog.create({ data: { actor: user.name, userId: user.id, action: `kontrak.bundle.${action}`, entity: 'KMBundle', targetId: bundle.id, note } });
     for (const c of components) await this.cache.del(`kontrak:${c.unitCode}`);
     return bundle;
-  }
-
-  // Alias kolom yang dikenali (case-insensitive). Boleh ada baris judul di atas tabel.
-  private static readonly COLUMN_ALIASES: Record<string, string[]> = {
-    indikator: ['indikator kinerja', 'indikator', 'kpi', 'nama indikator', 'indikator kpi'],
-    formula: ['formula', 'rumus', 'metode', 'cara hitung'],
-    satuan: ['satuan', 'unit'],
-    bobot: ['bobot', 'bobot (%)', 'bobot %', 'weight', 'persen'],
-    target: ['target semester i', 'target sem i', 'target semester 1', 'target sem 1', 'target sem1', 'target s1', 'target semester'],
-    target2: ['target tahun', 'target tahunan', 'target setahun', 'target ' + new Date().getFullYear(), 'target (tahun)', 'target akhir', 'target tahun ini'],
-  };
-
-  // Parse file Excel/CSV → kembalikan kpiItems untuk mengisi form.
-  // Robust: mendeteksi baris header otomatis (mengabaikan baris judul/kop di atasnya).
-  parseExcel(file?: { buffer: Buffer; originalname?: string }) {
-    if (!file?.buffer) throw new BadRequestException('File tidak ditemukan. Pilih file Excel (.xlsx/.xls) atau CSV.');
-
-    let grid: string[][];
-    try {
-      const wb = XLSX.read(file.buffer, { type: 'buffer' });
-      if (!wb.SheetNames.length) throw new Error('no sheet');
-      const sheet = wb.Sheets[wb.SheetNames[0]];
-      const raw = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: '', blankrows: false });
-      grid = raw.map((r) => (Array.isArray(r) ? r.map((c) => String(c ?? '').trim()) : []));
-    } catch {
-      throw new BadRequestException('File tidak dapat dibaca. Pastikan formatnya .xlsx, .xls, atau .csv yang valid.');
-    }
-
-    const norm = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
-    const matchKey = (cell: string): string | null => {
-      const n = norm(cell);
-      if (!n) return null;
-      for (const [key, aliases] of Object.entries(InputKontrakService.COLUMN_ALIASES)) {
-        if (aliases.some((a) => n === norm(a) || n.startsWith(norm(a)))) return key;
-      }
-      return null;
-    };
-
-    // Cari baris header: baris yang punya sel cocok "indikator".
-    let headerRow = -1;
-    const colMap: Record<string, number> = {};
-    for (let i = 0; i < grid.length; i++) {
-      const row = grid[i];
-      const localMap: Record<string, number> = {};
-      row.forEach((cell, idx) => {
-        const key = matchKey(cell);
-        if (key && localMap[key] === undefined) localMap[key] = idx;
-      });
-      if (localMap.indikator !== undefined) {
-        headerRow = i;
-        Object.assign(colMap, localMap);
-        break;
-      }
-    }
-
-    if (headerRow === -1) {
-      throw new BadRequestException(
-        'Kolom "Indikator Kinerja" tidak ditemukan. Pastikan baris header memuat kolom: ' +
-        'Indikator Kinerja, Formula, Satuan, Bobot, Target Semester I, Target (tahun). ' +
-        'Unduh Template untuk format yang benar.',
-      );
-    }
-
-    const get = (row: string[], key: string) => {
-      const idx = colMap[key];
-      return idx === undefined ? '' : String(row[idx] ?? '').trim();
-    };
-
-    const kpiItems = grid
-      .slice(headerRow + 1)
-      .map((row) => ({
-        indikator: get(row, 'indikator'),
-        formula: get(row, 'formula'),
-        satuan: get(row, 'satuan'),
-        bobot: get(row, 'bobot'),
-        target: get(row, 'target'),
-        target2: get(row, 'target2'),
-      }))
-      .filter((it) => it.indikator !== '');
-
-    if (kpiItems.length === 0) {
-      throw new BadRequestException('Header ditemukan tetapi tidak ada baris indikator berisi data. Isi minimal satu indikator.');
-    }
-    return { kpiItems, count: kpiItems.length };
-  }
-
-  // Template Excel siap-isi (buffer .xlsx)
-  buildTemplate(): Buffer {
-    const header = ['Indikator Kinerja', 'Formula', 'Satuan', 'Bobot', 'Target Semester I', `Target ${new Date().getFullYear()}`];
-    const example = ['Progress Konstruksi Jaringan', 'realisasi / rencana x 100', '%', '30', '50', '95'];
-    const ws = XLSX.utils.aoa_to_sheet([header, example]);
-    ws['!cols'] = [{ wch: 32 }, { wch: 26 }, { wch: 10 }, { wch: 8 }, { wch: 16 }, { wch: 14 }];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Kontrak Manajemen');
-    return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
   }
 }

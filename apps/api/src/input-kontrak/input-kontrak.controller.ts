@@ -1,8 +1,6 @@
 import {
-  Controller, Get, Post, Patch, Delete, Body, Query, Param, UseGuards, UseInterceptors, UploadedFile, Res,
+  Controller, Get, Post, Patch, Delete, Body, Query, Param, UseGuards,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { Response } from 'express';
 import { InputKontrakService } from './input-kontrak.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -84,22 +82,6 @@ export class InputKontrakController {
   @Post('save')
   save(@CurrentUser() user: User, @Body() dto: SaveDto) {
     return this.svc.save(user, dto.id, dto.unitCode, dto.bidang, dto.holder, dto.kpiItems, dto.kmType ?? 'draft');
-  }
-
-  @Post('upload')
-  @UseInterceptors(FileInterceptor('file'))
-  upload(@UploadedFile() file: { buffer: Buffer; originalname?: string }) {
-    return this.svc.parseExcel(file);
-  }
-
-  @Get('template/download')
-  template(@Res() res: Response) {
-    const buf = this.svc.buildTemplate();
-    res.set({
-      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'Content-Disposition': 'attachment; filename="template-kontrak-manajemen.xlsx"',
-    });
-    res.send(buf);
   }
 
   @Post(':id/submit')

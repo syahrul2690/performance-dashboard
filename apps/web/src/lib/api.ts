@@ -182,13 +182,6 @@ export const inputKontrak = {
     api.post('/input-kontrak/bundle/review', { scope, action, note, year, kmType }).then((r) => r.data),
   updateValues: (id: string, kpiItems: Record<string, unknown>[]) =>
     api.patch(`/input-kontrak/${id}/values`, { kpiItems }).then((r) => r.data),
-  uploadExcel: (file: File) => {
-    const form = new FormData();
-    form.append('file', file);
-    return api.post('/input-kontrak/upload', form).then((r) => r.data);
-  },
-  downloadTemplate: () =>
-    api.get('/input-kontrak/template/download', { responseType: 'blob' }).then((r) => r.data as Blob),
 };
 
 export type KpiAssignmentInput = {
@@ -208,6 +201,10 @@ export const kpiMaster = {
   delete: (id: string) => api.delete(`/kpi-master/${id}`).then((r) => r.data),
   rollup: (id: string, periodId?: string) =>
     api.get(`/kpi-master/${id}/rollup`, { params: { periodId } }).then((r) => r.data),
+  reviewPerKpi: (periodId?: string) =>
+    api.get('/kpi-master/review/per-kpi', { params: { periodId } }).then((r) => r.data),
+  reviewConsolidation: (kpiMasterId: string, action: 'approve' | 'reject', note?: string, periodId?: string) =>
+    api.post('/kpi-master/review/consolidation', { kpiMasterId, action, note, periodId }).then((r) => r.data),
   defaultsForKm: (kmId: string) =>
     api.get(`/kpi-master/defaults-for-km/${kmId}`).then((r) => r.data as { checkerIds: string[]; approverId: string | null }),
 };

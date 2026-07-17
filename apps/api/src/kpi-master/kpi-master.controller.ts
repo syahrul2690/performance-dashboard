@@ -29,6 +29,13 @@ class SaveMasterDto {
   @IsOptional() @IsIn(['weighted', 'sum']) aggregationMethod?: string;
 }
 
+class ConsolidationReviewDto {
+  @IsString() kpiMasterId: string;
+  @IsIn(['approve', 'reject']) action: 'approve' | 'reject';
+  @IsOptional() @IsString() note?: string;
+  @IsOptional() @IsString() periodId?: string;
+}
+
 @UseGuards(JwtAuthGuard)
 @Controller('kpi-master')
 export class KpiMasterController {
@@ -37,6 +44,16 @@ export class KpiMasterController {
   @Get()
   list(@Query('year') year?: string, @Query('kmType') kmType?: string, @Query('includeSuperseded') includeSuperseded?: string) {
     return this.svc.list(year, kmType, includeSuperseded === 'true');
+  }
+
+  @Get('review/per-kpi')
+  getPerKpiReview(@CurrentUser() user: User, @Query('periodId') periodId?: string) {
+    return this.svc.getPerKpiReview(user, periodId);
+  }
+
+  @Post('review/consolidation')
+  reviewConsolidation(@CurrentUser() user: User, @Body() dto: ConsolidationReviewDto) {
+    return this.svc.reviewConsolidation(user, dto.kpiMasterId, dto.action, dto.note, dto.periodId);
   }
 
   @Get(':id')

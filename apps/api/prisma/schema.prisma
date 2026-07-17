@@ -489,3 +489,24 @@ model KpiAssignment {
   @@index([unitCode, bidang])
   @@map("kpi_assignments")
 }
+
+// Persetujuan konsolidasi agregat KPI lintas-bidang (Fase H2). Setelah semua bidang
+// kontributor menyetujui realisasinya (InputRealisasi approved), RPC Perencanaan meninjau
+// & menyetujui nilai PARENT (agregat) sebelum dianggap final. Satu review per (KPI,periode).
+model KpiRollupReview {
+  id          String    @id @default(cuid())
+  kpiMasterId String
+  periodId    String
+  status      String    @default("pending") // pending | approved | rejected
+  reviewer    String?
+  reviewerId  String?
+  reviewNote  String?
+  nilaiParent Float?    // snapshot nilai agregat yang dikunci saat disetujui
+  reviewedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([kpiMasterId, periodId])
+  @@index([periodId])
+  @@map("kpi_rollup_reviews")
+}

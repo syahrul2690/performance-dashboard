@@ -3,7 +3,7 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { PrismaService } from '../prisma/prisma.service';
 import { Role, User } from '@prisma/client';
-import { CHECKER_ROLES, APPROVER_ROLES } from '../common/workflow-steps';
+import { CHECKER_ROLES, APPROVER_ROLES, RPC_BIDANG } from '../common/workflow-steps';
 
 export interface AssignmentInput {
   unitCode: string;
@@ -142,6 +142,194 @@ export class KpiMasterService {
       isFullyConfigured: isSum || Math.abs(totalPersen - 100) < 0.01,
       breakdown,
     };
+  }
+
+  // ===== Fase H1: View "Review per-KPI" (read-only) =====
+  // Lensa lintas-dokumen untuk konsolidator (RPC Perencanaan): tiap KPI yang dimiliki
+  // LEBIH DARI SATU bidang ditampilkan dengan seluruh slice bidang berdampingan —
+  // realisasi + status dokumen realisasi + reviewer per bidang. nilaiParent dihitung
+  // hanya dari slice yang realisasinya sudah 'approved' (konsisten dgn getRollup);
+  // slice non-approved tetap ditampilkan (realisasi berjalan + status) agar terlihat
+  // progres, tetapi belum ikut dihitung. KPI single-bidang tidak muncul di view ini.
+  async getPerKpiReview(user: User, periodId?: string) {
+    const period = periodId
+      ? await this.prisma.period.findUnique({ where: { id: periodId } })
+      : await this.prisma.period.findFirst({ where: { isActive: true } });
+    if (!period) throw new BadRequestException('Periode tidak ditemukan');
+
+    const activePeriod = await this.prisma.period.findFirst({ where: { isActive: true } });
+    const masters = await this.prisma.kpiMaster.findMany({
+      where: { status: { not: 'superseded' } },
+      include: { assignments: { orderBy: [{ unitCode: 'asc' }, { bidang: 'asc' }] } },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Status konsolidasi (Fase H2) tiap KPI untuk periode ini.
+    const reviews = await this.prisma.kpiRollupReview.findMany({ where: { periodId: period.id } });
+    const reviewByMaster = new Map(reviews.map((rv) => [rv.kpiMasterId, rv]));
+
+    const num = (v: unknown): number => {
+      if (v == null) return 0;
+      const n = parseFloat(String(v).replace(',', '.').replace(/[^0-9.-]/g, ''));
+      return Number.isFinite(n) ? n : 0;
+    };
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+
+    // Hanya KPI bersama (dimiliki >1 bidang) — inti dari lensa konsolidasi lintas-dokumen.
+    const shared = masters.filter((m) => m.assignments.length > 1);
+
+    type PerKpiSlice = {
+      unitCode: string; bidang: string; holder: string; persenAgregasi: number;
+      realisasi: number | null; status: string; reviewer: string | null;
+      isApproved: boolean; kontribusi: number; hasData: boolean;
+    };
+    const items: Array<Record<string, unknown>> = [];
+    for (const master of shared) {
+      const isSum = master.aggregationMethod === 'sum';
+      const slices: PerKpiSlice[] = [];
+      let nilaiParent = 0;
+      let approvedCount = 0;
+
+      for (const a of master.assignments) {
+        const record = await this.prisma.inputRealisasi.findFirst({
+          where: { periodId: period.id, unitCode: a.unitCode, bidang: a.bidang },
+          orderBy: { updatedAt: 'desc' },
+        });
+        const values = (record?.values ?? {}) as Record<string, Record<string, unknown>>;
+        const item = Object.values(values).find((it) => it['masterKpiId'] === master.id);
+        const realisasi = item ? num(item['realisasi']) : null;
+        const status = record?.status ?? 'none';
+        const isApproved = status === 'approved';
+        const kontribusi = realisasi == null || !isApproved
+          ? 0
+          : isSum ? r2(realisasi) : r2((realisasi * a.persenAgregasi) / 100);
+        if (isApproved) { nilaiParent += kontribusi; approvedCount++; }
+        slices.push({
+          unitCode: a.unitCode, bidang: a.bidang, holder: a.holder,
+          persenAgregasi: a.persenAgregasi,
+          realisasi, status, reviewer: record?.reviewer ?? null,
+          isApproved, kontribusi, hasData: realisasi != null,
+        });
+      }
+
+      const totalPersen = r2(master.assignments.reduce((s, a) => s + a.persenAgregasi, 0));
+      const isPending = !!activePeriod?.yearMonth && master.effectiveMonth > activePeriod.yearMonth;
+      const allApproved = approvedCount === master.assignments.length;
+      const rv = reviewByMaster.get(master.id);
+      const consolidation = rv
+        ? { status: rv.status, reviewer: rv.reviewer, reviewNote: rv.reviewNote, nilaiParent: rv.nilaiParent, reviewedAt: rv.reviewedAt }
+        : null;
+      items.push({
+        masterId: master.id, indikator: master.indikator, targetParent: master.targetParent,
+        aggregationMethod: master.aggregationMethod, kmType: master.kmType,
+        version: master.version, effectiveMonth: master.effectiveMonth, isPending,
+        totalAssignments: master.assignments.length, approvedCount, allApproved,
+        totalPersen, nilaiParent: r2(nilaiParent),
+        isFullyConfigured: isSum || Math.abs(totalPersen - 100) < 0.01,
+        // Siap dikonsolidasi bila semua bidang approved & belum ada keputusan 'approved'.
+        readyForConsolidation: allApproved && consolidation?.status !== 'approved',
+        consolidation,
+        slices,
+      });
+    }
+
+    return {
+      periodId: period.id, periodLabel: period.label,
+      viewerCanConsolidate: this.isRpcConsolidator(user),
+      items,
+    };
+  }
+
+  // Guard konsolidasi (Fase H2): RPC Perencanaan (Staff/Manajer/SM bidang Perencanaan &
+  // Project Control di Kantor Induk) menyetujui agregat; GM & admin sistem diizinkan juga.
+  private isRpcConsolidator(user: User): boolean {
+    if (user.role === Role.GM || user.role === Role.SUPERADMIN || user.role === Role.DEVELOPER) return true;
+    return user.unit === 'KP' && user.bidang === RPC_BIDANG;
+  }
+
+  // ===== Fase H2: Approval konsolidasi agregat KPI lintas-bidang =====
+  // Setelah semua bidang kontributor menyetujui realisasinya, RPC Perencanaan meninjau nilai
+  // parent (agregat). approve → kunci snapshot nilaiParent (final). reject → catat + notifikasi
+  // ke penyusun realisasi bidang kontributor agar merevisi.
+  async reviewConsolidation(user: User, kpiMasterId: string, action: 'approve' | 'reject', note?: string, periodId?: string) {
+    if (!this.isRpcConsolidator(user)) {
+      throw new ForbiddenException('Hanya RPC Perencanaan atau General Manager yang dapat menyetujui konsolidasi KPI');
+    }
+    const period = periodId
+      ? await this.prisma.period.findUnique({ where: { id: periodId } })
+      : await this.prisma.period.findFirst({ where: { isActive: true } });
+    if (!period) throw new BadRequestException('Periode tidak ditemukan');
+
+    const master = await this.prisma.kpiMaster.findUnique({ where: { id: kpiMasterId }, include: { assignments: true } });
+    if (!master) throw new NotFoundException('KPI master tidak ditemukan');
+    if (master.assignments.length <= 1) throw new BadRequestException('KPI ini tidak lintas-bidang — tidak memerlukan konsolidasi');
+
+    const num = (v: unknown): number => {
+      if (v == null) return 0;
+      const n = parseFloat(String(v).replace(',', '.').replace(/[^0-9.-]/g, ''));
+      return Number.isFinite(n) ? n : 0;
+    };
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+    const isSum = master.aggregationMethod === 'sum';
+
+    // Hitung ulang nilaiParent dari slice approved + kumpulkan penyusun (untuk notifikasi).
+    let nilaiParent = 0;
+    let approvedCount = 0;
+    const contributorSubmitterIds = new Set<string>();
+    for (const a of master.assignments) {
+      const record = await this.prisma.inputRealisasi.findFirst({
+        where: { periodId: period.id, unitCode: a.unitCode, bidang: a.bidang, status: 'approved' },
+      });
+      if (!record) continue;
+      const values = (record.values ?? {}) as Record<string, Record<string, unknown>>;
+      const item = Object.values(values).find((it) => it['masterKpiId'] === master.id);
+      if (!item) continue;
+      const realisasi = num(item['realisasi']);
+      nilaiParent += isSum ? r2(realisasi) : r2((realisasi * a.persenAgregasi) / 100);
+      approvedCount++;
+      if (record.submitterId) contributorSubmitterIds.add(record.submitterId);
+    }
+    const allApproved = approvedCount === master.assignments.length;
+
+    if (action === 'approve') {
+      if (!allApproved) throw new ForbiddenException('Belum semua bidang kontributor menyetujui realisasinya — konsolidasi belum dapat disetujui');
+      const review = await this.prisma.kpiRollupReview.upsert({
+        where: { kpiMasterId_periodId: { kpiMasterId, periodId: period.id } },
+        update: { status: 'approved', reviewer: user.name, reviewerId: user.id, reviewNote: note?.trim() || null, nilaiParent: r2(nilaiParent), reviewedAt: new Date() },
+        create: { kpiMasterId, periodId: period.id, status: 'approved', reviewer: user.name, reviewerId: user.id, reviewNote: note?.trim() || null, nilaiParent: r2(nilaiParent), reviewedAt: new Date() },
+      });
+      await this.prisma.auditLog.create({
+        data: {
+          actor: user.name, userId: user.id, action: 'kpi_rollup.approve', entity: 'KpiRollupReview', targetId: review.id,
+          note: `Konsolidasi KPI "${master.indikator}" periode ${period.label} disetujui — nilai parent final ${r2(nilaiParent)}`,
+        },
+      });
+      return review;
+    }
+
+    // reject
+    if (!note?.trim()) throw new BadRequestException('Catatan penolakan wajib diisi');
+    const review = await this.prisma.kpiRollupReview.upsert({
+      where: { kpiMasterId_periodId: { kpiMasterId, periodId: period.id } },
+      update: { status: 'rejected', reviewer: user.name, reviewerId: user.id, reviewNote: note.trim(), nilaiParent: null, reviewedAt: new Date() },
+      create: { kpiMasterId, periodId: period.id, status: 'rejected', reviewer: user.name, reviewerId: user.id, reviewNote: note.trim(), nilaiParent: null, reviewedAt: new Date() },
+    });
+    if (contributorSubmitterIds.size > 0) {
+      await this.prisma.notification.createMany({
+        data: [...contributorSubmitterIds].map((uid) => ({
+          userId: uid, type: 'alert', title: 'Konsolidasi KPI Ditolak',
+          msg: `Konsolidasi "${master.indikator}" periode ${period.label} ditolak RPC Perencanaan: ${note.trim()}`,
+          route: '/kpi-master', targetId: kpiMasterId, unread: true,
+        })),
+      });
+    }
+    await this.prisma.auditLog.create({
+      data: {
+        actor: user.name, userId: user.id, action: 'kpi_rollup.reject', entity: 'KpiRollupReview', targetId: review.id,
+        note: `Konsolidasi KPI "${master.indikator}" periode ${period.label} ditolak: ${note.trim()}`,
+      },
+    });
+    return review;
   }
 
   // Buat/ubah definisi KPI parent + assignment-nya, lalu sebar (fan-out) ke dokumen KM.
