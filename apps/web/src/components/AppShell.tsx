@@ -11,9 +11,15 @@ import {
   Tv2, Search, Download, User, HelpCircle, FilePlus, LineChart,
   FileSpreadsheet, Image, Printer, ExternalLink,
   Workflow, Network, Leaf, MapPin, ShieldAlert, Layers,
+  type LucideIcon,
 } from 'lucide-react';
 
-const NAV_ITEMS = [
+type NavItem = {
+  to: string; label: string; icon: LucideIcon;
+  end?: boolean; hideForUpmk?: boolean; devOnly?: boolean;
+};
+
+const NAV_ITEMS: Array<{ section: string; items: NavItem[] }> = [
   {
     section: 'Aksi Saya', items: [
       { to: '/approvals',      label: 'Persetujuan',             icon: CheckSquare },
@@ -134,9 +140,8 @@ export function AppShell() {
             // devOnly: hanya tampil untuk SUPERADMIN dan DEVELOPER
             const isPrivileged = user?.role === 'SUPERADMIN' || user?.role === 'DEVELOPER';
             const visibleItems = section.items.filter((it) => {
-              const nav = it as { hideForUpmk?: boolean; devOnly?: boolean };
-              if (isUpmkUser && nav.hideForUpmk) return false;
-              if (nav.devOnly && !isPrivileged) return false;
+              if (isUpmkUser && it.hideForUpmk) return false;
+              if (it.devOnly && !isPrivileged) return false;
               return true;
             });
             if (visibleItems.length === 0) return null;
