@@ -152,8 +152,8 @@ function ReviewerSlotsPanel({
                   ))}
                 </select>
               ) : (
-                <span style={{ fontSize: 11, color: preview ? 'var(--color-text)' : 'var(--color-warning)' }}>
-                  {preview ? `→ ${preview.name}` : '→ tak ditemukan (fallback ke default master)'}
+                <span style={{ fontSize: 11, color: preview ? 'var(--color-text)' : 'var(--color-warning)', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                  {preview ? `→ ${preview.name}` : (<><AlertCircle size={11} /> tak ditemukan — jatuh ke Default Alur Reviewer</>)}
                 </span>
               )}
               <label style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 10, color: 'var(--color-text-muted)', cursor: 'pointer' }}>
@@ -204,8 +204,8 @@ function ReviewerSlotsPanel({
             ) : (() => {
               const preview = previewApprover(slots.approver!);
               return (
-                <span style={{ fontSize: 11, color: preview ? 'var(--color-text)' : 'var(--color-warning)' }}>
-                  {preview ? `→ ${preview.name}` : '→ tak ditemukan (fallback ke default master)'}
+                <span style={{ fontSize: 11, color: preview ? 'var(--color-text)' : 'var(--color-warning)', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                  {preview ? `→ ${preview.name}` : (<><AlertCircle size={11} /> tak ditemukan — jatuh ke Default Alur Reviewer</>)}
                 </span>
               );
             })()}
@@ -369,6 +369,15 @@ function DefinisiKpiTab() {
     if (slots.checkers.length > 0) parts.push(`${slots.checkers.length} checker`);
     if (slots.approver) parts.push('approver');
     return parts.join(' + ');
+  };
+  // Fase 3 (polish): deteksi slot peran (bukan override) yang tak bisa di-resolve ke orang
+  // (mis. approver SRMANAJER di bidang tanpa Senior Manajer, seperti K3L/MRO) — beri sinyal
+  // di level ringkasan baris, bukan hanya di dalam panel, agar RPC sadar akan jatuh ke fallback.
+  const hasUnresolvedSlot = (unitCode: string, bidang: string, slots: ReviewerSlots | null): boolean => {
+    if (!slots) return false;
+    if (slots.checkers.some((s) => !s.userId && !previewChecker(unitCode, bidang, s))) return true;
+    if (slots.approver && !slots.approver.userId && !previewApprover(bidang, slots.approver)) return true;
+    return false;
   };
   const anyPersenSet = assignments.some((a) => (a.persenAgregasi || 0) > 0);
 
@@ -550,14 +559,21 @@ function DefinisiKpiTab() {
                           </td>
                         )}
                         <td>
-                          <button
-                            className="btn btn-ghost btn-sm"
-                            onClick={() => setOpenReviewerRow(openReviewerRow === i ? null : i)}
-                            style={{ fontSize: 11, color: reviewerSlotsSummary(a.reviewerSlots) === 'Belum diatur' ? 'var(--color-text-muted)' : 'var(--color-accent)' }}
-                          >
-                            <UserCheck size={12} /> {reviewerSlotsSummary(a.reviewerSlots)}
-                            <ChevronDown size={11} style={{ transform: openReviewerRow === i ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />
-                          </button>
+                          {(() => {
+                            const unresolved = hasUnresolvedSlot(a.unitCode, a.bidang, a.reviewerSlots);
+                            const empty = reviewerSlotsSummary(a.reviewerSlots) === 'Belum diatur';
+                            return (
+                              <button
+                                className="btn btn-ghost btn-sm"
+                                onClick={() => setOpenReviewerRow(openReviewerRow === i ? null : i)}
+                                title={unresolved ? 'Ada slot peran yang tak ketemu orangnya — akan jatuh ke Default Alur Reviewer' : undefined}
+                                style={{ fontSize: 11, color: unresolved ? 'var(--color-warning)' : empty ? 'var(--color-text-muted)' : 'var(--color-accent)' }}
+                              >
+                                {unresolved ? <AlertCircle size={12} /> : <UserCheck size={12} />} {reviewerSlotsSummary(a.reviewerSlots)}
+                                <ChevronDown size={11} style={{ transform: openReviewerRow === i ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />
+                              </button>
+                            );
+                          })()}
                         </td>
                         <td>
                           <button className="btn btn-ghost btn-sm" disabled={assignments.length <= 1} onClick={() => removeAssignment(i)} style={{ color: 'var(--color-danger)' }}><Trash2 size={13} /></button>
