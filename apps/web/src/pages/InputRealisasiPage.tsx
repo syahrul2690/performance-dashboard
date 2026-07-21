@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, Fragment } from 'react';
-import { inputRealisasi, inputKontrak, meta } from '../lib/api';
+import { inputRealisasi, inputKontrak, meta, periodTarget, type PeriodTarget } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { ClipboardEdit, CheckCircle, Clock, Trash2, Paperclip, Upload, X } from 'lucide-react';
 import { SkeletonTable, EmptyState, ErrorState } from '../components/LoadState';
@@ -18,6 +18,7 @@ type KpiItem = {
   no?: number; indikator?: string; formula?: string; satuan?: string;
   bobot?: number | string; target?: number | string; target2?: number | string;
   bidang?: string; realisasi?: number | string;
+  masterKpiId?: string; // tautan ke KpiAssignment untuk resolusi living target (KM Sementara)
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -48,6 +49,7 @@ export function InputRealisasiPage() {
   const [selectedPeriodId, setSelectedPeriodId] = useState<string>('');
   const [history, setHistory] = useState<unknown[]>([]);
   const [kpiList, setKpiList] = useState<KpiItem[]>([]);
+  const [periodTargets, setPeriodTargets] = useState<PeriodTarget[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [values, setValues] = useState<Record<string, string>>({});
@@ -108,11 +110,14 @@ export function InputRealisasiPage() {
         const periodObj = periods.find((p) => p.id === selectedPeriodId);
         const selectedYear = periodObj?.yearMonth?.slice(0, 4);
         const kmType = periodObj?.kmReference ?? 'draft';
-        const [histRes, approvedRes] = await Promise.allSettled([
+        const [histRes, approvedRes, ptRes] = await Promise.allSettled([
           inputRealisasi.history(selectedUnit, selectedPeriodId),
           inputKontrak.approved(selectedUnit, selectedYear, kmType),
+          periodTarget.list(selectedPeriodId),
         ]);
         if (histRes.status === 'fulfilled') setHistory(histRes.value as unknown[]);
+        // Living-target: KM Sementara per assignment periode ini (untuk package view).
+        setPeriodTargets(ptRes.status === 'fulfilled' ? ptRes.value : []);
         if (approvedRes.status === 'fulfilled') {
           // Acuan realisasi = KPI dari Kontrak Manajemen yang sudah DISETUJUI (final GM) untuk unit terpilih.
           const kontrak = approvedRes.value as KontrakManajemen[];
@@ -202,6 +207,16 @@ export function InputRealisasiPage() {
   const fillWindow = selectedPeriod?.fillWindow;
   const windowOpen = fillWindow ? fillWindow.isOpen : true; // belum ada data window → jangan blokir UI
   const fmtDate = (iso: string) => new Date(iso).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+
+  // Living-target: KM Sementara yang berlaku untuk satu KPI row (cocokkan masterKpiId + unit + bidang).
+  const livingTargetFor = (kpi: KpiItem): PeriodTarget | undefined =>
+    kpi.masterKpiId
+      ? periodTargets.find((pt) => pt.assignment
+          && pt.assignment.kpiMasterId === kpi.masterKpiId
+          && pt.assignment.unitCode === selectedUnit
+          && pt.assignment.bidang === (kpi.bidang ?? ''))
+      : undefined;
+  const anyLivingTarget = kpiList.some((k) => livingTargetFor(k));
 
   return (
     <div className="page input-realisasi-page">
@@ -317,6 +332,7 @@ export function InputRealisasiPage() {
                   <th className="num">Bobot</th>
                   <th className="num">Target Sem I</th>
                   <th className="num">Target {CURRENT_YEAR}</th>
+                  {anyLivingTarget && <th className="num" title="KM Sementara — target hidup bulan ini (bisa dikoreksi PIC REN sampai KM Final tiba)">KM Sementara</th>}
                   <th>Realisasi</th>
                 </tr>
               </thead>
@@ -324,6 +340,7 @@ export function InputRealisasiPage() {
                 {kpiList.map((kpi, i) => {
                   const val = values[String(i)] ?? '';
                   const hasVal = val.trim() !== '';
+                  const lt = livingTargetFor(kpi);
                   return (
                     <tr key={i} style={{ background: hasVal ? 'rgba(34,197,94,0.03)' : 'transparent' }}>
                       <td style={{ color: 'var(--color-text-muted)' }}>{kpi.no ?? i + 1}</td>
@@ -334,6 +351,21 @@ export function InputRealisasiPage() {
                       <td className="num" style={{ fontWeight: 700, color: 'var(--color-accent)' }}>{kpi.bobot ?? '—'}</td>
                       <td className="num">{kpi.target ?? '—'}</td>
                       <td className="num">{kpi.target2 ?? '—'}</td>
+                      {anyLivingTarget && (
+                        <td className="num" style={{ whiteSpace: 'nowrap' }}>
+                          {lt ? (
+                            <>
+                              <span style={{ fontWeight: 700 }}>{lt.frozen ? (lt.frozenTarget ?? lt.target) : lt.target}</span>
+                              <span
+                                title={lt.frozen ? 'Sudah dibekukan (bundle GM disetujui / deadline / restatement)' : lt.source === 'carried' ? 'Dibawa dari bulan lalu (belum diubah)' : 'Diinput/diubah bulan ini'}
+                                style={{ marginLeft: 4, fontSize: 9, fontWeight: 700, padding: '1px 4px', borderRadius: 4, border: '1px solid var(--color-border)', color: lt.frozen ? 'var(--color-text-muted)' : lt.source === 'carried' ? 'var(--color-warning)' : 'var(--color-accent)' }}
+                              >
+                                {lt.frozen ? 'BEKU' : lt.source === 'carried' ? 'CARRY' : 'HIDUP'}
+                              </span>
+                            </>
+                          ) : <span style={{ color: 'var(--color-text-subtle)' }}>—</span>}
+                        </td>
+                      )}
                       <td style={{ minWidth: 140 }}>
                         <input
                           type="text"

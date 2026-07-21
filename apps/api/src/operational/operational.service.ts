@@ -12,8 +12,8 @@ export class OperationalService {
     @Inject(CACHE_MANAGER) private cache: Cache,
   ) {}
 
-  async getData(periodId?: string) {
-    const cacheKey = `operational:${periodId || 'active'}`;
+  async getData(periodId?: string, phase?: 'sementara' | 'final') {
+    const cacheKey = `operational:${periodId || 'active'}:${phase ?? 'auto'}`;
     const cached = await this.cache.get(cacheKey);
     if (cached) return cached;
 
@@ -23,19 +23,21 @@ export class OperationalService {
 
     if (!period) return null;
 
-    // Living-target: default ke snapshot 'final' (KM Final, sudah direstate) bila sudah
-    // ada; jatuh ke 'sementara' (provisional, masih hidup) selama masa tunggu KM Final.
-    let snap = await this.prisma.operationalSnapshot.findUnique({ where: { periodId_phase: { periodId: period.id, phase: 'final' } } });
-    if (!snap) snap = await this.prisma.operationalSnapshot.findUnique({ where: { periodId_phase: { periodId: period.id, phase: 'sementara' } } });
+    // Living-target: bila phase eksplisit diminta (toggle dashboard), ambil phase itu saja;
+    // else default ke 'final' (KM Final, sudah direstate) bila ada, jatuh ke 'sementara'
+    // (provisional, masih hidup) selama masa tunggu KM Final.
+    const pick = async (pid: string) => {
+      if (phase) return this.prisma.operationalSnapshot.findUnique({ where: { periodId_phase: { periodId: pid, phase } } });
+      return (await this.prisma.operationalSnapshot.findUnique({ where: { periodId_phase: { periodId: pid, phase: 'final' } } }))
+        ?? this.prisma.operationalSnapshot.findUnique({ where: { periodId_phase: { periodId: pid, phase: 'sementara' } } });
+    };
+    let snap = await pick(period.id);
     // Fallback baseline ke snapshot periode aktif bila periode terpilih belum punya snapshot.
     if (!snap) {
       const active = await this.prisma.period.findFirst({ where: { isActive: true } });
-      if (active && active.id !== period.id) {
-        snap = await this.prisma.operationalSnapshot.findUnique({ where: { periodId_phase: { periodId: active.id, phase: 'final' } } })
-          ?? await this.prisma.operationalSnapshot.findUnique({ where: { periodId_phase: { periodId: active.id, phase: 'sementara' } } });
-      }
+      if (active && active.id !== period.id) snap = await pick(active.id);
     }
-    const result = { period, data: snap?.data ?? null, phase: snap?.phase ?? 'sementara' };
+    const result = { period, data: snap?.data ?? null, phase: snap?.phase ?? (phase ?? 'sementara') };
     await this.cache.set(cacheKey, result);
     return result;
   }
@@ -224,7 +226,9 @@ export class OperationalService {
       update: { data: newData as unknown as Prisma.InputJsonValue, targetOfRecord: targetOfRecord as unknown as Prisma.InputJsonValue },
       create: { periodId, phase, data: newData as unknown as Prisma.InputJsonValue, targetOfRecord: targetOfRecord as unknown as Prisma.InputJsonValue },
     });
-    await this.cache.del(`operational:${periodId}`);
-    await this.cache.del('operational:active');
+    // Bersihkan semua varian phase cache (auto/sementara/final) untuk periode ini & 'active'.
+    for (const base of [`operational:${periodId}`, 'operational:active']) {
+      for (const p of ['auto', 'sementara', 'final']) await this.cache.del(`${base}:${p}`);
+    }
   }
 }
