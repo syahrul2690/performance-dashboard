@@ -3,6 +3,7 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { num, r2, resolveTarget, computeCapaian, computeNilai, scoreItems, type TargetOverrideMap } from '../common/capaian';
 
 @Injectable()
 export class OperationalService {
@@ -22,26 +23,25 @@ export class OperationalService {
 
     if (!period) return null;
 
-    let snap = await this.prisma.operationalSnapshot.findUnique({ where: { periodId: period.id } });
+    // Living-target: default ke snapshot 'final' (KM Final, sudah direstate) bila sudah
+    // ada; jatuh ke 'sementara' (provisional, masih hidup) selama masa tunggu KM Final.
+    let snap = await this.prisma.operationalSnapshot.findUnique({ where: { periodId_phase: { periodId: period.id, phase: 'final' } } });
+    if (!snap) snap = await this.prisma.operationalSnapshot.findUnique({ where: { periodId_phase: { periodId: period.id, phase: 'sementara' } } });
     // Fallback baseline ke snapshot periode aktif bila periode terpilih belum punya snapshot.
     if (!snap) {
       const active = await this.prisma.period.findFirst({ where: { isActive: true } });
       if (active && active.id !== period.id) {
-        snap = await this.prisma.operationalSnapshot.findUnique({ where: { periodId: active.id } });
+        snap = await this.prisma.operationalSnapshot.findUnique({ where: { periodId_phase: { periodId: active.id, phase: 'final' } } })
+          ?? await this.prisma.operationalSnapshot.findUnique({ where: { periodId_phase: { periodId: active.id, phase: 'sementara' } } });
       }
     }
-    const result = { period, data: snap?.data ?? null };
+    const result = { period, data: snap?.data ?? null, phase: snap?.phase ?? 'sementara' };
     await this.cache.set(cacheKey, result);
     return result;
   }
 
-  async refreshFromRealisasi(periodId: string): Promise<void> {
-    const num = (v: unknown): number => {
-      if (v == null) return 0;
-      const n = parseFloat(String(v).replace(',', '.').replace(/[^0-9.-]/g, ''));
-      return Number.isFinite(n) ? n : 0;
-    };
-    const r2 = (n: number) => Math.round(n * 100) / 100;
+  // Lihat catatan phase/targetOverrides yang sama di ExecutiveService.refreshFromRealisasi.
+  async refreshFromRealisasi(periodId: string, phase: 'sementara' | 'final' = 'sementara', targetOverrides?: TargetOverrideMap): Promise<void> {
     const UNIT_NAMES: Record<string, string> = {
       KP: 'Kantor Induk', UPMK1: 'UPMK I', UPMK2: 'UPMK II',
       UPMK3: 'UPMK III', UPMK4: 'UPMK IV', UPMK5: 'UPMK V',
@@ -56,6 +56,15 @@ export class OperationalService {
     if (allRecords.length === 0) return;
     const kpRecords = allRecords.filter(r => r.unitCode === 'KP');
 
+    // Target-of-record efektif: override eksplisit (restatement KM Final) menang; selain
+    // itu gabungkan targetOfRecord tiap record (living target saat submit terakhir).
+    const targetOfRecord: TargetOverrideMap = { ...targetOverrides };
+    if (!targetOverrides) {
+      for (const r of allRecords) {
+        Object.assign(targetOfRecord, (r.targetOfRecord ?? {}) as TargetOverrideMap);
+      }
+    }
+
     const allItems = kpRecords.flatMap(r =>
       Object.values((r.values ?? {}) as Record<string, Record<string, unknown>>)
         .map(it => ({ it, bidang: r.bidang }))
@@ -63,15 +72,15 @@ export class OperationalService {
     const regularItems = allItems.filter(({ it }) => num(it['bobot']) > 0);
     const pengurangItems = allItems.filter(({ it }) => num(it['bobot']) < 0);
 
-    // Get existing snapshot as base
-    const existing = await this.prisma.operationalSnapshot.findUnique({ where: { periodId } });
+    // Get existing snapshot (SAME phase) as base
+    const existing = await this.prisma.operationalSnapshot.findUnique({ where: { periodId_phase: { periodId, phase } } });
     let base: Record<string, unknown>;
     if (existing?.data) {
       base = existing.data as Record<string, unknown>;
     } else {
       const active = await this.prisma.period.findFirst({ where: { isActive: true } });
       const fallback = active && active.id !== periodId
-        ? await this.prisma.operationalSnapshot.findUnique({ where: { periodId: active.id } })
+        ? await this.prisma.operationalSnapshot.findUnique({ where: { periodId_phase: { periodId: active.id, phase } } })
         : null;
       base = (fallback?.data ?? {}) as Record<string, unknown>;
     }
@@ -89,14 +98,12 @@ export class OperationalService {
         return kname.length > 8 && nameLow.slice(0, 20).includes(kname.slice(0, 12));
       });
       const bobot = num(it['bobot']);
-      const target = num(it['target2'] ?? it['target']);
+      const target = resolveTarget(it, targetOfRecord);
       const actual = num(it['realisasi']);
       const satuan = String(it['satuan'] ?? '');
       const isInverse = satuan.toLowerCase() === 'hari kerja';
-      const achievement = target > 0 && actual > 0
-        ? (isInverse ? Math.min((target / actual) * 100, 110) : Math.min((actual / target) * 100, 110))
-        : 0;
-      const nilai = r2((achievement / 100) * bobot);
+      const achievement = computeCapaian(target, actual, isInverse);
+      const nilai = computeNilai(bobot, achievement);
       const prevSpark = (existingKpi?.['sparkline'] ?? Array(12).fill(0)) as number[];
       const no = kpiNo++;
       return {
@@ -153,26 +160,14 @@ export class OperationalService {
     const kepatuhanPenalty = r2(kepatuhan.reduce((s, k) => s + Number(k.applied ?? 0), 0));
     const totalNilai = r2(kpiNilai + piNilai + kepatuhanPenalty);
 
-    // buComparison from all approved units (allRecords sudah diambil di awal fungsi)
+    // buComparison from all approved units (allRecords sudah diambil di awal fungsi).
+    // Track KI Adjusted (`values`) — authoritative utk rollup/perbandingan antar-unit.
     const byUnit: Record<string, typeof allRecords> = {};
     for (const r of allRecords) (byUnit[r.unitCode] ??= []).push(r);
     const unitScoreMap: Record<string, number> = {};
     for (const [code, records] of Object.entries(byUnit)) {
-      let total = 0;
-      for (const r of records) {
-        for (const it of Object.values((r.values ?? {}) as Record<string, Record<string, unknown>>)) {
-          const bobot = num(it['bobot']);
-          const target = num(it['target2'] ?? it['target']);
-          const actual = num(it['realisasi']);
-          const satuan = String(it['satuan'] ?? '').toLowerCase();
-          if (bobot > 0 && target > 0 && actual > 0) {
-            const inv = satuan === 'hari kerja';
-            const capaian = inv ? Math.min((target / actual) * 100, 110) : Math.min((actual / target) * 100, 110);
-            total += (capaian / 100) * bobot;
-          }
-        }
-      }
-      unitScoreMap[code] = r2(total);
+      const items = records.flatMap((r) => Object.values((r.values ?? {}) as Record<string, Record<string, unknown>>));
+      unitScoreMap[code] = scoreItems(items, targetOfRecord);
     }
     const existingBuComp = (base.buComparison ?? {}) as Record<string, unknown>;
     const buComparison = {
@@ -182,27 +177,10 @@ export class OperationalService {
         .sort((a, b) => b.score - a.score),
     };
 
-    // Self-Assessment (UPMK) vs Evaluasi (hasil koreksi berjenjang s.d. SM RPC).
-    // `selfAssessment` = snapshot dikunci saat submit; `values` = salinan kerja yang
-    // dapat dikoreksi reviewer sepanjang alur → representasi hasil evaluasi akhir.
-    const scoreFromSource = (records: typeof allRecords, pick: (r: typeof records[0]) => unknown): number => {
-      let total = 0;
-      for (const r of records) {
-        const src = (pick(r) ?? {}) as Record<string, Record<string, unknown>>;
-        for (const it of Object.values(src)) {
-          const bobot = num(it['bobot']);
-          const target = num(it['target2'] ?? it['target']);
-          const actual = num(it['realisasi']);
-          const satuan = String(it['satuan'] ?? '').toLowerCase();
-          if (bobot > 0 && target > 0 && actual > 0) {
-            const inv = satuan === 'hari kerja';
-            const capaian = inv ? Math.min((target / actual) * 100, 110) : Math.min((actual / target) * 100, 110);
-            total += (capaian / 100) * bobot;
-          }
-        }
-      }
-      return r2(total);
-    };
+    // Self-Assessment (UPMK) vs Evaluasi (hasil koreksi berjenjang s.d. SM RPC). Dua track
+    // eksplisit (§5 desain): `selfAssessment` = UPMK Version (dikunci saat submit); `values`
+    // = KI Adjusted Version (salinan kerja hasil koreksi berjenjang). Dihitung dgn
+    // target-of-record yg SAMA agar divergensi murni mencerminkan koreksi REN PIC.
     const byUnitUpmk: Record<string, typeof allRecords> = {};
     for (const r of allRecords) {
       if (r.unitCode === 'KP') continue;
@@ -211,8 +189,10 @@ export class OperationalService {
     }
     const selfAssessmentGap = Object.entries(byUnitUpmk)
       .map(([code, records]) => {
-        const selfScore = scoreFromSource(records, (r) => r.selfAssessment);
-        const evaluatedScore = scoreFromSource(records, (r) => r.values);
+        const selfItems = records.flatMap((r) => Object.values((r.selfAssessment ?? {}) as Record<string, Record<string, unknown>>));
+        const evalItems = records.flatMap((r) => Object.values((r.values ?? {}) as Record<string, Record<string, unknown>>));
+        const selfScore = scoreItems(selfItems, targetOfRecord);
+        const evaluatedScore = scoreItems(evalItems, targetOfRecord);
         const gap = r2(evaluatedScore - selfScore);
         return {
           code, unit: UNIT_NAMES[code] ?? code,
@@ -240,9 +220,9 @@ export class OperationalService {
     };
 
     await this.prisma.operationalSnapshot.upsert({
-      where:  { periodId },
-      update: { data: newData as unknown as Prisma.InputJsonValue },
-      create: { periodId, data: newData as unknown as Prisma.InputJsonValue },
+      where:  { periodId_phase: { periodId, phase } },
+      update: { data: newData as unknown as Prisma.InputJsonValue, targetOfRecord: targetOfRecord as unknown as Prisma.InputJsonValue },
+      create: { periodId, phase, data: newData as unknown as Prisma.InputJsonValue, targetOfRecord: targetOfRecord as unknown as Prisma.InputJsonValue },
     });
     await this.cache.del(`operational:${periodId}`);
     await this.cache.del('operational:active');
