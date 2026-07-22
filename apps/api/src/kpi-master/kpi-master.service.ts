@@ -465,7 +465,14 @@ export class KpiMasterService {
 
   // Buat/ubah definisi KPI parent + assignment-nya, lalu sebar (fan-out) ke dokumen KM.
   async save(user: User, dto: SaveMasterInput) {
-    if (user.unit !== 'KP') throw new ForbiddenException('KPI Master hanya dapat disusun oleh Kantor Induk');
+    // KPI Master mendefinisikan KPI lintas-bidang/unit — dipersempit ke RPC (Perencanaan &
+    // Project Control, semua jenjang: Staff/Manajer/SM), sesuai peran RPC sbg pemilik cascading
+    // KPI (selaras isPicRen() di period-target.service.ts). GM & Admin tetap boleh override.
+    const isAdminOverride = user.role === Role.GM || user.role === Role.SUPERADMIN || user.role === Role.DEVELOPER;
+    const isRpc = user.unit === 'KP' && user.bidang === RPC_BIDANG;
+    if (!isAdminOverride && !isRpc) {
+      throw new ForbiddenException('KPI Master hanya dapat disusun oleh Perencanaan & Project Control (RPC), GM, atau Admin');
+    }
     if (!dto.indikator?.trim()) throw new BadRequestException('Nama indikator wajib diisi');
     if (!Array.isArray(dto.assignments) || dto.assignments.length === 0) {
       throw new BadRequestException('Pilih minimal satu unit/bidang untuk di-assign');

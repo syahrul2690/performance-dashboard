@@ -23,6 +23,8 @@ const BIDANG_OPTIONS = [
   'Perencanaan & Project Control', 'K3L', 'MRO',
 ];
 const CURRENT_YEAR = new Date().getFullYear();
+// KPI Master (definisi lintas-bidang/unit) dipersempit ke RPC — lihat kpi-master.service.ts save().
+const RPC_BIDANG = 'Perencanaan & Project Control';
 
 // ============================ Shell: Manajemen KPI (3 tab) ============================
 export function KpiMasterPage() {
@@ -241,7 +243,8 @@ function ReviewerSlotsPanel({
 function DefinisiKpiTab() {
   const { user } = useAuth();
   const { periodId } = usePeriod();
-  const canAuthor = user?.unit === 'KP';
+  const canAuthor = user?.role === 'GM' || user?.role === 'SUPERADMIN' || user?.role === 'DEVELOPER'
+    || (user?.unit === 'KP' && user?.bidang === RPC_BIDANG);
 
   const [masters, setMasters] = useState<KpiMasterRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -968,7 +971,11 @@ function DokumenKmTab() {
 
   const myBidang = user?.bidang ?? null;
   const myUnit = user?.unit ?? null;
-  const canSeeAllKm = user?.role === 'GM';
+  // RPC (pemilik definisi KPI Master lintas-bidang) & Admin bisa MELIHAT semua dokumen KM —
+  // meniru pola yang sudah otomatis benar utk UPMK (fan-out RPC selalu terlihat submitter-nya
+  // sendiri). Ini hanya visibility; tombol aksi/submit tetap dijaga terpisah oleh canActOnRow().
+  const canSeeAllKm = user?.role === 'GM' || user?.role === 'SUPERADMIN' || user?.role === 'DEVELOPER'
+    || (user?.unit === 'KP' && user?.bidang === RPC_BIDANG);
   const canActOnRow = (k: KontrakManajemen) =>
     user?.role === 'STAFF' && user?.unit === 'KP' &&
     ((user?.bidang ?? null) === k.bidang || k.submitterId === user?.id);
