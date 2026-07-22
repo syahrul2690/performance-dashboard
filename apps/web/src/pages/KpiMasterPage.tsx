@@ -88,7 +88,7 @@ type KpiMasterRow = {
   aggregationMethod: 'weighted' | 'sum';
   subIndicators: SubIndicatorInput[] | null;
 };
-const emptySubIndicator = (): SubIndicatorInput => ({ nama: '', satuan: '', bobot: '', target: '', target2: '' });
+const emptySubIndicator = (): SubIndicatorInput => ({ nama: '', satuan: '', bobot: '', target: '', target2: '', formula: '' });
 const ROLE_LABEL: Record<string, string> = { ASMAN: 'ASMAN', MANAJER: 'Manajer', SRMANAJER: 'Senior Manajer', GM: 'General Manager' };
 const candDesc = (c: ReviewerCandidate) => `${ROLE_LABEL[c.role] ?? c.role}${c.unit && c.unit !== 'KP' ? ' · ' + (UNIT_NAMES[c.unit] ?? c.unit) : ''}`;
 type RollupBreakdown = { unitCode: string; bidang: string; persenAgregasi: number; realisasi: number | null; kontribusi: number; hasData: boolean };
@@ -555,7 +555,7 @@ function DefinisiKpiTab() {
                   <table className="data-table compact">
                     <thead>
                       <tr>
-                        <th>Nama Sub-Indikator</th><th>Satuan</th>
+                        <th>Nama Sub-Indikator</th><th>Formula / Cara Pengukuran</th><th>Satuan</th>
                         <th className="num">Bobot (poin)</th><th>Target Sem I</th><th>Target {CURRENT_YEAR}</th>
                         <th style={{ width: 40 }} />
                       </tr>
@@ -564,6 +564,7 @@ function DefinisiKpiTab() {
                       {subIndicators.map((s, i) => (
                         <tr key={i}>
                           <td><input className="form-input form-input-sm" value={s.nama} onChange={(e) => updateSubIndicator(i, 'nama', e.target.value)} placeholder="mis. OPEX vs RKAP" /></td>
+                          <td><input className="form-input form-input-sm" value={s.formula ?? ''} onChange={(e) => updateSubIndicator(i, 'formula', e.target.value)} placeholder="Rumus / cara pengukuran sub ini" /></td>
                           <td><input className="form-input form-input-sm" value={s.satuan ?? ''} onChange={(e) => updateSubIndicator(i, 'satuan', e.target.value)} placeholder="%, Rp M, dsb" /></td>
                           <td><input className="form-input form-input-sm" style={{ textAlign: 'center' }} value={s.bobot} onChange={(e) => updateSubIndicator(i, 'bobot', e.target.value)} placeholder="poin" /></td>
                           <td><input className="form-input form-input-sm" value={s.target} onChange={(e) => updateSubIndicator(i, 'target', e.target.value)} placeholder="Target Sem I" /></td>
@@ -574,7 +575,7 @@ function DefinisiKpiTab() {
                         </tr>
                       ))}
                       <tr style={{ background: 'var(--color-surface-2)' }}>
-                        <td colSpan={2} style={{ textAlign: 'right', fontWeight: 700, fontSize: 'var(--text-xs)' }}>Total Bobot (= Bobot KM assignment):</td>
+                        <td colSpan={3} style={{ textAlign: 'right', fontWeight: 700, fontSize: 'var(--text-xs)' }}>Total Bobot (= Bobot KM assignment):</td>
                         <td className="num" style={{ fontWeight: 700 }}>{totalSubBobot || 0}</td>
                         <td colSpan={3} />
                       </tr>

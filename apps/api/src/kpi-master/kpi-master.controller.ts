@@ -25,6 +25,7 @@ class SubIndicatorDto {
   @IsString() bobot: string;
   @IsString() target: string;
   @IsOptional() @IsString() target2?: string;
+  @IsOptional() @IsString() formula?: string;
 }
 
 class SaveMasterDto {

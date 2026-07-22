@@ -37,7 +37,7 @@ export function computeNilai(bobot: number, capaian: number): number {
 // Target sub diambil LANGSUNG dari definisi dokumen KM (sub.target/target2) — TIDAK memakai
 // target-of-record living-target/PeriodTarget (itu khusus KPI nilai-tunggal, lihat resolveTarget
 // di atas). Sub tanpa bobot/target/realisasi valid dilewati (belum dinilai), sama seperti item biasa.
-export type SubIndicatorScore = { nama: string; satuan: string; bobot: number; target: number; actual: number; capaian: number; nilai: number };
+export type SubIndicatorScore = { nama: string; satuan: string; bobot: number; target: number; actual: number; capaian: number; nilai: number; formula: string };
 
 export function breakdownComposite(item: Record<string, unknown>): SubIndicatorScore[] {
   const subs = Array.isArray(item['subIndicators']) ? (item['subIndicators'] as Record<string, unknown>[]) : [];
@@ -47,7 +47,7 @@ export function breakdownComposite(item: Record<string, unknown>): SubIndicatorS
     const actual = num(si['realisasi']);
     const satuan = String(si['satuan'] ?? '').toLowerCase();
     const capaian = bobot > 0 && target > 0 && actual > 0 ? computeCapaian(target, actual, satuan === 'hari kerja') : 0;
-    return { nama: String(si['nama'] ?? ''), satuan, bobot, target, actual, capaian, nilai: computeNilai(bobot, capaian) };
+    return { nama: String(si['nama'] ?? ''), satuan, bobot, target, actual, capaian, nilai: computeNilai(bobot, capaian), formula: String(si['formula'] ?? '') };
   });
 }
 

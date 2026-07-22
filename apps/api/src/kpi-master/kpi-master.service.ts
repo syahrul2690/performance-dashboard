@@ -32,6 +32,7 @@ export interface SubIndicatorInput {
   bobot: string; // poin KM (Σ seluruh sub = bobotKm assignment, turunan otomatis)
   target: string;
   target2?: string;
+  formula?: string; // teks deskriptif cara pengukuran sub ini — tak memengaruhi nilai (sama sifatnya dgn KpiMaster.formula)
 }
 export interface SaveMasterInput {
   id?: string;
@@ -162,7 +163,11 @@ export class KpiMasterService {
       if (!Number.isFinite(bobotNum) || bobotNum <= 0) throw new BadRequestException(`Bobot sub-indikator "${nama}" harus angka > 0`);
       const target = String(r?.target ?? '').trim();
       if (!target) throw new BadRequestException(`Target sub-indikator "${nama}" wajib diisi`);
-      out.push({ nama, satuan: String(r?.satuan ?? ''), bobot: bobotStr, target, target2: String(r?.target2 ?? '') || undefined });
+      out.push({
+        nama, satuan: String(r?.satuan ?? ''), bobot: bobotStr, target,
+        target2: String(r?.target2 ?? '') || undefined,
+        formula: String(r?.formula ?? '') || undefined,
+      });
     }
     return out;
   }

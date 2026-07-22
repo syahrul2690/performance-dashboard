@@ -217,7 +217,7 @@ export type KpiAssignmentInput = {
 };
 // Sub-indikator (opt-in, generik) — non-kosong menandai KPI ini "komposit". Lihat
 // kpi-master.service.ts SubIndicatorInput.
-export type SubIndicatorInput = { nama: string; satuan?: string; bobot: string; target: string; target2?: string };
+export type SubIndicatorInput = { nama: string; satuan?: string; bobot: string; target: string; target2?: string; formula?: string };
 export const kpiMaster = {
   list: (year?: string, kmType?: 'draft' | 'final') =>
     api.get('/kpi-master', { params: { year, kmType } }).then((r) => r.data),

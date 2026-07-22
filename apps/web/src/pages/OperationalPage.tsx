@@ -10,7 +10,7 @@ interface RekapUnit { code: string; name: string; score: number; status: string;
 interface Rekap { hasData: boolean; overall: number | null; units: RekapUnit[]; }
 
 // Sub-indikator KPI komposit (opt-in, generik) — lihat common/capaian.ts breakdownComposite.
-type SubBreakdownItem = { nama: string; satuan: string; bobot: number; target: number; actual: number; capaian: number; nilai: number };
+type SubBreakdownItem = { nama: string; satuan: string; bobot: number; target: number; actual: number; capaian: number; nilai: number; formula?: string };
 
 type Kpi = {
   id: string; no?: string; label?: string; name?: string; indikator?: string; formula?: string;
@@ -179,7 +179,10 @@ export function OperationalPage() {
                 {isComposite && k.subBreakdown!.map((si, j) => (
                   <tr key={`${i}.${j}`} style={{ background: 'var(--color-surface-2)' }}>
                     <td />
-                    <td style={{ paddingLeft: 'var(--space-4)', fontSize: 12, color: 'var(--color-text-muted)' }}>↳ {si.nama}</td>
+                    <td style={{ paddingLeft: 'var(--space-4)' }}>
+                      <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>↳ {si.nama}</span>
+                      {si.formula && <div style={{ fontSize: 10, color: 'var(--color-text-subtle)', marginTop: 2, paddingLeft: 12 }}>{si.formula}</div>}
+                    </td>
                     <td style={{ color: 'var(--color-text-muted)' }}>{si.satuan || '—'}</td>
                     <td className="num">{fmt(si.target, 1)}</td>
                     <td className="num">{fmt(si.actual, 2)}</td>

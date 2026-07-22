@@ -16,7 +16,7 @@ const BIDANG_SORT: Record<string, number> = {
 
 // Sub-indikator KPI komposit (opt-in, generik) — lihat kpi-master.service.ts SubIndicatorInput.
 // Definisi target/bobot dari dokumen KM; `realisasi` diisi di sini saat submit.
-type SubIndicatorItem = { nama: string; satuan?: string; bobot: string; target: string; target2?: string; realisasi?: number | string };
+type SubIndicatorItem = { nama: string; satuan?: string; bobot: string; target: string; target2?: string; realisasi?: number | string; formula?: string };
 
 type KpiItem = {
   no?: number; indikator?: string; formula?: string; satuan?: string;
@@ -448,7 +448,7 @@ export function InputRealisasiPage() {
                           <td />
                           <td />
                           <td style={{ paddingLeft: 'var(--space-4)', fontSize: 12, color: 'var(--color-text-muted)' }}>↳ {si.nama}</td>
-                          <td />
+                          <td style={{ fontSize: 10, color: 'var(--color-text-muted)', maxWidth: 200 }}>{si.formula ?? '—'}</td>
                           <td style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>{si.satuan ?? '—'}</td>
                           <td className="num">{si.bobot}</td>
                           <td className="num">{si.target}</td>
