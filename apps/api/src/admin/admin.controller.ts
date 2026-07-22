@@ -149,4 +149,18 @@ export class AdminController {
   async runBackfillKpiMaster(@CurrentUser() user: User) {
     return this.kpiMaster.runBackfill(user);
   }
+
+  // ===== Fase 6: Backfill KM Sementara (materialisasi PeriodTarget per periode) =====
+
+  @Get('backfill-period-target/preview')
+  previewBackfillPeriodTarget(@Query('periodId') periodId: string) {
+    if (!periodId) throw new BadRequestException('periodId diperlukan');
+    return this.periodTarget.previewBackfill(periodId);
+  }
+
+  @Post('backfill-period-target/run')
+  async runBackfillPeriodTarget(@CurrentUser() user: User, @Query('periodId') periodId: string) {
+    if (!periodId) throw new BadRequestException('periodId diperlukan');
+    return this.periodTarget.runBackfill(periodId, user);
+  }
 }

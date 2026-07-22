@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, Fragment } from 'react';
-import { inputRealisasi, inputKontrak, meta, periodTarget, type PeriodTarget } from '../lib/api';
+import { inputRealisasi, inputKontrak, meta, periodTarget, type PeriodTarget, type RevisionLogEntry } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
-import { ClipboardEdit, CheckCircle, Clock, Trash2, Paperclip, Upload, X } from 'lucide-react';
+import { ClipboardEdit, CheckCircle, Clock, Trash2, Paperclip, Upload, X, History } from 'lucide-react';
 import { SkeletonTable, EmptyState, ErrorState } from '../components/LoadState';
 import ReviewerPickerModal from '../components/ReviewerPickerModal';
 import type { KontrakManajemen, Period } from '../lib/types';
@@ -20,6 +20,24 @@ type KpiItem = {
   bidang?: string; realisasi?: number | string;
   masterKpiId?: string; // tautan ke KpiAssignment untuk resolusi living target (KM Sementara)
 };
+
+// Fase 5: RevisionLog field='values' menyimpan seluruh blob values lama/baru — tampilkan
+// hanya baris realisasi yang benar-benar berubah (bukan seluruh objek mentah).
+function RealisasiDiff({ oldValue, newValue }: { oldValue: unknown; newValue: unknown }) {
+  const oldItems = (oldValue ?? {}) as Record<string, { indikator?: string; realisasi?: unknown }>;
+  const newItems = (newValue ?? {}) as Record<string, { indikator?: string; realisasi?: unknown }>;
+  const changed = Object.keys(newItems).filter((k) => String(oldItems[k]?.realisasi ?? '') !== String(newItems[k]?.realisasi ?? ''));
+  if (changed.length === 0) return <span style={{ color: 'var(--color-text-muted)' }}>Nilai realisasi diperbarui.</span>;
+  return (
+    <div>
+      {changed.map((k) => (
+        <div key={k}>
+          {newItems[k]?.indikator ?? k}: <b>{String(oldItems[k]?.realisasi ?? '—')}</b> → <b>{String(newItems[k]?.realisasi ?? '—')}</b>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 const STATUS_LABEL: Record<string, string> = {
   draft: 'Draft', submitted: 'Menunggu Review', ready: 'Siap Konsolidasi (GM)', approved: 'Disetujui', rejected: 'Dikembalikan',
@@ -60,6 +78,10 @@ export function InputRealisasiPage() {
   const [evidOpen, setEvidOpen] = useState<string | null>(null);
   const [evidBusy, setEvidBusy] = useState(false);
   const evidInputRef = useRef<HTMLInputElement>(null);
+  // Fase 5: timeline riwayat revisi (target + nilai realisasi) per package
+  const [revOpen, setRevOpen] = useState<string | null>(null);
+  const [revisions, setRevisions] = useState<RevisionLogEntry[]>([]);
+  const [revLoading, setRevLoading] = useState(false);
 
   const reloadHistory = async () => {
     const hist = await inputRealisasi.history(selectedUnit, selectedPeriodId);
@@ -82,6 +104,15 @@ export function InputRealisasiPage() {
     if (!confirm('Hapus berkas evidence ini?')) return;
     try { await inputRealisasi.deleteEvidence(id, fileId); await reloadHistory(); }
     catch (e) { alert((e as Error)?.message ?? 'Gagal menghapus'); }
+  };
+
+  // Fase 5: buka/tutup timeline riwayat revisi (target + nilai realisasi) untuk satu package.
+  const toggleRevisions = async (id: string) => {
+    if (revOpen === id) { setRevOpen(null); return; }
+    setRevOpen(id); setRevLoading(true);
+    try { setRevisions(await inputRealisasi.revisions(id)); }
+    catch { setRevisions([]); }
+    finally { setRevLoading(false); }
   };
   const fmtSize = (b: number) => (b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB');
 
@@ -452,6 +483,9 @@ export function InputRealisasiPage() {
                           <button className="btn btn-ghost btn-sm" onClick={() => setEvidOpen(evidOpen === rid ? null : rid)} title="Lampiran evidence">
                             <Paperclip size={14} /> {atts.length}
                           </button>
+                          <button className="btn btn-ghost btn-sm" onClick={() => toggleRevisions(rid)} title="Riwayat revisi (target & nilai realisasi)">
+                            <History size={14} />
+                          </button>
                           {canDelete && (
                             <button className="btn btn-ghost btn-sm" onClick={() => handleDelete(rid)} title="Hapus realisasi" style={{ color: 'var(--color-danger)' }}>
                               <Trash2 size={14} />
@@ -485,6 +519,41 @@ export function InputRealisasiPage() {
                           <span style={{ fontSize: 10, color: 'var(--color-text-muted)', marginLeft: 8 }}>
                             Maks 5 berkas · ≤ 10 MB/berkas · PDF, Excel, Word, JPG/PNG {atts.length >= 5 ? '· (batas tercapai)' : ''}
                           </span>
+                        </td>
+                      </tr>
+                    )}
+                    {revOpen === rid && (
+                      <tr>
+                        <td colSpan={6} style={{ background: 'var(--color-surface-2)', padding: 'var(--space-3)' }}>
+                          <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6 }}>Riwayat Revisi (Target & Nilai Realisasi)</div>
+                          {revLoading ? (
+                            <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>Memuat…</div>
+                          ) : revisions.length === 0 ? (
+                            <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>Belum ada revisi tercatat untuk package ini.</div>
+                          ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              {revisions.map((rv) => (
+                                <div key={rv.id} style={{ display: 'flex', gap: 8, fontSize: 11, alignItems: 'flex-start', borderLeft: `2px solid ${rv.entity === 'period_target' ? 'var(--color-accent)' : 'var(--color-warning)'}`, paddingLeft: 8 }}>
+                                  <span
+                                    style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4, whiteSpace: 'nowrap', background: rv.entity === 'period_target' ? 'var(--color-accent-tint)' : 'var(--color-warning-tint)', color: rv.entity === 'period_target' ? 'var(--color-accent)' : 'var(--color-warning)' }}
+                                  >
+                                    {rv.entity === 'period_target' ? 'TARGET (PIC REN)' : 'REALISASI (KI)'}
+                                  </span>
+                                  <div style={{ flex: 1 }}>
+                                    {rv.field === 'target' ? (
+                                      <span>Target: <b>{String(rv.oldValue ?? '—')}</b> → <b>{String(rv.newValue ?? '—')}</b></span>
+                                    ) : (
+                                      <RealisasiDiff oldValue={rv.oldValue} newValue={rv.newValue} />
+                                    )}
+                                    <div style={{ color: 'var(--color-text-muted)', fontSize: 10, marginTop: 2 }}>
+                                      {rv.actor} · {new Date(rv.createdAt).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                      {rv.note && ` · "${rv.note}"`}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </td>
                       </tr>
                     )}

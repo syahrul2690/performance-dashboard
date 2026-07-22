@@ -35,6 +35,7 @@ class TargetFixDto {
 
 class UpdateValuesDto {
   @IsObject() values: Record<string, unknown>;
+  @IsOptional() @IsString() note?: string;
 }
 
 class BundleReviewDto {
@@ -81,7 +82,13 @@ export class InputRealisasiController {
 
   @Patch(':id/values')
   updateValues(@CurrentUser() user: User, @Param('id') id: string, @Body() dto: UpdateValuesDto) {
-    return this.svc.updateValues(user, id, dto.values);
+    return this.svc.updateValues(user, id, dto.values, dto.note);
+  }
+
+  // Fase 5: timeline riwayat revisi gabungan (koreksi nilai realisasi + koreksi target KM Sementara).
+  @Get(':id/revisions')
+  getRevisionHistory(@Param('id') id: string) {
+    return this.svc.getRevisionHistory(id);
   }
 
   @Post(':id/review')

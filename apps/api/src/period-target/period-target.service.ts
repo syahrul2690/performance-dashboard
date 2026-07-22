@@ -150,4 +150,63 @@ export class PeriodTargetService {
   async getForPeriod(periodId: string) {
     return this.prisma.periodTarget.findMany({ where: { periodId }, include: { assignment: true } });
   }
+
+  // ===== Fase 6: Backfill KM Sementara (materialisasi PeriodTarget) =====
+  // getOrSeed() sudah membuat baris on-demand saat diakses (submit/resolveTargetFix/dsb),
+  // tapi periode yang BELUM PERNAH diakses (mis. bulan lama sebelum fitur ini ada, atau bulan
+  // yang belum ada realisasi masuk) tetap nol baris PeriodTarget — dan restatement KM Final
+  // MELEWATI periode tanpa baris PeriodTarget sama sekali (lihat RestatementService, "periode
+  // tanpa living target — lewati"). Backfill memastikan setiap KpiAssignment aktif punya baris
+  // utk periode ini SEBELUM restatement dijalankan, dengan aturan carry-forward/fresh yang
+  // identik (reuse getOrSeed, bukan duplikasi logika).
+  async previewBackfill(periodId: string) {
+    const period = await this.prisma.period.findUnique({ where: { id: periodId } });
+    if (!period) throw new NotFoundException('Periode tidak ditemukan');
+    const assignments = await this.prisma.kpiAssignment.findMany({ select: { id: true } });
+    const existing = await this.prisma.periodTarget.findMany({ where: { periodId }, select: { kpiAssignmentId: true } });
+    const existingIds = new Set(existing.map((e) => e.kpiAssignmentId));
+    const missing = assignments.filter((a) => !existingIds.has(a.id));
+    return { periodId, periodLabel: period.label, totalAssignments: assignments.length, alreadySeeded: existingIds.size, toSeed: missing.length };
+  }
+
+  async runBackfill(periodId: string, user: User) {
+    const period = await this.prisma.period.findUnique({ where: { id: periodId } });
+    if (!period) throw new NotFoundException('Periode tidak ditemukan');
+    const assignments = await this.prisma.kpiAssignment.findMany({ select: { id: true } });
+    const existing = await this.prisma.periodTarget.findMany({ where: { periodId }, select: { kpiAssignmentId: true } });
+    const existingIds = new Set(existing.map((e) => e.kpiAssignmentId));
+    const missing = assignments.filter((a) => !existingIds.has(a.id));
+
+    let carried = 0, fresh = 0;
+    for (const a of missing) {
+      const pt = await this.getOrSeed(periodId, a.id);
+      if (pt.source === 'carried') carried++; else fresh++;
+    }
+    await this.prisma.auditLog.create({
+      data: {
+        actor: user.name, userId: user.id, action: 'period_target.backfill', entity: 'Period', targetId: periodId,
+        note: `Backfill KM Sementara periode ${period.label}: ${missing.length} baris dibuat (${carried} carry-forward, ${fresh} fresh dari KpiAssignment.target)`,
+      },
+    });
+    return { created: missing.length, carried, fresh };
+  }
+
+  // Resolusi read-only (Fase 5, audit simetris): id baris PeriodTarget yang berlaku untuk
+  // satu package realisasi, dipakai untuk menautkan RevisionLog (entity='period_target') ke
+  // timeline package. Tidak memakai getOrSeed — baris yang belum pernah dibuat berarti belum
+  // pernah dikoreksi, jadi memang tak punya riwayat (bukan error).
+  async findPeriodTargetIdsForPackage(periodId: string, unitCode: string, bidang: string, items: Record<string, unknown>[]): Promise<string[]> {
+    const ids: string[] = [];
+    for (const it of items) {
+      const masterKpiId = it['masterKpiId'];
+      if (typeof masterKpiId !== 'string') continue;
+      const assignment = await this.resolveAssignment(masterKpiId, unitCode, bidang);
+      if (!assignment) continue;
+      const pt = await this.prisma.periodTarget.findUnique({
+        where: { periodId_kpiAssignmentId: { periodId, kpiAssignmentId: assignment.id } },
+      });
+      if (pt) ids.push(pt.id);
+    }
+    return ids;
+  }
 }

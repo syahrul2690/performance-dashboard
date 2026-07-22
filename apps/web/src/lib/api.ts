@@ -122,6 +122,13 @@ export const workflowKm = {
     api.post(`/workflow-km/${docId}/review`, { action, note }).then((r) => r.data),
 };
 
+// Fase 5 (audit simetris): baris jejak revisi level-NILAI (bukan level-langkah — itu di history).
+export type RevisionLogEntry = {
+  id: string; entity: 'period_target' | 'input_realisasi'; targetId: string; periodId: string;
+  actor: string; actorId: string | null; field: string | null;
+  oldValue: unknown; newValue: unknown; note: string | null; createdAt: string;
+};
+
 export const inputRealisasi = {
   history: (unitCode?: string, periodId?: string) =>
     api.get('/input-realisasi/history', { params: { unitCode, periodId } }).then((r) => r.data),
@@ -137,8 +144,12 @@ export const inputRealisasi = {
   // PIC REN mengoreksi KM Sementara untuk package berstatus target_fix, lalu package balik ke PIC.
   resolveTargetFix: (id: string, updates: Array<{ kpiAssignmentId: string; target: string }>, note: string) =>
     api.post(`/input-realisasi/${id}/resolve-target-fix`, { updates, note }).then((r) => r.data),
-  updateValues: (id: string, values: Record<string, unknown>) =>
-    api.patch(`/input-realisasi/${id}/values`, { values }).then((r) => r.data),
+  updateValues: (id: string, values: Record<string, unknown>, note?: string) =>
+    api.patch(`/input-realisasi/${id}/values`, { values, note }).then((r) => r.data),
+  // Fase 5 (audit simetris): timeline revisi gabungan — koreksi nilai realisasi (KI) +
+  // koreksi target KM Sementara (PIC REN) untuk package ini, terurut terbaru dulu.
+  revisions: (id: string) =>
+    api.get(`/input-realisasi/${id}/revisions`).then((r) => r.data as RevisionLogEntry[]),
   delete: (id: string) =>
     api.delete(`/input-realisasi/${id}`).then((r) => r.data),
   bundle: (periodId?: string) =>
@@ -255,6 +266,12 @@ export const admin = {
   backfillKpiMasterRun: () => api.post('/admin/backfill-kpi-master/run').then((r) => r.data),
   // Deadline konvergensi bulanan lewat → force-freeze KM Sementara (target-of-record PIC REN menang).
   forceFreeze: (periodId: string) => api.post(`/admin/periods/${periodId}/force-freeze`).then((r) => r.data),
+  // Fase 6: backfill KM Sementara (materialisasi PeriodTarget) utk periode tertentu — perlu
+  // dijalankan sebelum restatement KM Final agar periode lama ikut direstate (bukan dilewati).
+  backfillPeriodTargetPreview: (periodId: string) =>
+    api.get('/admin/backfill-period-target/preview', { params: { periodId } }).then((r) => r.data),
+  backfillPeriodTargetRun: (periodId: string) =>
+    api.post('/admin/backfill-period-target/run', undefined, { params: { periodId } }).then((r) => r.data),
 };
 
 // Living-target: KM Sementara (target hidup) per (periode, assignment).

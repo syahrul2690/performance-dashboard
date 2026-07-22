@@ -1,5 +1,5 @@
 import { Controller, Get, Patch, Body, Param, Query, UseGuards, BadRequestException } from '@nestjs/common';
-import { IsString } from 'class-validator';
+import { IsString, IsOptional } from 'class-validator';
 import { PeriodTargetService } from './period-target.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -7,7 +7,7 @@ import { User } from '@prisma/client';
 
 class UpdateTargetDto {
   @IsString() target: string;
-  note?: string;
+  @IsOptional() @IsString() note?: string;
 }
 
 @UseGuards(JwtAuthGuard)

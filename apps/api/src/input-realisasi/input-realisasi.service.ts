@@ -202,7 +202,7 @@ export class InputRealisasiService {
   }
 
   // Reviewer pada langkahnya dapat mengedit nilai realisasi (revisi minor) sebelum menyetujui.
-  async updateValues(user: User, id: string, values: Record<string, unknown>) {
+  async updateValues(user: User, id: string, values: Record<string, unknown>, note?: string) {
     const r = await this.prisma.inputRealisasi.findUnique({ where: { id } });
     if (!r) throw new NotFoundException('Realisasi tidak ditemukan');
     if (r.status !== 'submitted') throw new ForbiddenException('Hanya realisasi yang sedang direview yang dapat diedit');
@@ -216,8 +216,44 @@ export class InputRealisasiService {
     await this.prisma.auditLog.create({
       data: { actor: user.name, userId: user.id, action: 'realisasi.edit', entity: 'InputRealisasi', targetId: id },
     });
+    // Audit simetris (Fase 5): koreksi nilai realisasi (KI review) dicatat berdampingan
+    // dengan koreksi target (period_target) — RevisionLog jadi satu sumber kebenaran
+    // level-NILAI utk timeline package, terpisah dari InputRealisasi.history (level-LANGKAH).
+    const oldValues = (r.values ?? {}) as Record<string, unknown>;
+    if (JSON.stringify(oldValues) !== JSON.stringify(values)) {
+      await this.prisma.revisionLog.create({
+        data: {
+          entity: 'input_realisasi', targetId: id, periodId: r.periodId,
+          actor: user.name, actorId: user.id, field: 'values',
+          oldValue: oldValues as object, newValue: values as object,
+          note,
+        },
+      });
+    }
     await this.invalidateKinerja(r.periodId, r.unitCode);
     return result;
+  }
+
+  // ===== Fase 5: Audit simetris — timeline revisi gabungan (target + nilai realisasi) =====
+  // InputRealisasi.history tetap mencatat level LANGKAH (approve/reject/edit per step);
+  // RevisionLog di sini mencatat level NILAI (diff lama->baru), digabung dari dua entity:
+  //   'input_realisasi' — koreksi values oleh reviewer (KI) via updateValues.
+  //   'period_target'   — koreksi target KM Sementara oleh PIC REN (langsung atau via resolveTargetFix).
+  async getRevisionHistory(id: string) {
+    const r = await this.prisma.inputRealisasi.findUnique({ where: { id } });
+    if (!r) throw new NotFoundException('Realisasi tidak ditemukan');
+
+    const items = Object.values((r.values ?? {}) as Record<string, Record<string, unknown>>);
+    const periodTargetIds = await this.periodTargetSvc.findPeriodTargetIdsForPackage(r.periodId, r.unitCode, r.bidang, items);
+
+    const [ownRevisions, targetRevisions] = await Promise.all([
+      this.prisma.revisionLog.findMany({ where: { entity: 'input_realisasi', targetId: id }, orderBy: { createdAt: 'desc' } }),
+      periodTargetIds.length > 0
+        ? this.prisma.revisionLog.findMany({ where: { entity: 'period_target', targetId: { in: periodTargetIds } }, orderBy: { createdAt: 'desc' } })
+        : Promise.resolve([]),
+    ]);
+
+    return [...ownRevisions, ...targetRevisions].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
   // ===== EVIDENCE (lampiran realisasi) =====
