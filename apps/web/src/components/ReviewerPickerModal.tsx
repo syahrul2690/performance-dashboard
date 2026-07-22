@@ -16,7 +16,7 @@ const ROLE_LABEL: Record<string, string> = {
   ASMAN: 'ASMAN', MANAJER: 'Manajer', SRMANAJER: 'Senior Manajer', GM: 'General Manager',
 };
 const desc = (c: ReviewerCandidate) =>
-  `${ROLE_LABEL[c.role] ?? c.role}${c.unit && c.unit !== 'KP' ? ' · ' + (UNIT_LABEL[c.unit] ?? c.unit) : ''}`;
+  `${ROLE_LABEL[c.role] ?? c.role}${c.unit && c.unit !== 'KP' ? ' · ' + (UNIT_LABEL[c.unit] ?? c.unit) : ''}${c.bidang ? ' · ' + c.bidang : ''}`;
 
 type Props = {
   open: boolean;

@@ -55,6 +55,30 @@ export class InputKontrakService {
     });
   }
 
+  // KM yang bisa dipakai sebagai acuan Input Realisasi — KM Sementara berjalan PARALEL
+  // dengan alur reviewnya sendiri (Staff RPC → Checker → Approver), BUKAN prasyarat serial.
+  // Begitu Staff RPC men-submit (keluar dari 'draft'), unit/bidang yang dituju sudah dapat
+  // mengisi realisasi terhadapnya; dokumen KM lanjut direview independen di tab Dokumen KM.
+  async getForRealisasi(unitCode?: string, year?: string, kmType?: string) {
+    let periodIdsInYear: string[] | undefined;
+    if (year) {
+      const periods = await this.prisma.period.findMany({
+        where: { yearMonth: { startsWith: `${year}-` } },
+        select: { id: true },
+      });
+      periodIdsInYear = periods.map((p) => p.id);
+    }
+    return this.prisma.kontrakManajemen.findMany({
+      where: {
+        status: { in: ['submitted', 'ready', 'approved'] },
+        ...(unitCode ? { unitCode } : {}),
+        ...(periodIdsInYear ? { periodId: { in: periodIdsInYear } } : {}),
+        ...(kmType ? { kmType } : {}),
+      },
+      orderBy: [{ unitCode: 'asc' }, { submittedAt: 'desc' }],
+    });
+  }
+
   // Save: create a NEW kontrak, or update an existing one when `id` is given.
   // Tidak lagi menimpa kontrak lain pada unit/periode yang sama.
   async save(

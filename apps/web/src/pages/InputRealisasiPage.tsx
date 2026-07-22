@@ -12,6 +12,8 @@ const BIDANG_SORT: Record<string, number> = {
   'Operasi Manajemen Proyek': 0, 'QA/QC': 1,
   'Keuangan, Komunikasi & Umum': 2, 'Perencanaan & Project Control': 3,
   'MRO': 4, 'K3L': 5,
+  // Bagian internal UPMK (taksonomi terpisah dari bidang Kantor Induk di atas)
+  'Bagian Pembangkit': 0, 'Bagian Jaringan': 1, 'Bagian KKU': 2,
 };
 
 type KpiItem = {
@@ -41,10 +43,15 @@ function RealisasiDiff({ oldValue, newValue }: { oldValue: unknown; newValue: un
 
 const STATUS_LABEL: Record<string, string> = {
   draft: 'Draft', submitted: 'Menunggu Review', ready: 'Siap Konsolidasi (GM)', approved: 'Disetujui', rejected: 'Dikembalikan',
+  target_fix: 'Menunggu Koreksi Target (PIC REN)',
 };
 const STATUS_PILL: Record<string, string> = {
   draft: 'in-review', submitted: 'needs-revision', ready: 'at-risk', approved: 'completed', rejected: 'delayed',
+  target_fix: 'needs-revision',
 };
+// Status yang berarti package sudah terkirim & sedang berjalan di alur — PIC tidak perlu
+// (dan tidak boleh) input ulang sampai package kembali ke dirinya (status 'rejected').
+const IN_FLIGHT_STATUSES = ['submitted', 'ready', 'approved', 'target_fix'];
 
 // Unit yang bisa mengisi realisasi: Kantor Induk + 5 UPMK
 const UNIT_OPTIONS = [
@@ -59,6 +66,11 @@ const UNIT_OPTIONS = [
 export function InputRealisasiPage() {
   const { user } = useAuth();
   const isStaff = user?.role === 'STAFF';
+  // Checker (ASMAN/Manajer) & Approver (SRManajer/GM) hanya memeriksa & menyetujui — input
+  // realisasi murni tugas PIC Bidang (Staff). Halaman ini jadi tampilan referensi/riwayat
+  // baginya, wording berubah jadi "Persetujuan Realisasi Bulanan" (aksi sungguhan di Persetujuan).
+  const isReviewerRole = user?.role === 'ASMAN' || user?.role === 'MANAJER' || user?.role === 'SRMANAJER' || user?.role === 'GM';
+  const canInput = !isReviewerRole;
   // Hanya GM yang boleh pilih unit bebas untuk monitoring
   const canSelectUnit = user?.role === 'GM';
   const lockedUnit = user?.unit ?? 'KP';
@@ -141,17 +153,18 @@ export function InputRealisasiPage() {
         const periodObj = periods.find((p) => p.id === selectedPeriodId);
         const selectedYear = periodObj?.yearMonth?.slice(0, 4);
         const kmType = periodObj?.kmReference ?? 'draft';
-        const [histRes, approvedRes, ptRes] = await Promise.allSettled([
+        const [histRes, kmRes, ptRes] = await Promise.allSettled([
           inputRealisasi.history(selectedUnit, selectedPeriodId),
-          inputKontrak.approved(selectedUnit, selectedYear, kmType),
+          inputKontrak.forRealisasi(selectedUnit, selectedYear, kmType),
           periodTarget.list(selectedPeriodId),
         ]);
         if (histRes.status === 'fulfilled') setHistory(histRes.value as unknown[]);
         // Living-target: KM Sementara per assignment periode ini (untuk package view).
         setPeriodTargets(ptRes.status === 'fulfilled' ? ptRes.value : []);
-        if (approvedRes.status === 'fulfilled') {
-          // Acuan realisasi = KPI dari Kontrak Manajemen yang sudah DISETUJUI (final GM) untuk unit terpilih.
-          const kontrak = approvedRes.value as KontrakManajemen[];
+        if (kmRes.status === 'fulfilled') {
+          // Acuan realisasi = KPI dari KM yang sudah DISUBMIT Staff RPC (KM Sementara berjalan
+          // paralel dengan alur review-nya sendiri — bukan menunggu approval penuh).
+          const kontrak = kmRes.value as KontrakManajemen[];
           let merged: KpiItem[] = kontrak.flatMap((k) =>
             (k.kpiItems as KpiItem[]).map((it) => ({ ...it, bidang: k.bidang })),
           );
@@ -239,6 +252,15 @@ export function InputRealisasiPage() {
   const windowOpen = fillWindow ? fillWindow.isOpen : true; // belum ada data window → jangan blokir UI
   const fmtDate = (iso: string) => new Date(iso).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
 
+  // Package bidang PIC sendiri yang sudah terkirim & sedang berjalan (bukan draft/rejected) —
+  // form input ditutup selama ini berlangsung, cegah kirim ulang/menimpa yang sedang direview.
+  const myActivePackage = (isStaff && user?.bidang)
+    ? (history as Record<string, unknown>[]).find((h) =>
+        h.bidang === user.bidang && IN_FLIGHT_STATUSES.includes(String(h.status ?? '')))
+    : undefined;
+  const myActiveStatus = myActivePackage ? String(myActivePackage.status ?? '') : null;
+  const formOpen = canInput && !myActivePackage;
+
   // Living-target: KM Sementara yang berlaku untuk satu KPI row (cocokkan masterKpiId + unit + bidang).
   const livingTargetFor = (kpi: KpiItem): PeriodTarget | undefined =>
     kpi.masterKpiId
@@ -258,7 +280,7 @@ export function InputRealisasiPage() {
             <ClipboardEdit size={24} color="var(--color-accent)" />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 700 }}>Input Realisasi Bulanan — {selectedPeriodLabel}</div>
+            <div style={{ fontSize: 'var(--text-lg)', fontWeight: 700 }}>{isReviewerRole ? 'Persetujuan Realisasi Bulanan' : 'Input Realisasi Bulanan'} — {selectedPeriodLabel}</div>
             <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
               <span>Periode:</span>
               <select
@@ -308,15 +330,19 @@ export function InputRealisasiPage() {
               )}
             </div>
           </div>
-          <div style={{ textAlign: 'right', flexShrink: 0 }}>
-            <div style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Progress Isi</div>
-            <div style={{ fontSize: 'var(--text-xl)', fontWeight: 800, color: completionPct === 100 ? 'var(--color-success)' : 'var(--color-accent)' }}>{completionPct}%</div>
-            <div style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>{filledCount}/{kpiList.length} terisi</div>
+          {formOpen && (
+            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+              <div style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Progress Isi</div>
+              <div style={{ fontSize: 'var(--text-xl)', fontWeight: 800, color: completionPct === 100 ? 'var(--color-success)' : 'var(--color-accent)' }}>{completionPct}%</div>
+              <div style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>{filledCount}/{kpiList.length} terisi</div>
+            </div>
+          )}
+        </div>
+        {formOpen && (
+          <div style={{ height: 4, background: 'var(--color-surface-2)', borderRadius: '0 0 var(--radius-lg) var(--radius-lg)', overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${completionPct}%`, background: completionPct === 100 ? 'var(--color-success)' : 'var(--color-accent)', transition: 'width 0.3s' }} />
           </div>
-        </div>
-        <div style={{ height: 4, background: 'var(--color-surface-2)', borderRadius: '0 0 var(--radius-lg) var(--radius-lg)', overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${completionPct}%`, background: completionPct === 100 ? 'var(--color-success)' : 'var(--color-accent)', transition: 'width 0.3s' }} />
-        </div>
+        )}
       </div>
 
       {fillWindow && !windowOpen && (
@@ -337,19 +363,36 @@ export function InputRealisasiPage() {
         </div>
       )}
 
+      {canInput && myActivePackage && (
+        <div className="status-banner" style={{ marginBottom: 'var(--space-4)', background: 'var(--color-accent-tint)' }}>
+          <CheckCircle size={18} color="var(--color-accent)" />
+          <strong>
+            Realisasi bidang Anda untuk {selectedPeriodLabel} sudah dikirim — status:{' '}
+            <span className={`status-pill ${STATUS_PILL[myActiveStatus ?? ''] ?? 'in-review'}`} style={{ fontSize: 10 }}>
+              {STATUS_LABEL[myActiveStatus ?? ''] ?? myActiveStatus}
+            </span>
+            . Form input ditutup sampai package ini selesai direview atau dikembalikan.
+          </strong>
+        </div>
+      )}
+
       {/* KPI Input Table */}
       <div className="card p-0" style={{ marginBottom: 'var(--space-6)' }}>
         <div className="card-header compact">
           <div className="card-title"><ClipboardEdit size={14} />KPI Realisasi — {UNIT_OPTIONS.find((u) => u.code === selectedUnit)?.name ?? selectedUnit}</div>
           <span className="card-meta">
-            Isi nilai realisasi {selectedPeriodLabel} · Acuan: <b>{selectedPeriod?.kmReference === 'final' ? 'KM Final' : 'KM Draft'}</b>
+            {!canInput
+              ? <>Referensi KPI {selectedPeriodLabel} — input hanya oleh PIC Bidang</>
+              : myActivePackage
+                ? <>Realisasi {selectedPeriodLabel} sudah terkirim — menunggu proses</>
+                : <>Isi nilai realisasi {selectedPeriodLabel}</>} · Acuan: <b>{selectedPeriod?.kmReference === 'final' ? 'KM Final' : 'KM Draft'}</b>
           </span>
         </div>
         <div className="table-wrap">
           {kpiList.length === 0 ? (
             <EmptyState
               title="Belum ada KPI acuan"
-              message="Belum ada Kontrak Manajemen yang disetujui (final GM) untuk unit Anda. Selesaikan persetujuan KM terlebih dahulu di menu Input Kontrak Manajemen → Persetujuan."
+              message="Belum ada KM Sementara yang disubmit Staff RPC untuk unit Anda. Setelah KPI di-assign & dokumen KM dikirim dari menu Manajemen KPI → Dokumen KM, KPI akan muncul di sini."
             />
           ) : (
             <table className="data-table compact">
@@ -398,14 +441,16 @@ export function InputRealisasiPage() {
                         </td>
                       )}
                       <td style={{ minWidth: 140 }}>
-                        <input
-                          type="text"
-                          className="form-input form-input-sm"
-                          style={{ borderColor: hasVal ? 'rgba(34,197,94,0.5)' : undefined }}
-                          value={val}
-                          onChange={e => setValues(v => ({ ...v, [String(i)]: e.target.value }))}
-                          placeholder={`Target: ${kpi.target ?? '—'}`}
-                        />
+                        {formOpen ? (
+                          <input
+                            type="text"
+                            className="form-input form-input-sm"
+                            style={{ borderColor: hasVal ? 'rgba(34,197,94,0.5)' : undefined }}
+                            value={val}
+                            onChange={e => setValues(v => ({ ...v, [String(i)]: e.target.value }))}
+                            placeholder={`Target: ${kpi.target ?? '—'}`}
+                          />
+                        ) : <span style={{ color: 'var(--color-text-subtle)' }}>—</span>}
                       </td>
                     </tr>
                   );
@@ -414,7 +459,7 @@ export function InputRealisasiPage() {
             </table>
           )}
         </div>
-        {kpiList.length > 0 && (
+        {formOpen && kpiList.length > 0 && (
           <div className="card-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', alignItems: 'center' }}>
             <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>{filledCount} dari {kpiList.length} indikator terisi</span>
             <button
@@ -570,7 +615,7 @@ export function InputRealisasiPage() {
         open={pickerOpen}
         title="Alur Reviewer Realisasi"
         busy={submitting}
-        fetchCandidates={inputRealisasi.reviewerCandidates}
+        fetchCandidates={() => inputRealisasi.reviewerCandidates(selectedUnit, kpiList[0]?.bidang)}
         onConfirm={handleConfirmSubmit}
         onCancel={() => setPickerOpen(false)}
       />

@@ -60,8 +60,8 @@ export class InputRealisasiController {
   }
 
   @Get('reviewer-candidates')
-  reviewerCandidates() {
-    return this.svc.getReviewerCandidates();
+  reviewerCandidates(@Query('unitCode') unitCode?: string, @Query('bidang') bidang?: string) {
+    return this.svc.getReviewerCandidates(unitCode, bidang);
   }
 
   // Bundle periode (deklarasikan sebelum rute :id agar tidak tertangkap param)

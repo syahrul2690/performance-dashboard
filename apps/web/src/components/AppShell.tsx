@@ -16,14 +16,18 @@ import {
 
 type NavItem = {
   to: string; label: string; icon: LucideIcon;
-  end?: boolean; hideForUpmk?: boolean; devOnly?: boolean;
+  end?: boolean; hideForUpmk?: boolean; devOnly?: boolean; rpcOnly?: boolean;
 };
+
+const RPC_BIDANG = 'Perencanaan & Project Control';
 
 const NAV_ITEMS: Array<{ section: string; items: NavItem[] }> = [
   {
     section: 'Aksi Saya', items: [
       { to: '/approvals',      label: 'Persetujuan',             icon: CheckSquare },
-      { to: '/kpi-master',     label: 'Manajemen KPI',           icon: Layers,      hideForUpmk: true },
+      // Manajemen KPI (Definisi KPI, Dokumen KM, Review per-KPI) hanya untuk PIC Kinerja (Staff RPC) —
+      // penyusun & pengirim tunggal dokumen KM; role lain tidak butuh menu ini.
+      { to: '/kpi-master',     label: 'Manajemen KPI',           icon: Layers,      hideForUpmk: true, rpcOnly: true },
       { to: '/input-realisasi',label: 'Input Realisasi Bulanan', icon: ClipboardEdit },
     ]
   },
@@ -70,8 +74,6 @@ const ROUTE_NAMES: Record<string, string> = {
   '/input-realisasi': 'Input Realisasi',
   '/input-kontrak': 'Manajemen KPI',
   '/kpi-master': 'Manajemen KPI',
-  '/workflow-km/usulan': 'Proses Usulan KM',
-  '/workflow-km/realisasi': 'Proses Realisasi KM',
   '/settings': 'Settings',
   '/admin': 'Admin Tools',
 };
@@ -94,7 +96,10 @@ export function AppShell() {
   const exportRef = useRef<HTMLDivElement>(null);
   const roleRef = useRef<HTMLDivElement>(null);
 
-  const currentPageName = ROUTE_NAMES[location.pathname] ?? 'Dashboard';
+  const isReviewerRoleForBreadcrumb = user?.role === 'ASMAN' || user?.role === 'MANAJER' || user?.role === 'SRMANAJER' || user?.role === 'GM';
+  const currentPageName = location.pathname === '/input-realisasi' && isReviewerRoleForBreadcrumb
+    ? 'Persetujuan Realisasi'
+    : ROUTE_NAMES[location.pathname] ?? 'Dashboard';
   const effectiveRole = viewAs ?? user?.role ?? 'STAFF';
   const avatarInitials = user?.name?.split(' ').map((w) => w[0]).slice(0, 2).join('') ?? '?';
 
@@ -139,28 +144,37 @@ export function AppShell() {
             const isUpmkUser = user?.unit && user.unit !== 'KP';
             // devOnly: hanya tampil untuk SUPERADMIN dan DEVELOPER
             const isPrivileged = user?.role === 'SUPERADMIN' || user?.role === 'DEVELOPER';
+            // Checker/Approver hanya memeriksa & menyetujui realisasi — bukan mengisi.
+            const isReviewerRole = user?.role === 'ASMAN' || user?.role === 'MANAJER' || user?.role === 'SRMANAJER' || user?.role === 'GM';
+            // rpcOnly: Manajemen KPI hanya untuk PIC Kinerja (Staff RPC) — role lain (termasuk GM)
+            // tidak melihat menu ini sama sekali. Akun privileged tetap dapat melihat utk dev/testing.
+            const isRpcStaff = user?.role === 'STAFF' && user?.unit === 'KP' && user?.bidang === RPC_BIDANG;
             const visibleItems = section.items.filter((it) => {
               if (isUpmkUser && it.hideForUpmk) return false;
               if (it.devOnly && !isPrivileged) return false;
+              if (it.rpcOnly && !isRpcStaff && !isPrivileged) return false;
               return true;
             });
             if (visibleItems.length === 0) return null;
             return (
               <div key={section.section}>
                 <div className="nav-section-label">{section.section}</div>
-                {visibleItems.map(({ to, label, icon: Icon, end }) => (
-                  <NavLink
-                    key={to}
-                    to={to}
-                    end={end}
-                    className="nav-item"
-                    aria-current={location.pathname === to || (!end && location.pathname.startsWith(to) && to !== '/') ? 'page' : undefined}
-                    title={collapsed ? label : undefined}
-                  >
-                    <Icon size={18} className="nav-icon" />
-                    <span className="nav-label">{label}</span>
-                  </NavLink>
-                ))}
+                {visibleItems.map(({ to, label, icon: Icon, end }) => {
+                  const displayLabel = to === '/input-realisasi' && isReviewerRole ? 'Persetujuan Realisasi Bulanan' : label;
+                  return (
+                    <NavLink
+                      key={to}
+                      to={to}
+                      end={end}
+                      className="nav-item"
+                      aria-current={location.pathname === to || (!end && location.pathname.startsWith(to) && to !== '/') ? 'page' : undefined}
+                      title={collapsed ? displayLabel : undefined}
+                    >
+                      <Icon size={18} className="nav-icon" />
+                      <span className="nav-label">{displayLabel}</span>
+                    </NavLink>
+                  );
+                })}
               </div>
             );
           })}

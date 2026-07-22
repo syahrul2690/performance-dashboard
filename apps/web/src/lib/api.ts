@@ -115,13 +115,6 @@ export const approvals = {
     api.post(`/approvals/reports/${id}/return`, { note }).then((r) => r.data),
 };
 
-export const workflowKm = {
-  usulan: () => api.get('/workflow-km/usulan').then((r) => r.data),
-  realisasi: () => api.get('/workflow-km/realisasi').then((r) => r.data),
-  review: (docId: string, action: 'approve' | 'return', note?: string) =>
-    api.post(`/workflow-km/${docId}/review`, { action, note }).then((r) => r.data),
-};
-
 // Fase 5 (audit simetris): baris jejak revisi level-NILAI (bukan level-langkah — itu di history).
 export type RevisionLogEntry = {
   id: string; entity: 'period_target' | 'input_realisasi'; targetId: string; periodId: string;
@@ -136,8 +129,8 @@ export const inputRealisasi = {
     api.put('/input-realisasi/submit', { unitCode, bidang, values, checkerIds, approverId, periodId }).then((r) => r.data),
   reviewList: () =>
     api.get('/input-realisasi/review/list').then((r) => r.data),
-  reviewerCandidates: () =>
-    api.get('/input-realisasi/reviewer-candidates').then((r) => r.data),
+  reviewerCandidates: (unitCode?: string, bidang?: string) =>
+    api.get('/input-realisasi/reviewer-candidates', { params: { unitCode, bidang } }).then((r) => r.data),
   // returnTo 'target' (living-target): routing masalah target ke PIC REN → status target_fix.
   review: (id: string, action: 'approve' | 'reject', note?: string, returnTo?: 'konseptor' | 'previous' | 'target') =>
     api.post(`/input-realisasi/${id}/review`, { action, note, returnTo }).then((r) => r.data),
@@ -190,6 +183,8 @@ export const inputKontrak = {
     api.get('/input-kontrak/reviewer-candidates').then((r) => r.data),
   approved: (unitCode?: string, year?: string, kmType?: 'draft' | 'final') =>
     api.get('/input-kontrak/approved', { params: { unitCode, year, kmType } }).then((r) => r.data),
+  forRealisasi: (unitCode?: string, year?: string, kmType?: 'draft' | 'final') =>
+    api.get('/input-kontrak/for-realisasi', { params: { unitCode, year, kmType } }).then((r) => r.data),
   review: (id: string, action: 'approve' | 'reject', note?: string, returnTo?: 'konseptor' | 'previous') =>
     api.post(`/input-kontrak/${id}/review`, { action, note, returnTo }).then((r) => r.data),
   bundle: (scope: 'KP' | 'UPMK' = 'KP', year?: string, kmType: 'draft' | 'final' = 'draft') =>
@@ -205,7 +200,7 @@ export type ReviewerSlot = { role: 'ASMAN' | 'MANAJER' | 'SRMANAJER' | 'GM'; use
 export type ReviewerSlots = { checkers: ReviewerSlot[]; approver: ReviewerSlot | null };
 
 export type KpiAssignmentInput = {
-  unitCode: string; bidang: string; holder?: string; bobotKm?: string; target?: string; target2?: string;
+  unitCode: string; bidang: string; holder?: string; target?: string; target2?: string;
   persenAgregasi?: number;
   reviewerSlots?: ReviewerSlots | null;
 };
@@ -215,7 +210,7 @@ export const kpiMaster = {
   getById: (id: string) => api.get(`/kpi-master/${id}`).then((r) => r.data),
   save: (dto: {
     id?: string; kmType?: 'draft' | 'final'; indikator: string; formula?: string;
-    satuan?: string; targetParent?: string; assignments: KpiAssignmentInput[];
+    satuan?: string; bobotKm?: string; targetParent?: string; assignments: KpiAssignmentInput[];
     defaultCheckerIds?: string[]; defaultApproverId?: string;
     aggregationMethod?: 'weighted' | 'sum';
   }) => api.post('/kpi-master/save', dto).then((r) => r.data),

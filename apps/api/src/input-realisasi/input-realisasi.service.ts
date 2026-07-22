@@ -51,15 +51,21 @@ export class InputRealisasiService {
   }
 
   // Daftar kandidat reviewer (Checker: ASMAN/Manajer, Approver: SRManajer/GM).
-  async getReviewerCandidates() {
+  // Bila unitCode+bidang diberikan (submit realisasi selalu per unit+bidang): scope Checker
+  // ke ASMAN/Manajer unit+bidang yang sama; Approver ke SRManajer KP bidang yang sama, atau GM
+  // (selalu ikut — approver puncak lintas-bidang, tak terikat satu bidang).
+  async getReviewerCandidates(unitCode?: string, bidang?: string) {
     const users = await this.prisma.user.findMany({
       where: { isActive: true, role: { in: [...CHECKER_ROLES, ...APPROVER_ROLES] } },
       orderBy: [{ role: 'asc' }, { unit: 'asc' }, { name: 'asc' }],
       select: { id: true, name: true, role: true, unit: true, bidang: true },
     });
+    const scoped = unitCode && bidang;
     return {
-      checkers: users.filter((u) => CHECKER_ROLES.includes(u.role)),
-      approvers: users.filter((u) => APPROVER_ROLES.includes(u.role)),
+      checkers: users.filter((u) => CHECKER_ROLES.includes(u.role)
+        && (!scoped || (u.unit === unitCode && u.bidang === bidang))),
+      approvers: users.filter((u) => APPROVER_ROLES.includes(u.role)
+        && (!scoped || u.role === Role.GM || (u.unit === 'KP' && u.bidang === bidang))),
     };
   }
 

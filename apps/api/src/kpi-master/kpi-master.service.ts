@@ -16,7 +16,6 @@ export interface AssignmentInput {
   unitCode: string;
   bidang: string;
   holder?: string;
-  bobotKm?: string;
   target?: string;
   target2?: string;
   persenAgregasi?: number; // bobot rollup ke parent (0-100), diinput RPC Perencanaan
@@ -28,6 +27,7 @@ export interface SaveMasterInput {
   indikator: string;
   formula?: string;
   satuan?: string;
+  bobotKm?: string; // bobot skor KM (poin) — data parent, sama untuk semua assignment
   targetParent?: string;
   assignments: AssignmentInput[];
   defaultCheckerIds?: string[]; // default alur reviewer (Fase C) — diwariskan ke picker submit
@@ -515,7 +515,7 @@ export class KpiMasterService {
           where: { id: dto.id },
           data: {
             indikator: dto.indikator.trim(), formula: dto.formula ?? '', satuan: dto.satuan ?? '',
-            targetParent: dto.targetParent ?? '', kmType, defaultCheckerIds, defaultApproverId, aggregationMethod,
+            bobotKm: dto.bobotKm ?? '', targetParent: dto.targetParent ?? '', kmType, defaultCheckerIds, defaultApproverId, aggregationMethod,
           },
         });
         await this.prisma.kpiAssignment.deleteMany({ where: { kpiMasterId: master.id } });
@@ -527,7 +527,7 @@ export class KpiMasterService {
         master = await this.prisma.kpiMaster.create({
           data: {
             year: nextPeriod.yearMonth.slice(0, 4), kmType, indikator: dto.indikator.trim(), formula: dto.formula ?? '',
-            satuan: dto.satuan ?? '', targetParent: dto.targetParent ?? '', createdBy: user.name, createdById: user.id,
+            satuan: dto.satuan ?? '', bobotKm: dto.bobotKm ?? '', targetParent: dto.targetParent ?? '', createdBy: user.name, createdById: user.id,
             defaultCheckerIds, defaultApproverId, aggregationMethod,
             effectiveMonth: nextMonth, version: existing.version + 1, previousVersionId: existing.id,
           },
@@ -539,7 +539,7 @@ export class KpiMasterService {
       master = await this.prisma.kpiMaster.create({
         data: {
           year: activePeriod.yearMonth.slice(0, 4), kmType, indikator: dto.indikator.trim(), formula: dto.formula ?? '',
-          satuan: dto.satuan ?? '', targetParent: dto.targetParent ?? '', createdBy: user.name, createdById: user.id,
+          satuan: dto.satuan ?? '', bobotKm: dto.bobotKm ?? '', targetParent: dto.targetParent ?? '', createdBy: user.name, createdById: user.id,
           defaultCheckerIds, defaultApproverId, aggregationMethod, effectiveMonth: activePeriod.yearMonth, version: 1,
         },
       });
@@ -551,7 +551,7 @@ export class KpiMasterService {
         const slots = this.sanitizeReviewerSlots(a.reviewerSlots);
         return {
           kpiMasterId: master.id, unitCode: a.unitCode, bidang: a.bidang,
-          holder: a.holder ?? '', bobotKm: a.bobotKm ?? '', target: a.target ?? '', target2: a.target2 ?? '',
+          holder: a.holder ?? '', target: a.target ?? '', target2: a.target2 ?? '',
           persenAgregasi: Number(a.persenAgregasi) || 0,
           reviewerSlots: slots === null ? Prisma.DbNull : (slots as unknown as Prisma.InputJsonValue),
         };
@@ -610,8 +610,8 @@ export class KpiMasterService {
 
   // ===== Fan-out: sinkronkan item KPI ke dokumen KM DRAFT per-(unit,bidang) =====
   private async fanOut(
-    master: { id: string; kmType: string; indikator: string; formula: string; satuan: string; createdBy: string; createdById: string | null },
-    assignments: Array<{ unitCode: string; bidang: string; holder: string; bobotKm: string; target: string; target2: string }>,
+    master: { id: string; kmType: string; indikator: string; formula: string; satuan: string; bobotKm: string; createdBy: string; createdById: string | null },
+    assignments: Array<{ unitCode: string; bidang: string; holder: string; target: string; target2: string }>,
     periodId: string,
   ): Promise<{ docsAffected: number }> {
     const assignedKeys = new Set(assignments.map((a) => `${a.unitCode}||${a.bidang}`));
@@ -637,7 +637,7 @@ export class KpiMasterService {
       const item: FannedItem = {
         masterKpiId: master.id,
         indikator: master.indikator, formula: master.formula, satuan: master.satuan,
-        bobot: a.bobotKm, target: a.target, target2: a.target2,
+        bobot: master.bobotKm, target: a.target, target2: a.target2,
       };
       const existingKm = await this.prisma.kontrakManajemen.findFirst({
         where: { periodId, unitCode: a.unitCode, bidang: a.bidang, kmType: master.kmType, status: 'draft' },
@@ -752,8 +752,9 @@ export class KpiMasterService {
       const first = entries[0].item; // kemunculan pertama -> definisi master
       const formula = typeof first['formula'] === 'string' ? first['formula'] : '';
       const satuan = typeof first['satuan'] === 'string' ? first['satuan'] : '';
+      const bobotKm = typeof first['bobot'] === 'string' ? first['bobot'] : ''; // kini data parent
 
-      // Satu assignment per (unitCode,bidang) — bobot/target ambil kemunculan pertama pasangan tsb.
+      // Satu assignment per (unitCode,bidang) — target ambil kemunculan pertama pasangan tsb.
       const byPair = new Map<string, BackfillGroupItem>();
       for (const e of entries) {
         const pairKey = `${e.unitCode}||${e.bidang}`;
@@ -762,7 +763,7 @@ export class KpiMasterService {
 
       const master = await this.prisma.kpiMaster.create({
         data: {
-          year: activePeriod.yearMonth.slice(0, 4), kmType, indikator, formula, satuan,
+          year: activePeriod.yearMonth.slice(0, 4), kmType, indikator, formula, satuan, bobotKm,
           targetParent: '', createdBy: user.name, createdById: user.id,
           effectiveMonth: activePeriod.yearMonth, version: 1, status: 'active',
         },
@@ -772,7 +773,6 @@ export class KpiMasterService {
       await this.prisma.kpiAssignment.createMany({
         data: Array.from(byPair.values()).map((e) => ({
           kpiMasterId: master.id, unitCode: e.unitCode, bidang: e.bidang,
-          bobotKm: typeof e.item['bobot'] === 'string' ? e.item['bobot'] : '',
           target: typeof e.item['target'] === 'string' ? e.item['target'] : '',
           target2: typeof e.item['target2'] === 'string' ? e.item['target2'] : '',
         })),

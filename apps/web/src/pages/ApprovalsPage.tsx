@@ -5,8 +5,11 @@ import { useAuth } from '../context/AuthContext';
 import { usePeriod } from '../context/PeriodContext';
 import { useNotif } from '../context/NotifContext';
 import type { Report, KontrakManajemen, RealisasiKinerja } from '../lib/types';
-import { CheckCircle, XCircle, Clock, CalendarClock, FileText, UsersRound, FileSignature, ChevronDown, ClipboardCheck, Timer, MessageSquare, Pencil, Layers, Printer, Unlock, Lock } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, CalendarClock, FileText, UsersRound, FileSignature, ChevronDown, ClipboardCheck, Timer, MessageSquare, Pencil, Layers, Printer, Unlock, Lock, PieChart } from 'lucide-react';
 import { SkeletonTable, EmptyState, ErrorState } from '../components/LoadState';
+// Konsolidasi nilai parent KPI lintas-bidang (dulu tab "Review per-KPI" di Manajemen KPI) —
+// GM tak lagi punya akses menu Manajemen KPI (rpcOnly), jadi kartu ini dipindah ke sini.
+import { ReviewPerKpiTab } from './KpiMasterPage';
 
 // Badge SLA approval (Task 6): hari tersisa hingga deadline tahap berjalan.
 function SlaBadge({ days }: { days?: number | null }) {
@@ -164,10 +167,10 @@ const STAGES = ['', 'Staff', 'Asman', 'Manajer', 'Sr. Manajer', 'GM'];
 // Jenjang persetujuan usulan Kontrak Manajemen: Staff → Asman → Manajer → Sr. Manajer → GM (final)
 
 const DOC_STATUS_LABEL: Record<string, string> = {
-  draft: 'Draft', submitted: 'Menunggu Review', ready: 'Siap Konsolidasi', approved: 'Disetujui', rejected: 'Dikembalikan',
+  draft: 'Draft', submitted: 'Menunggu Review', ready: 'Siap Konsolidasi', approved: 'Disetujui', rejected: 'Dikembalikan', target_fix: 'Koreksi Target (PIC REN)',
 };
 const DOC_STATUS_PILL: Record<string, string> = {
-  draft: 'in-review', submitted: 'needs-revision', ready: 'at-risk', approved: 'completed', rejected: 'delayed',
+  draft: 'in-review', submitted: 'needs-revision', ready: 'at-risk', approved: 'completed', rejected: 'delayed', target_fix: 'needs-revision',
 };
 const UNIT_NAMES: Record<string, string> = {
   KP: 'Kantor Induk', UPMK1: 'UPMK I', UPMK2: 'UPMK II',
@@ -177,6 +180,8 @@ const BIDANG_ORDER: Record<string, number> = {
   'Operasi Manajemen Proyek': 0, 'QA/QC': 1,
   'Keuangan, Komunikasi & Umum': 2, 'Perencanaan & Project Control': 3,
   'MRO': 4, 'K3L': 5,
+  // Bagian internal UPMK (taksonomi terpisah dari bidang Kantor Induk di atas)
+  'Bagian Pembangkit': 0, 'Bagian Jaringan': 1, 'Bagian KKU': 2,
 };
 const sortByBidang = <T extends { bidang: string }>(arr: T[]): T[] =>
   [...arr].sort((a, b) => (BIDANG_ORDER[a.bidang] ?? 99) - (BIDANG_ORDER[b.bidang] ?? 99));
@@ -256,12 +261,10 @@ export function ApprovalsPage() {
   const [realTarget, setRealTarget] = useState<string | null>(null);
   const [realExpanded, setRealExpanded] = useState<string | null>(null);
   const [realBusy, setRealBusy] = useState(false);
-  // B2-5: edit nilai realisasi saat review (per layer)
-  const [realEditId, setRealEditId] = useState<string | null>(null);
-  const [editValues, setEditValues] = useState<Record<string, string>>({});
 
   // Living-target: koreksi KM Sementara oleh PIC REN untuk package berstatus 'target_fix'.
-  const [picRenTargets, setPicRenTargets] = useState<PeriodTarget[]>([]);
+  // periodId -> KM Sementara periode tsb (satu package target_fix hanya dikoreksi terhadap periodenya sendiri).
+  const [picRenTargets, setPicRenTargets] = useState<Record<string, PeriodTarget[]>>({});
   const [tfxExpanded, setTfxExpanded] = useState<string | null>(null);
   const [tfxValues, setTfxValues] = useState<Record<string, string>>({}); // masterKpiId -> target baru
   const [tfxNote, setTfxNote] = useState('');
@@ -279,6 +282,13 @@ export function ApprovalsPage() {
   const [highlight, setHighlight] = useState<'real' | 'km' | 'kmbundle' | 'realbundle' | null>(null);
   // Task 4: ekspansi riwayat komentar pada kartu "Semua Dokumen Persetujuan".
   const [docExpanded, setDocExpanded] = useState<string | null>(null);
+  // Filter tracker "Semua Dokumen Persetujuan" — jenis dokumen, status, dan periode.
+  const [trackerType, setTrackerType] = useState<'all' | 'km' | 'real'>('all');
+  const [trackerStatus, setTrackerStatus] = useState<string>('all');
+  const [trackerPeriod, setTrackerPeriod] = useState<string>('all');
+  // Monitoring/audit (riwayat dokumen, timeline, RACI) — bukan aksi, disembunyikan default
+  // supaya halaman tetap fokus pada antrean; siapa pun bisa buka bila perlu.
+  const [showMonitoring, setShowMonitoring] = useState(false);
 
   // B4: Bundle konsolidasi realisasi periode (persetujuan GM sekali).
   const { periodId, periods, refreshPeriods } = usePeriod();
@@ -374,21 +384,28 @@ export function ApprovalsPage() {
   useEffect(() => { load(); loadKm(); loadReal(); loadDocs(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { loadBundle(); loadKmBundle(); }, [periodId, kmBundleType]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Living-target: muat KM Sementara periode ini untuk pemetaan koreksi target (PIC REN).
-  const loadPicRenTargets = () => {
-    if (!isPicRen || !periodId) { setPicRenTargets([]); return; }
-    periodTarget.list(periodId).then((d) => setPicRenTargets(d)).catch(() => setPicRenTargets([]));
-  };
-  useEffect(() => { loadPicRenTargets(); }, [periodId, isPicRen]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Package berstatus 'target_fix' (menunggu koreksi target PIC REN) — SEMUA periode, bukan
+  // hanya periode yang sedang dipilih di navbar (finding: koreksi Januari harus tetap tampil
+  // meski navbar sedang di Februari).
+  const targetFixList = (allReal as RealisasiKinerja[]).filter((r) => r.status === 'target_fix');
 
-  // Package berstatus 'target_fix' (menunggu koreksi target PIC REN) untuk periode terpilih.
-  const targetFixList = (allReal as RealisasiKinerja[]).filter(
-    (r) => r.status === 'target_fix' && (!periodId || r.periodId === periodId),
-  );
-  // Peta masterKpiId -> { assignmentId, livingTarget, frozen } untuk (unit,bidang) tertentu.
-  const assignmentForItem = (unitCode: string, bidang: string, masterKpiId?: string): PeriodTarget | undefined =>
+  // Living-target: muat KM Sementara PER PERIODE ASLI tiap package target_fix (bukan periode
+  // navbar) — tiap package dikoreksi terhadap KM Sementara periodenya sendiri.
+  const loadPicRenTargets = () => {
+    if (!isPicRen) { setPicRenTargets({}); return; }
+    const periodIds = [...new Set(targetFixList.map((r) => r.periodId))];
+    if (periodIds.length === 0) { setPicRenTargets({}); return; }
+    Promise.all(periodIds.map((pid) => periodTarget.list(pid).then((d) => [pid, d] as const)))
+      .then((entries) => setPicRenTargets(Object.fromEntries(entries)))
+      .catch(() => setPicRenTargets({}));
+  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { loadPicRenTargets(); }, [isPicRen, targetFixList.map((r) => r.periodId).join(',')]);
+
+  // Peta masterKpiId -> { assignmentId, livingTarget, frozen } untuk (periode, unit, bidang) tertentu.
+  const assignmentForItem = (periodId: string, unitCode: string, bidang: string, masterKpiId?: string): PeriodTarget | undefined =>
     masterKpiId
-      ? picRenTargets.find((pt) => pt.assignment
+      ? (picRenTargets[periodId] ?? []).find((pt) => pt.assignment
           && pt.assignment.kpiMasterId === masterKpiId
           && pt.assignment.unitCode === unitCode
           && pt.assignment.bidang === bidang)
@@ -400,7 +417,7 @@ export function ApprovalsPage() {
     const updates: Array<{ kpiAssignmentId: string; target: string }> = [];
     for (const it of Object.values(rl.values ?? {}) as Record<string, unknown>[]) {
       const masterKpiId = it['masterKpiId'] as string | undefined;
-      const pt = assignmentForItem(rl.unitCode, bidang, masterKpiId);
+      const pt = assignmentForItem(rl.periodId, rl.unitCode, bidang, masterKpiId);
       const newVal = tfxValues[masterKpiId ?? ''];
       if (pt?.assignment && newVal != null && newVal.trim() !== '' && newVal.trim() !== pt.target) {
         updates.push({ kpiAssignmentId: pt.assignment.id, target: newVal.trim() });
@@ -945,7 +962,8 @@ export function ApprovalsPage() {
                   : null;
     if (!target) return;
     setHighlight(target);
-    const idMap = { real: 'card-realisasi', km: 'card-km', kmbundle: 'card-km-bundle', realbundle: 'card-real-bundle' } as const;
+    // 'real' & 'km' kini satu kartu gabungan (antrean tunggal).
+    const idMap = { real: 'card-queue', km: 'card-queue', kmbundle: 'card-km-bundle-kp', realbundle: 'card-real-bundle' } as const;
     const el = document.getElementById(idMap[target]);
     el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     const t = setTimeout(() => setHighlight(null), 4000);
@@ -968,32 +986,6 @@ export function ApprovalsPage() {
     }
   };
 
-  const startEditReal = (rl: RealisasiKinerja) => {
-    const ev: Record<string, string> = {};
-    Object.entries(rl.values ?? {}).forEach(([key, v]) => {
-      ev[key] = String((v as { realisasi?: unknown })?.realisasi ?? '');
-    });
-    setEditValues(ev);
-    setRealEditId(rl.id);
-    setRealExpanded(rl.id);
-  };
-
-  const saveEditReal = async (rl: RealisasiKinerja) => {
-    const merged: Record<string, unknown> = {};
-    Object.entries(rl.values ?? {}).forEach(([key, v]) => {
-      merged[key] = { ...(v as object), realisasi: editValues[key] ?? (v as { realisasi?: unknown })?.realisasi };
-    });
-    setRealBusy(true);
-    try {
-      await inputRealisasi.updateValues(rl.id, merged);
-      setRealEditId(null);
-      loadReal();
-    } catch (e) {
-      alert((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Gagal menyimpan perubahan');
-    } finally {
-      setRealBusy(false);
-    }
-  };
 
   const startEditKm = (k: KontrakManajemen) => {
     setKmEditItems((k.kpiItems as Record<string, unknown>[]).map((item) => ({ ...(item as object) })));
@@ -1034,13 +1026,8 @@ export function ApprovalsPage() {
     return (
       <div className="page">
         <div className="page-header"><h1 className="page-title">Persetujuan</h1></div>
-        <div className="kpi-strip-grid">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="metric-card" style={{ minHeight: 80 }}>
-              <div className="skeleton-line skeleton" style={{ width: '60%', height: 12 }} />
-              <div className="skeleton-line skeleton" style={{ width: '30%', height: 28, marginTop: 8 }} />
-            </div>
-          ))}
+        <div style={{ marginBottom: 'var(--space-4)' }}>
+          <div className="skeleton-line skeleton" style={{ width: 220, height: 14 }} />
         </div>
         <SkeletonTable rows={5} cols={5} />
       </div>
@@ -1060,11 +1047,6 @@ export function ApprovalsPage() {
   const scopeKm = scopeByBidang ? allKm : allKm.filter((k) => k.bidang === myBidang);
   const scopeReal = scopeByBidang ? allReal : allReal.filter((r) => (r as RealisasiKinerja & { bidang?: string }).bidang === myBidang);
 
-  // Ringkasan dari dokumen yang DIINPUT manual ke sistem (Kontrak Manajemen + Realisasi Kinerja)
-  const docs: Array<{ status: string }> = [...scopeKm, ...scopeReal];
-  const totalDoc = docs.length;
-  const approvedDoc = docs.filter((d) => d.status === 'approved').length;
-  const pendingDoc = docs.filter((d) => d.status === 'submitted').length;
   const myTasks = kmList.length + realList.length;
 
   // Registri semua dokumen persetujuan nyata (KM + Realisasi) lintas unit
@@ -1085,43 +1067,62 @@ export function ApprovalsPage() {
     return '—';
   };
 
+  // Tracker "Semua Dokumen Persetujuan" — hasil docRows disaring oleh jenis/status/periode.
+  const filteredDocRows = docRows.filter((d) => {
+    if (trackerType === 'km' && d.jenis !== 'Kontrak Manajemen') return false;
+    if (trackerType === 'real' && d.jenis !== 'Realisasi Kinerja') return false;
+    if (trackerStatus !== 'all' && d.status !== trackerStatus) return false;
+    if (trackerPeriod !== 'all' && d.periodId !== trackerPeriod) return false;
+    return true;
+  });
+
+  // Antrean tunggal — checker/approver berpikir "apa yang harus saya proses", bukan
+  // "KM atau Realisasi". Digabung & diurutkan dari yang paling mendesak (SLA terkecil/telat
+  // dulu); item tanpa data SLA jatuh ke bawah.
+  type QueueEntry = { kind: 'km'; data: KontrakManajemen } | { kind: 'real'; data: RealisasiKinerja };
+  const slaOf = (e: QueueEntry) => {
+    const d = (e.data as { slaRemainingDays?: number | null }).slaRemainingDays;
+    return d === undefined || d === null ? Infinity : d;
+  };
+  const queueEntries: QueueEntry[] = [
+    ...kmList.map((k): QueueEntry => ({ kind: 'km', data: k })),
+    ...realList.map((r): QueueEntry => ({ kind: 'real', data: r })),
+  ].sort((a, b) => slaOf(a) - slaOf(b));
+
   return (
     <div className="page approvals-page">
-      <div className="kpi-strip-grid">
-        {[
-          { label: 'Total Dokumen', value: totalDoc, color: 'var(--color-accent)' },
-          { label: 'Sudah Disetujui', value: approvedDoc, color: 'var(--color-success)' },
-          { label: 'Menunggu Review', value: pendingDoc, color: 'var(--color-warning)' },
-          { label: 'Tugas Saya', value: myTasks, color: 'var(--color-info)' },
-        ].map((k, i) => (
-          <div key={i} className="metric-card" style={{ borderTop: `3px solid ${k.color}` }}>
-            <div className="metric-label">{k.label}</div>
-            <div className="metric-value" style={{ color: k.color }}>{k.value}</div>
-          </div>
-        ))}
+      <div style={{ marginBottom: 'var(--space-5)' }}>
+        <h1 className="page-title" style={{ margin: 0 }}>Persetujuan</h1>
+        <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginTop: 2 }}>
+          {canReview
+            ? myTasks === 0 ? 'Tidak ada dokumen menunggu persetujuan Anda' : `${myTasks} dokumen menunggu persetujuan Anda`
+            : 'Anda tidak memiliki tahap persetujuan pada alur ini'}
+        </div>
       </div>
 
-      {/* Review Usulan Kontrak Manajemen — hanya untuk Asman ke atas */}
+      {/* Antrean persetujuan — gabungan Usulan KM + Realisasi, urut paling mendesak. Checker
+          berpikir "apa yang harus saya proses", bukan "KM atau Realisasi" — satu daftar saja. */}
       {canReview && (
         <FoldCard
-          id="card-km"
-          highlight={highlight === 'km'}
+          id="card-queue"
+          highlight={highlight === 'km' || highlight === 'real'}
           accent="var(--color-accent)"
-          icon={<FileSignature size={14} />}
-          title="Usulan Kontrak Manajemen Menunggu Review"
-          right={<span className="status-pill" style={{ background: 'var(--color-accent-tint)', color: 'var(--color-accent)', fontWeight: 'bold' }}>{kmList.length} Usulan</span>}
+          icon={<ClipboardCheck size={14} />}
+          title="Perlu Persetujuan Anda"
+          right={<span className="status-pill" style={{ background: 'var(--color-accent-tint)', color: 'var(--color-accent)', fontWeight: 'bold' }}>{queueEntries.length} dokumen</span>}
         >
-          {kmList.length === 0 ? (
-            <div className="card-body"><EmptyState title="Tidak ada usulan" message="Belum ada usulan kontrak manajemen yang menunggu review." /></div>
+          {queueEntries.length === 0 ? (
+            <div className="card-body"><EmptyState title="Tidak ada yang menunggu aksi Anda" message="Anda akan diberi tahu saat dokumen masuk ke tahap Anda." /></div>
           ) : (
             <div className="table-wrap">
               <table className="data-table compact">
                 <thead>
                   <tr>
+                    <th>Jenis</th>
                     <th>Unit</th>
                     <th>Bidang</th>
                     <th>Pengirim</th>
-                    <th>KPI</th>
+                    <th>Indikator</th>
                     <th>Jenjang Persetujuan</th>
                     <th>SLA</th>
                     <th>Tanggal</th>
@@ -1129,7 +1130,8 @@ export function ApprovalsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {kmList.map((k) => {
+                  {queueEntries.map((entry) => entry.kind === 'km' ? (() => {
+                  const k = entry.data;
                     const kk = k as KontrakManajemen & { steps?: { label: string }[]; currentStepIndex?: number; stepLabel?: string };
                     const ksteps = kk.steps ?? [];
                     const kci = kk.currentStepIndex ?? 0;
@@ -1138,6 +1140,7 @@ export function ApprovalsPage() {
                     return (
                       <Fragment key={k.id}>
                         <tr>
+                          <td><span className="status-pill" style={{ fontSize: 9, background: 'var(--color-accent-tint)', color: 'var(--color-accent)', fontWeight: 700 }}>KM Sementara</span></td>
                           <td style={{ fontWeight: 600 }}>{UNIT_NAMES[k.unitCode] ?? k.unitCode}</td>
                           <td>{k.bidang}</td>
                           <td style={{ color: 'var(--color-text-muted)' }}>{k.submitter}</td>
@@ -1207,7 +1210,7 @@ export function ApprovalsPage() {
                         </tr>
                         {kmExpanded === k.id && (
                           <tr>
-                            <td colSpan={8} style={{ background: 'var(--color-surface-2)', padding: 0 }}>
+                            <td colSpan={9} style={{ background: 'var(--color-surface-2)', padding: 0 }}>
                               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)', padding: 'var(--space-2) var(--space-3)' }}>
                                 {kmEditId === k.id ? (
                                   <>
@@ -1264,7 +1267,112 @@ export function ApprovalsPage() {
                         )}
                       </Fragment>
                     );
-                  })}
+                  })() : (() => {
+                    const rl = entry.data;
+                    const entries = Object.values(rl.values ?? {});
+                    const rr = rl as RealisasiKinerja & { steps?: { label: string }[]; currentStepIndex?: number; stepLabel?: string };
+                    const steps = rr.steps ?? [];
+                    const ci = rr.currentStepIndex ?? 0;
+                    const stepCount = steps.length;
+                    const isLastStep = ci >= stepCount - 1;
+                    const prevLabel = steps[ci - 1]?.label;
+                    return (
+                      <Fragment key={rl.id}>
+                        <tr>
+                          <td><span className="status-pill" style={{ fontSize: 9, background: 'var(--color-info-tint)', color: 'var(--color-info)', fontWeight: 700 }}>Realisasi</span></td>
+                          <td style={{ fontWeight: 600 }}>{UNIT_NAMES[rl.unitCode] ?? rl.unitCode}</td>
+                          <td style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{(rl as RealisasiKinerja & { bidang?: string }).bidang ?? '—'}</td>
+                          <td style={{ color: 'var(--color-text-muted)' }}>{rl.submitter}</td>
+                          <td>
+                            <button className="btn btn-ghost btn-sm" onClick={() => setRealExpanded(realExpanded === rl.id ? null : rl.id)}>
+                              {entries.length} indikator <ChevronDown size={12} style={{ transform: realExpanded === rl.id ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />
+                            </button>
+                          </td>
+                          <td style={{ minWidth: 200 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 3 }}>
+                              {steps.map((_, idx) => (
+                                <div key={idx} title={steps[idx]?.label} style={{
+                                  width: 16, height: 16, borderRadius: '50%', fontSize: 8, fontWeight: 700,
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  background: idx < ci ? 'var(--color-success)' : idx === ci ? 'var(--color-info)' : 'var(--color-surface-2)',
+                                  color: idx <= ci ? '#fff' : 'var(--color-text-muted)',
+                                }}>{idx < ci ? '✓' : idx + 1}</div>
+                              ))}
+                            </div>
+                            <div style={{ fontSize: 10, color: 'var(--color-info)', fontWeight: 600 }}>
+                              Langkah {ci}/{stepCount - 1}: {rr.stepLabel ?? steps[ci]?.label ?? '—'}
+                            </div>
+                          </td>
+                          <td><SlaBadge days={(rl as RealisasiKinerja & { slaRemainingDays?: number }).slaRemainingDays} /></td>
+                          <td style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
+                            {new Date(rl.submittedAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })}
+                          </td>
+                          <td>
+                            {realTarget === rl.id ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                                <textarea
+                                  className="form-textarea"
+                                  style={{ fontSize: 'var(--text-xs)', minHeight: 48 }}
+                                  placeholder="Catatan/komentar (wajib untuk setiap keputusan)"
+                                  value={realNote}
+                                  onChange={(e) => setRealNote(e.target.value)}
+                                />
+                                <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                                  <button className="btn btn-sm" style={{ background: 'var(--color-success)', color: '#fff' }} disabled={realBusy} onClick={() => handleRealReview(rl.id, 'approve')}>
+                                    <CheckCircle size={12} /> {isLastStep ? 'Setujui (Selesai → Bundle)' : 'Setujui & Teruskan'}
+                                  </button>
+                                  <button className="btn btn-sm" style={{ background: 'var(--color-danger)', color: '#fff' }} disabled={realBusy} onClick={() => handleRealReview(rl.id, 'reject', 'konseptor')} title="Masalah pada REALISASI → kembali ke penyusun (PIC)">
+                                    <XCircle size={12} /> Masalah Realisasi → Konseptor
+                                  </button>
+                                  <button className="btn btn-sm" style={{ background: 'var(--color-accent)', color: '#fff' }} disabled={realBusy} onClick={() => handleRealReview(rl.id, 'reject', 'target')} title="Masalah pada TARGET (KM Sementara) → routing ke PIC REN untuk koreksi target">
+                                    <XCircle size={12} /> Masalah Target → PIC REN
+                                  </button>
+                                  {ci >= 2 && (
+                                    <button className="btn btn-sm" style={{ background: 'var(--color-warning)', color: '#fff' }} disabled={realBusy} onClick={() => handleRealReview(rl.id, 'reject', 'previous')}>
+                                      <XCircle size={12} /> Kembalikan ke {prevLabel ?? 'langkah sebelumnya'}
+                                    </button>
+                                  )}
+                                  <button className="btn btn-ghost btn-sm" onClick={() => { setRealTarget(null); setRealNote(''); }}>Batal</button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                                <button className="btn btn-secondary btn-sm" onClick={() => { setRealTarget(rl.id); setRealNote(''); }}>
+                                  <Clock size={12} /> Tinjau
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                        {realExpanded === rl.id && (
+                          <tr>
+                            <td colSpan={9} style={{ background: 'var(--color-surface-2)', padding: 0 }}>
+                              <table className="data-table compact" style={{ margin: 0 }}>
+                                <thead>
+                                  <tr><th>No</th><th>Indikator</th><th>Satuan</th><th className="num">Bobot</th><th className="num">Target</th><th className="num">Realisasi</th></tr>
+                                </thead>
+                                <tbody>
+                                  {Object.entries(rl.values ?? {}).map(([key, vRaw], idx) => {
+                                    const it = vRaw as { indikator?: string; satuan?: string; bobot?: unknown; target?: unknown; realisasi?: unknown };
+                                    return (
+                                      <tr key={key}>
+                                        <td>{idx + 1}</td>
+                                        <td>{it.indikator ?? '—'}</td>
+                                        <td>{it.satuan ?? '—'}</td>
+                                        <td className="num">{String(it.bobot ?? '—')}</td>
+                                        <td className="num">{String(it.target ?? '—')}</td>
+                                        <td className="num" style={{ fontWeight: 700 }}>{String(it.realisasi ?? '—')}</td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    );
+                  })())}
                 </tbody>
               </table>
             </div>
@@ -1272,9 +1380,96 @@ export function ApprovalsPage() {
         </FoldCard>
       )}
 
-      {/* Bundle Konsolidasi KM Tahunan — persetujuan akhir GM */}
-      {/* Tab KM Draft / KM Final — bundle & konsolidasi terpisah untuk masing-masing tipe */}
-      {canReview && (
+      {/* Living-target: Koreksi Target KM Sementara — hanya PIC REN (warden target) */}
+      {isPicRen && (
+        <FoldCard
+          id="card-target-fix"
+          accent="var(--color-accent)"
+          icon={<Pencil size={14} />}
+          title="Koreksi Target KM Sementara (PIC REN)"
+          right={<span className="status-pill" style={{ background: 'var(--color-accent-tint)', color: 'var(--color-accent)', fontWeight: 'bold' }}>{targetFixList.length} package</span>}
+        >
+          {targetFixList.length === 0 ? (
+            <div className="card-body"><EmptyState title="Tidak ada koreksi target tertunda" message="Package akan muncul di sini saat reviewer mengembalikannya dengan alasan 'Masalah Target'." /></div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {targetFixList.map((rl) => {
+                const bidang = (rl as RealisasiKinerja & { bidang?: string }).bidang ?? '';
+                const items = Object.values(rl.values ?? {}) as Record<string, unknown>[];
+                const open = tfxExpanded === rl.id;
+                return (
+                  <div key={rl.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--space-2) var(--space-4)' }}>
+                      <div style={{ fontSize: 'var(--text-sm)' }}>
+                        <span className="status-pill" style={{ fontSize: 9, marginRight: 6, background: 'var(--color-surface-2)' }}>
+                          {periods.find((p) => p.id === rl.periodId)?.label ?? rl.periodId}
+                        </span>
+                        <b>{UNIT_NAMES[rl.unitCode] ?? rl.unitCode}</b> — {bidang} <span style={{ color: 'var(--color-text-muted)' }}>· {rl.submitter}</span>
+                        {rl.reviewNote && <div style={{ fontSize: 10, color: 'var(--color-danger)', marginTop: 2 }}>Alasan reviewer: {rl.reviewNote}</div>}
+                      </div>
+                      <button className="btn btn-ghost btn-sm" onClick={() => { setTfxExpanded(open ? null : rl.id); setTfxValues({}); setTfxNote(''); }}>
+                        {open ? 'Tutup' : 'Koreksi Target'} <ChevronDown size={12} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />
+                      </button>
+                    </div>
+                    {open && (
+                      <div style={{ padding: '0 var(--space-4) var(--space-3)' }}>
+                        <table className="data-table compact" style={{ margin: 0 }}>
+                          <thead>
+                            <tr><th>Indikator</th><th className="num">KM Sementara Skrg</th><th className="num">Realisasi</th><th className="num">Target Baru</th></tr>
+                          </thead>
+                          <tbody>
+                            {items.map((it, idx) => {
+                              const masterKpiId = it['masterKpiId'] as string | undefined;
+                              const pt = assignmentForItem(rl.periodId, rl.unitCode, bidang, masterKpiId);
+                              const editable = !!pt?.assignment && !pt.frozen;
+                              return (
+                                <tr key={idx}>
+                                  <td style={{ maxWidth: 240 }}>{String(it['indikator'] ?? '—')}</td>
+                                  <td className="num">{pt ? pt.target : <span style={{ color: 'var(--color-text-subtle)' }} title="KPI tanpa assignment KM Sementara (legacy)">—</span>}{pt?.frozen && <span style={{ marginLeft: 4, fontSize: 9, color: 'var(--color-text-muted)' }}>(beku)</span>}</td>
+                                  <td className="num">{String(it['realisasi'] ?? '—')}</td>
+                                  <td className="num">
+                                    {editable ? (
+                                      <input
+                                        className="form-input form-input-sm" style={{ width: 90, textAlign: 'right' }}
+                                        value={tfxValues[masterKpiId!] ?? pt!.target}
+                                        onChange={(e) => setTfxValues((v) => ({ ...v, [masterKpiId!]: e.target.value }))}
+                                      />
+                                    ) : <span style={{ color: 'var(--color-text-subtle)' }}>—</span>}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                        <textarea
+                          className="form-textarea" style={{ marginTop: 'var(--space-2)', fontSize: 'var(--text-xs)', minHeight: 44, width: '100%' }}
+                          placeholder="Catatan koreksi target (wajib) — akan dikirim ke penyusun untuk resubmit"
+                          value={tfxNote} onChange={(e) => setTfxNote(e.target.value)}
+                        />
+                        <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
+                          <button className="btn btn-sm btn-primary" disabled={tfxBusy} onClick={() => handleResolveTargetFix(rl)}>
+                            <CheckCircle size={12} /> Simpan Koreksi & Kembalikan ke PIC
+                          </button>
+                          <button className="btn btn-ghost btn-sm" onClick={() => { setTfxExpanded(null); setTfxValues({}); setTfxNote(''); }}>Batal</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </FoldCard>
+      )}
+
+      {/* Bundle Konsolidasi KM Tahunan — persetujuan akhir GM. Card ini hanya berisi aksi GM
+          (Checker/Approver biasa tak punya tombol di sini), jadi disembunyikan dari mereka
+          sepenuhnya — bukan hanya tombolnya — supaya tak jadi info yang tak bisa diapa-apakan. */}
+      {isGM && (
+        <>
+        <div style={{ marginTop: 'var(--space-6)', marginBottom: 'var(--space-2)', fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+          Konsolidasi & Kontrol (GM)
+        </div>
         <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)', alignItems: 'center' }}>
           <button
             className={`btn btn-sm ${kmBundleType === 'draft' ? 'btn-primary' : 'btn-ghost'}`}
@@ -1289,9 +1484,10 @@ export function ApprovalsPage() {
             Bundle KM Final
           </button>
         </div>
+        </>
       )}
       {/* === Card 1: Bundle KM Kantor Induk === */}
-      {canReview && kmBundleKP && (
+      {isGM && kmBundleKP && (
         <FoldCard
           id="card-km-bundle-kp"
           highlight={highlight === 'kmbundle'}
@@ -1383,7 +1579,7 @@ export function ApprovalsPage() {
       )}
 
       {/* === Card 2: Bundle KM UPMK (gabungan UPMK I–V) === */}
-      {canReview && kmBundleUPMK && (
+      {isGM && kmBundleUPMK && (
         <FoldCard
           id="card-km-bundle-upmk"
           accent="var(--color-accent)"
@@ -1499,251 +1695,17 @@ export function ApprovalsPage() {
         </FoldCard>
       )}
 
-      {/* Review Realisasi Kinerja Bulanan — hanya untuk Asman ke atas */}
-      {canReview && (
+      {/* Konsolidasi nilai parent KPI lintas-bidang — GM (Manajemen KPI di-hide utk role selain PIC RPC) */}
+      {isGM && (
         <FoldCard
-          id="card-realisasi"
-          highlight={highlight === 'real'}
-          accent="var(--color-info)"
-          icon={<ClipboardCheck size={14} />}
-          title="Realisasi Kinerja Bulanan Menunggu Review"
-          right={<span className="status-pill" style={{ background: 'var(--color-info-tint)', color: 'var(--color-info)', fontWeight: 'bold' }}>{realList.length} Realisasi</span>}
-        >
-          {realList.length === 0 ? (
-            <div className="card-body"><EmptyState title="Tidak ada realisasi" message="Belum ada realisasi kinerja yang menunggu review Anda." /></div>
-          ) : (
-            <div className="table-wrap">
-              <table className="data-table compact">
-                <thead>
-                  <tr>
-                    <th>Unit</th>
-                    <th>Bidang</th>
-                    <th>Pengirim</th>
-                    <th>Indikator</th>
-                    <th>Jenjang Persetujuan</th>
-                    <th>SLA</th>
-                    <th>Tanggal</th>
-                    <th style={{ width: 260 }}>Tindakan</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {realList.map((rl) => {
-                    const entries = Object.values(rl.values ?? {});
-                    const rr = rl as RealisasiKinerja & { steps?: { label: string }[]; currentStepIndex?: number; stepLabel?: string };
-                    const steps = rr.steps ?? [];
-                    const ci = rr.currentStepIndex ?? 0;
-                    const stepCount = steps.length;
-                    const isLastStep = ci >= stepCount - 1;
-                    const prevLabel = steps[ci - 1]?.label;
-                    return (
-                      <Fragment key={rl.id}>
-                        <tr>
-                          <td style={{ fontWeight: 600 }}>{UNIT_NAMES[rl.unitCode] ?? rl.unitCode}</td>
-                          <td style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{(rl as RealisasiKinerja & { bidang?: string }).bidang ?? '—'}</td>
-                          <td style={{ color: 'var(--color-text-muted)' }}>{rl.submitter}</td>
-                          <td>
-                            <button className="btn btn-ghost btn-sm" onClick={() => setRealExpanded(realExpanded === rl.id ? null : rl.id)}>
-                              {entries.length} indikator <ChevronDown size={12} style={{ transform: realExpanded === rl.id ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />
-                            </button>
-                          </td>
-                          <td style={{ minWidth: 200 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 3 }}>
-                              {steps.map((_, idx) => (
-                                <div key={idx} title={steps[idx]?.label} style={{
-                                  width: 16, height: 16, borderRadius: '50%', fontSize: 8, fontWeight: 700,
-                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                  background: idx < ci ? 'var(--color-success)' : idx === ci ? 'var(--color-info)' : 'var(--color-surface-2)',
-                                  color: idx <= ci ? '#fff' : 'var(--color-text-muted)',
-                                }}>{idx < ci ? '✓' : idx + 1}</div>
-                              ))}
-                            </div>
-                            <div style={{ fontSize: 10, color: 'var(--color-info)', fontWeight: 600 }}>
-                              Langkah {ci}/{stepCount - 1}: {rr.stepLabel ?? steps[ci]?.label ?? '—'}
-                            </div>
-                          </td>
-                          <td><SlaBadge days={(rl as RealisasiKinerja & { slaRemainingDays?: number }).slaRemainingDays} /></td>
-                          <td style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
-                            {new Date(rl.submittedAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })}
-                          </td>
-                          <td>
-                            {realTarget === rl.id ? (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                                <textarea
-                                  className="form-textarea"
-                                  style={{ fontSize: 'var(--text-xs)', minHeight: 48 }}
-                                  placeholder="Catatan/komentar (wajib untuk setiap keputusan)"
-                                  value={realNote}
-                                  onChange={(e) => setRealNote(e.target.value)}
-                                />
-                                <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-                                  <button className="btn btn-sm" style={{ background: 'var(--color-success)', color: '#fff' }} disabled={realBusy} onClick={() => handleRealReview(rl.id, 'approve')}>
-                                    <CheckCircle size={12} /> {isLastStep ? 'Setujui (Selesai → Bundle)' : 'Setujui & Teruskan'}
-                                  </button>
-                                  <button className="btn btn-sm" style={{ background: 'var(--color-danger)', color: '#fff' }} disabled={realBusy} onClick={() => handleRealReview(rl.id, 'reject', 'konseptor')} title="Masalah pada REALISASI → kembali ke penyusun (PIC)">
-                                    <XCircle size={12} /> Masalah Realisasi → Konseptor
-                                  </button>
-                                  <button className="btn btn-sm" style={{ background: 'var(--color-accent)', color: '#fff' }} disabled={realBusy} onClick={() => handleRealReview(rl.id, 'reject', 'target')} title="Masalah pada TARGET (KM Sementara) → routing ke PIC REN untuk koreksi target">
-                                    <XCircle size={12} /> Masalah Target → PIC REN
-                                  </button>
-                                  {ci >= 2 && (
-                                    <button className="btn btn-sm" style={{ background: 'var(--color-warning)', color: '#fff' }} disabled={realBusy} onClick={() => handleRealReview(rl.id, 'reject', 'previous')}>
-                                      <XCircle size={12} /> Kembalikan ke {prevLabel ?? 'langkah sebelumnya'}
-                                    </button>
-                                  )}
-                                  <button className="btn btn-ghost btn-sm" onClick={() => { setRealTarget(null); setRealNote(''); }}>Batal</button>
-                                </div>
-                              </div>
-                            ) : (
-                              <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-                                <button className="btn btn-secondary btn-sm" onClick={() => { setRealTarget(rl.id); setRealNote(''); }}>
-                                  <Clock size={12} /> Tinjau
-                                </button>
-                                <button className="btn btn-ghost btn-sm" onClick={() => startEditReal(rl)} title="Edit nilai realisasi pada tahap Anda">
-                                  <Pencil size={12} /> Edit Nilai
-                                </button>
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                        {realExpanded === rl.id && (
-                          <tr>
-                            <td colSpan={8} style={{ background: 'var(--color-surface-2)', padding: 0 }}>
-                              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)', padding: 'var(--space-2) var(--space-3)' }}>
-                                {realEditId === rl.id ? (
-                                  <>
-                                    <button className="btn btn-sm" style={{ background: 'var(--color-success)', color: '#fff' }} disabled={realBusy} onClick={() => saveEditReal(rl)}>
-                                      <CheckCircle size={12} /> Simpan Nilai
-                                    </button>
-                                    <button className="btn btn-ghost btn-sm" onClick={() => setRealEditId(null)}>Batal Edit</button>
-                                  </>
-                                ) : (
-                                  <button className="btn btn-secondary btn-sm" onClick={() => startEditReal(rl)} title="Edit nilai realisasi pada tahap Anda">
-                                    <Pencil size={12} /> Edit Nilai
-                                  </button>
-                                )}
-                              </div>
-                              <table className="data-table compact" style={{ margin: 0 }}>
-                                <thead>
-                                  <tr><th>No</th><th>Indikator</th><th>Satuan</th><th className="num">Bobot</th><th className="num">Target</th><th className="num">Realisasi</th></tr>
-                                </thead>
-                                <tbody>
-                                  {Object.entries(rl.values ?? {}).map(([key, vRaw], idx) => {
-                                    const it = vRaw as { indikator?: string; satuan?: string; bobot?: unknown; target?: unknown; realisasi?: unknown };
-                                    const editing = realEditId === rl.id;
-                                    return (
-                                      <tr key={key}>
-                                        <td>{idx + 1}</td>
-                                        <td>{it.indikator ?? '—'}</td>
-                                        <td>{it.satuan ?? '—'}</td>
-                                        <td className="num">{String(it.bobot ?? '—')}</td>
-                                        <td className="num">{String(it.target ?? '—')}</td>
-                                        <td className="num" style={{ fontWeight: 700 }}>
-                                          {editing ? (
-                                            <input
-                                              type="text"
-                                              className="form-input form-input-sm"
-                                              style={{ width: 90, textAlign: 'right' }}
-                                              value={editValues[key] ?? ''}
-                                              onChange={(e) => setEditValues((v) => ({ ...v, [key]: e.target.value }))}
-                                            />
-                                          ) : (
-                                            String(it.realisasi ?? '—')
-                                          )}
-                                        </td>
-                                      </tr>
-                                    );
-                                  })}
-                                </tbody>
-                              </table>
-                            </td>
-                          </tr>
-                        )}
-                      </Fragment>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </FoldCard>
-      )}
-
-      {/* Living-target: Koreksi Target KM Sementara — hanya PIC REN (warden target) */}
-      {isPicRen && (
-        <FoldCard
-          id="card-target-fix"
+          id="card-kpi-consolidation"
           accent="var(--color-accent)"
-          icon={<Pencil size={14} />}
-          title="Koreksi Target KM Sementara (PIC REN)"
-          right={<span className="status-pill" style={{ background: 'var(--color-accent-tint)', color: 'var(--color-accent)', fontWeight: 'bold' }}>{targetFixList.length} package</span>}
+          icon={<PieChart size={14} />}
+          title="Konsolidasi Nilai Parent KPI (Lintas Bidang)"
         >
-          {targetFixList.length === 0 ? (
-            <div className="card-body"><EmptyState title="Tidak ada koreksi target tertunda" message="Package akan muncul di sini saat reviewer mengembalikannya dengan alasan 'Masalah Target'." /></div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              {targetFixList.map((rl) => {
-                const bidang = (rl as RealisasiKinerja & { bidang?: string }).bidang ?? '';
-                const items = Object.values(rl.values ?? {}) as Record<string, unknown>[];
-                const open = tfxExpanded === rl.id;
-                return (
-                  <div key={rl.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--space-2) var(--space-4)' }}>
-                      <div style={{ fontSize: 'var(--text-sm)' }}>
-                        <b>{UNIT_NAMES[rl.unitCode] ?? rl.unitCode}</b> — {bidang} <span style={{ color: 'var(--color-text-muted)' }}>· {rl.submitter}</span>
-                        {rl.reviewNote && <div style={{ fontSize: 10, color: 'var(--color-danger)', marginTop: 2 }}>Alasan reviewer: {rl.reviewNote}</div>}
-                      </div>
-                      <button className="btn btn-ghost btn-sm" onClick={() => { setTfxExpanded(open ? null : rl.id); setTfxValues({}); setTfxNote(''); }}>
-                        {open ? 'Tutup' : 'Koreksi Target'} <ChevronDown size={12} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />
-                      </button>
-                    </div>
-                    {open && (
-                      <div style={{ padding: '0 var(--space-4) var(--space-3)' }}>
-                        <table className="data-table compact" style={{ margin: 0 }}>
-                          <thead>
-                            <tr><th>Indikator</th><th className="num">KM Sementara Skrg</th><th className="num">Realisasi</th><th className="num">Target Baru</th></tr>
-                          </thead>
-                          <tbody>
-                            {items.map((it, idx) => {
-                              const masterKpiId = it['masterKpiId'] as string | undefined;
-                              const pt = assignmentForItem(rl.unitCode, bidang, masterKpiId);
-                              const editable = !!pt?.assignment && !pt.frozen;
-                              return (
-                                <tr key={idx}>
-                                  <td style={{ maxWidth: 240 }}>{String(it['indikator'] ?? '—')}</td>
-                                  <td className="num">{pt ? pt.target : <span style={{ color: 'var(--color-text-subtle)' }} title="KPI tanpa assignment KM Sementara (legacy)">—</span>}{pt?.frozen && <span style={{ marginLeft: 4, fontSize: 9, color: 'var(--color-text-muted)' }}>(beku)</span>}</td>
-                                  <td className="num">{String(it['realisasi'] ?? '—')}</td>
-                                  <td className="num">
-                                    {editable ? (
-                                      <input
-                                        className="form-input form-input-sm" style={{ width: 90, textAlign: 'right' }}
-                                        value={tfxValues[masterKpiId!] ?? pt!.target}
-                                        onChange={(e) => setTfxValues((v) => ({ ...v, [masterKpiId!]: e.target.value }))}
-                                      />
-                                    ) : <span style={{ color: 'var(--color-text-subtle)' }}>—</span>}
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                        <textarea
-                          className="form-textarea" style={{ marginTop: 'var(--space-2)', fontSize: 'var(--text-xs)', minHeight: 44, width: '100%' }}
-                          placeholder="Catatan koreksi target (wajib) — akan dikirim ke penyusun untuk resubmit"
-                          value={tfxNote} onChange={(e) => setTfxNote(e.target.value)}
-                        />
-                        <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
-                          <button className="btn btn-sm btn-primary" disabled={tfxBusy} onClick={() => handleResolveTargetFix(rl)}>
-                            <CheckCircle size={12} /> Simpan Koreksi & Kembalikan ke PIC
-                          </button>
-                          <button className="btn btn-ghost btn-sm" onClick={() => { setTfxExpanded(null); setTfxValues({}); setTfxNote(''); }}>Batal</button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          <div className="card-body" style={{ paddingBottom: 0 }}>
+            <ReviewPerKpiTab />
+          </div>
         </FoldCard>
       )}
 
@@ -1830,7 +1792,7 @@ export function ApprovalsPage() {
       )}
 
       {/* Bundle Konsolidasi Realisasi — persetujuan akhir GM (sekali untuk seluruh periode) */}
-      {canReview && bundle && (
+      {isGM && bundle && (
         <FoldCard
           id="card-real-bundle"
           highlight={highlight === 'realbundle'}
@@ -1943,53 +1905,65 @@ export function ApprovalsPage() {
         </FoldCard>
       )}
 
-      {/* Workflow Timeline Card */}
-      <FoldCard
-        icon={<CalendarClock size={14} />}
-        title="Timeline Pelaporan Bulanan"
-        right={<span className="card-meta">5 Fase siklus bulanan</span>}
-        defaultOpen={false}
-      >
-        <div className="card-body" style={{ padding: 'var(--space-4)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: 'var(--space-5)', overflowX: 'auto', paddingBottom: 4 }}>
-            {WORKFLOW_STATIC.map((w, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, minWidth: 80 }}>
-                  <div style={{ width: 32, height: 32, borderRadius: '50%', background: FASE_ACCENT[i], color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 12, flexShrink: 0 }}>{w.stage}</div>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: FASE_ACCENT[i], marginTop: 6, textAlign: 'center', whiteSpace: 'nowrap' }}>{w.fase}</div>
-                  <div style={{ fontSize: 10, color: 'var(--color-text-muted)', textAlign: 'center', whiteSpace: 'nowrap' }}>{w.deadline}</div>
-                </div>
-                {i < WORKFLOW_STATIC.length - 1 && (
-                  <div style={{ flex: 1, height: 2, background: `linear-gradient(to right, ${FASE_ACCENT[i]}, ${FASE_ACCENT[i + 1]})`, minWidth: 16 }} />
-                )}
-              </div>
-            ))}
-          </div>
-
-          <div className="three-col-grid" style={{ marginBottom: 0 }}>
-            {WORKFLOW_STATIC.map((w, i) => (
-              <div key={i} style={{ border: '1px solid var(--color-border)', borderTop: `3px solid ${FASE_ACCENT[i]}`, borderRadius: 'var(--radius-md)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-surface)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: FASE_ACCENT[i], textTransform: 'uppercase', letterSpacing: '0.06em' }}>{w.fase} · {w.deadline}</span>
-                  <span style={{ fontSize: 10, background: 'var(--color-surface-2)', color: 'var(--color-text-muted)', padding: '1px 7px', borderRadius: 8 }}>SLA {w.slaHours}j</span>
-                </div>
-                <div style={{ fontWeight: 600, fontSize: 'var(--text-sm)', marginBottom: 'var(--space-1)' }}>{w.action}</div>
-                <div style={{ fontSize: 10, color: 'var(--color-accent)', marginBottom: 'var(--space-2)' }}>{STAGES[w.stage]}</div>
-                <ul style={{ margin: 0, paddingLeft: 14, fontSize: 10, color: 'var(--color-text-muted)', lineHeight: 1.75 }}>
-                  {w.checklist.map((c, ci) => <li key={ci}>{c}</li>)}
-                </ul>
-              </div>
-            ))}
-          </div>
-        </div>
-      </FoldCard>
-
-      {/* Semua Dokumen Persetujuan — data nyata dari dokumen yang diinput */}
+      {/* Semua Dokumen Persetujuan — data nyata dari dokumen yang diinput. Selalu tampil
+          (bukan di balik toggle) agar checker/approver bisa langsung menelusuri tanpa membuka accordion. */}
       <FoldCard
         icon={<FileText size={14} />}
         title="Semua Dokumen Persetujuan"
-        right={<span className="card-meta">{docRows.length} dokumen · KM + Realisasi</span>}
+        right={<span className="card-meta">{filteredDocRows.length} dokumen</span>}
       >
+        <div className="card-body" style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', alignItems: 'center', paddingBottom: 'var(--space-3)' }}>
+          <button
+            className={`btn btn-sm ${trackerType === 'all' ? 'btn-primary' : 'btn-ghost'}`}
+            onClick={() => setTrackerType('all')}
+          >
+            Semua
+          </button>
+          <button
+            className={`btn btn-sm ${trackerType === 'km' ? 'btn-primary' : 'btn-ghost'}`}
+            onClick={() => setTrackerType('km')}
+          >
+            KM
+          </button>
+          <button
+            className={`btn btn-sm ${trackerType === 'real' ? 'btn-primary' : 'btn-ghost'}`}
+            onClick={() => setTrackerType('real')}
+          >
+            Realisasi
+          </button>
+          <select className="form-input form-input-sm" value={trackerStatus} onChange={(e) => setTrackerStatus(e.target.value)}>
+            <option value="all">Semua status</option>
+            {Object.entries(DOC_STATUS_LABEL).map(([key, label]) => (
+              <option key={key} value={key}>{label}</option>
+            ))}
+          </select>
+          <select className="form-input form-input-sm" value={trackerPeriod} onChange={(e) => setTrackerPeriod(e.target.value)}>
+            <option value="all">Semua periode</option>
+            {periods.map((p) => (
+              <option key={p.id} value={p.id}>{p.label}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="kpi-strip-grid" style={{ padding: '0 var(--space-4) var(--space-4)' }}>
+          <div className="metric-card" style={{ maxWidth: 'none' }}>
+            <div className="metric-label">Total</div>
+            <div className="metric-value">{filteredDocRows.length}</div>
+          </div>
+          <div className="metric-card" style={{ maxWidth: 'none' }}>
+            <div className="metric-label">Disetujui</div>
+            <div className="metric-value" style={{ color: 'var(--color-success)' }}>{filteredDocRows.filter((d) => d.status === 'approved').length}</div>
+          </div>
+          <div className="metric-card" style={{ maxWidth: 'none' }}>
+            <div className="metric-label">Dalam Review</div>
+            <div className="metric-value" style={{ color: 'var(--color-warning)' }}>{filteredDocRows.filter((d) => d.status === 'submitted').length}</div>
+          </div>
+          <div className="metric-card" style={{ maxWidth: 'none' }}>
+            <div className="metric-label">Dikembalikan</div>
+            <div className="metric-value" style={{ color: 'var(--color-danger)' }}>{filteredDocRows.filter((d) => d.status === 'rejected').length}</div>
+          </div>
+        </div>
+
         <div className="table-wrap">
           <table className="data-table compact">
             <thead>
@@ -2004,7 +1978,7 @@ export function ApprovalsPage() {
               </tr>
             </thead>
             <tbody>
-              {docRows.map((d) => (
+              {filteredDocRows.map((d) => (
                 <Fragment key={d.id}>
                   <tr>
                     <td style={{ fontWeight: 600 }}>{UNIT_NAMES[d.unitCode] ?? d.unitCode}</td>
@@ -2048,11 +2022,72 @@ export function ApprovalsPage() {
                   )}
                 </Fragment>
               ))}
-              {docRows.length === 0 && (
-                <tr><td colSpan={7}><EmptyState title="Belum ada dokumen" message="Belum ada Kontrak Manajemen atau Realisasi yang diinput." /></td></tr>
+              {filteredDocRows.length === 0 && (
+                <tr><td colSpan={7}>
+                  <EmptyState
+                    title={docRows.length === 0 ? 'Belum ada dokumen' : 'Tidak ada dokumen yang cocok'}
+                    message={docRows.length === 0
+                      ? 'Belum ada Kontrak Manajemen atau Realisasi yang diinput.'
+                      : 'Coba ubah filter jenis, status, atau periode.'}
+                  />
+                </td></tr>
               )}
             </tbody>
           </table>
+        </div>
+      </FoldCard>
+
+      {/* Monitoring/audit — bukan aksi, disembunyikan di balik toggle agar halaman tetap ringkas */}
+      <button
+        type="button"
+        className="btn btn-ghost btn-sm"
+        onClick={() => setShowMonitoring((v) => !v)}
+        style={{ marginTop: 'var(--space-6)', color: 'var(--color-text-muted)' }}
+      >
+        <ChevronDown size={14} style={{ transform: showMonitoring ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />
+        Pantau semua — riwayat dokumen, timeline, RACI
+      </button>
+
+      {showMonitoring && (
+      <div style={{ marginTop: 'var(--space-4)' }}>
+      {/* Workflow Timeline Card */}
+      <FoldCard
+        icon={<CalendarClock size={14} />}
+        title="Timeline Pelaporan Bulanan"
+        right={<span className="card-meta">5 Fase siklus bulanan</span>}
+        defaultOpen={false}
+      >
+        <div className="card-body" style={{ padding: 'var(--space-4)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: 'var(--space-5)', overflowX: 'auto', paddingBottom: 4 }}>
+            {WORKFLOW_STATIC.map((w, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, minWidth: 80 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: '50%', background: FASE_ACCENT[i], color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 12, flexShrink: 0 }}>{w.stage}</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: FASE_ACCENT[i], marginTop: 6, textAlign: 'center', whiteSpace: 'nowrap' }}>{w.fase}</div>
+                  <div style={{ fontSize: 10, color: 'var(--color-text-muted)', textAlign: 'center', whiteSpace: 'nowrap' }}>{w.deadline}</div>
+                </div>
+                {i < WORKFLOW_STATIC.length - 1 && (
+                  <div style={{ flex: 1, height: 2, background: `linear-gradient(to right, ${FASE_ACCENT[i]}, ${FASE_ACCENT[i + 1]})`, minWidth: 16 }} />
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="three-col-grid" style={{ marginBottom: 0 }}>
+            {WORKFLOW_STATIC.map((w, i) => (
+              <div key={i} style={{ border: '1px solid var(--color-border)', borderTop: `3px solid ${FASE_ACCENT[i]}`, borderRadius: 'var(--radius-md)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-surface)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: FASE_ACCENT[i], textTransform: 'uppercase', letterSpacing: '0.06em' }}>{w.fase} · {w.deadline}</span>
+                  <span style={{ fontSize: 10, background: 'var(--color-surface-2)', color: 'var(--color-text-muted)', padding: '1px 7px', borderRadius: 8 }}>SLA {w.slaHours}j</span>
+                </div>
+                <div style={{ fontWeight: 600, fontSize: 'var(--text-sm)', marginBottom: 'var(--space-1)' }}>{w.action}</div>
+                <div style={{ fontSize: 10, color: 'var(--color-accent)', marginBottom: 'var(--space-2)' }}>{STAGES[w.stage]}</div>
+                <ul style={{ margin: 0, paddingLeft: 14, fontSize: 10, color: 'var(--color-text-muted)', lineHeight: 1.75 }}>
+                  {w.checklist.map((c, ci) => <li key={ci}>{c}</li>)}
+                </ul>
+              </div>
+            ))}
+          </div>
         </div>
       </FoldCard>
 
@@ -2166,6 +2201,8 @@ export function ApprovalsPage() {
           </FoldCard>
         );
       })()}
+      </div>
+      )}
     </div>
   );
 }
