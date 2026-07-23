@@ -389,13 +389,27 @@ export class InputKontrakService {
     // untuk scope ini — misal UPMK yang disahkan lewat bundle lama sebelum fitur pisah scope).
     const allApproved = components.length > 0 && components.every((c) => c.status === 'approved');
     const effectiveStatus = readyCount > 0 ? 'open' : allApproved ? 'approved' : (bundle?.status ?? 'open');
+    // Sisipkan persenAgregasi ke tiap item (read-only, tak ditulis balik ke DB) — konsumen
+    // (print bundle di FE) pakai ini utk membagi bobot sesuai porsi assignment alih-alih
+    // mencetak bobotKm penuh berulang di tiap bidang saat 1 KPI di-assign ke banyak bidang.
+    const masterIds = Array.from(new Set(
+      components.flatMap((c) => (Array.isArray(c.kpiItems) ? c.kpiItems as Record<string, unknown>[] : [])
+        .map((it) => it['masterKpiId']).filter((v): v is string => typeof v === 'string')),
+    ));
+    const assignments = masterIds.length
+      ? await this.prisma.kpiAssignment.findMany({ where: { kpiMasterId: { in: masterIds } } })
+      : [];
+    const persenLookup = new Map(assignments.map((a) => [`${a.kpiMasterId}|${a.unitCode}|${a.bidang}`, a.persenAgregasi]));
     return {
       year: yr, scope, kmType, status: effectiveStatus, reviewer: bundle?.reviewer ?? null,
       reviewNote: bundle?.reviewNote ?? null, reviewedAt: bundle?.reviewedAt ?? null,
       total: components.length, readyCount, canApprove,
       components: components.map((c) => ({
         id: c.id, unitCode: c.unitCode, bidang: c.bidang, status: c.status,
-        submitter: c.submitter, holder: c.holder, kpiItems: c.kpiItems, history: c.history,
+        submitter: c.submitter, holder: c.holder, history: c.history,
+        kpiItems: (Array.isArray(c.kpiItems) ? c.kpiItems as Record<string, unknown>[] : []).map((it) => ({
+          ...it, persenAgregasi: persenLookup.get(`${it['masterKpiId']}|${c.unitCode}|${c.bidang}`),
+        })),
       })),
     };
   }

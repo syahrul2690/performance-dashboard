@@ -513,6 +513,17 @@ export class InputRealisasiService {
     const inflight = components.length;
     // GM dapat menyetujui bila ada komponen 'ready' & tak ada lagi yang masih dalam proses.
     const canApprove = readyCount > 0 && inProgressCount === 0;
+    // Sisipkan persenAgregasi ke tiap entry values (read-only, tak ditulis balik ke DB) — sama
+    // seperti input-kontrak.service.ts getBundle(), dipakai print bundle FE utk membagi bobot
+    // sesuai porsi assignment alih-alih mencetak bobotKm penuh berulang per bidang.
+    const masterIds = Array.from(new Set(
+      components.flatMap((c) => Object.values((c.values && typeof c.values === 'object' ? c.values : {}) as Record<string, Record<string, unknown>>))
+        .map((v) => v?.['masterKpiId']).filter((v): v is string => typeof v === 'string'),
+    ));
+    const assignments = masterIds.length
+      ? await this.prisma.kpiAssignment.findMany({ where: { kpiMasterId: { in: masterIds } } })
+      : [];
+    const persenLookup = new Map(assignments.map((a) => [`${a.kpiMasterId}|${a.unitCode}|${a.bidang}`, a.persenAgregasi]));
     return {
       period,
       status: bundle?.status ?? 'open',
@@ -523,10 +534,14 @@ export class InputRealisasiService {
       readyCount,
       approvedCount,
       canApprove,
-      components: components.map((c) => ({
-        id: c.id, unitCode: c.unitCode, bidang: c.bidang, status: c.status,
-        submitter: c.submitter, reviewer: c.reviewer, values: c.values,
-      })),
+      components: components.map((c) => {
+        const values = (c.values && typeof c.values === 'object' ? c.values : {}) as Record<string, Record<string, unknown>>;
+        const enriched: Record<string, Record<string, unknown>> = {};
+        for (const [k, v] of Object.entries(values)) {
+          enriched[k] = { ...v, persenAgregasi: persenLookup.get(`${v?.['masterKpiId']}|${c.unitCode}|${c.bidang}`) };
+        }
+        return { id: c.id, unitCode: c.unitCode, bidang: c.bidang, status: c.status, submitter: c.submitter, reviewer: c.reviewer, values: enriched };
+      }),
     };
   }
 

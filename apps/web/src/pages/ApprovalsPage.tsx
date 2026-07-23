@@ -481,6 +481,24 @@ export function ApprovalsPage() {
     }
   };
 
+  // Bagikan bobot sesuai porsi assignment (persenAgregasi) bila diketahui — cegah bobot penuh
+  // tercetak berulang saat 1 KPI di-assign ke banyak bidang. Tanpa info porsi (data legacy/tak
+  // lengkap), tampilkan bobot penuh apa adanya (perilaku lama, tak berubah). Dipakai bersama
+  // oleh print Bundle KM & Bundle Realisasi.
+  const bobotShare = (bobot: unknown, persenAgregasi?: number): number => {
+    const b = Number(bobot);
+    if (!Number.isFinite(b)) return 0;
+    if (persenAgregasi == null || persenAgregasi >= 100) return b;
+    return Math.round((b * persenAgregasi / 100) * 100) / 100;
+  };
+  const bidangLabel = (bidang: string, persenAgregasi?: number): string =>
+    persenAgregasi != null && persenAgregasi < 100 ? `${bidang} (${persenAgregasi}%)` : bidang;
+  const getPersenAgregasi = (it: Record<string, unknown>): number | undefined =>
+    typeof it['persenAgregasi'] === 'number' ? it['persenAgregasi'] as number : undefined;
+  const getSubIndicators = (it: Record<string, unknown>): Record<string, unknown>[] =>
+    Array.isArray(it['subIndicators']) ? it['subIndicators'] as Record<string, unknown>[] : [];
+  const subLetter = (i: number) => String.fromCharCode(97 + i);
+
   const handlePrintRealBundle = () => {
     if (!bundle) return;
     const periodLabel = bundle.period?.label ?? 'Periode Aktif';
@@ -563,6 +581,24 @@ export function ApprovalsPage() {
     const subLtrR = (i: number) => String.fromCharCode(97 + i);
     let kpBody = '';
     for (const { it, bidang } of kpSorted) {
+      const persenAgregasi = getPersenAgregasi(it);
+      const subs = getSubIndicators(it);
+      if (subs.length > 0) {
+        kpBody += `<tr><td class="num">${n++}</td>` +
+          `<td colspan="6" style="font-weight:700">${it['indikator'] ?? '—'} <span style="font-weight:400;font-style:italic">(Komposit — ${subs.length} sub-indikator)</span></td>` +
+          `<td class="num" style="font-size:7pt">${bidangLabel(bidang, persenAgregasi)}</td></tr>`;
+        subs.forEach((si, j) => {
+          kpBody += `<tr><td class="num" style="font-size:7pt">${subLetter(j)}.</td>` +
+            `<td style="padding-left:10pt">${si['nama'] ?? '—'}</td>` +
+            `<td style="font-size:7pt;color:#444">${si['formula'] ?? '—'}</td>` +
+            `<td class="num">${si['satuan'] ?? '—'}</td>` +
+            `<td class="num">${bobotShare(si['bobot'], persenAgregasi) || '—'}</td>` +
+            `<td class="rt">${si['target2'] ?? si['target'] ?? '—'}</td>` +
+            `<td class="rw">${si['realisasi'] ?? '—'}</td>` +
+            `<td class="num" style="font-size:7pt">${bidangLabel(bidang, persenAgregasi)}</td></tr>`;
+        });
+        continue;
+      }
       const ord = getKpOrder(String(it['indikator'] ?? ''));
       const isG8 = ord === 81 || ord === 82;
       const isG12 = ord === 121 || ord === 122 || ord === 123;
@@ -580,29 +616,29 @@ export function ApprovalsPage() {
           `<td style="padding-left:10pt">${subInd}</td>` +
           `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
           `<td class="num">${it['satuan'] ?? '—'}</td>` +
-          `<td class="num">${it['bobot'] ?? '—'}</td>` +
+          `<td class="num">${bobotShare(it['bobot'], persenAgregasi) || '—'}</td>` +
           `<td class="rt">${it['target'] ?? '—'}</td>` +
           `<td class="rw">${it['realisasi'] ?? '—'}</td>` +
-          `<td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+          `<td class="num" style="font-size:7pt">${bidangLabel(bidang, persenAgregasi)}</td></tr>`;
       } else if (isG12) {
         const subInd = String(it['indikator'] ?? '').replace(/^Pengurang\s*[-–]\s*/i, '');
         kpBody += `<tr><td class="num" style="font-size:7pt">${subLtrR(subR12++)}.</td>` +
           `<td style="padding-left:10pt">${subInd}</td>` +
           `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
           `<td class="num">${it['satuan'] ?? '—'}</td>` +
-          `<td class="num">${it['bobot'] ?? '—'}</td>` +
+          `<td class="num">${bobotShare(it['bobot'], persenAgregasi) || '—'}</td>` +
           `<td class="rt">${it['target'] ?? '—'}</td>` +
           `<td class="rw">${it['realisasi'] ?? '—'}</td>` +
-          `<td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+          `<td class="num" style="font-size:7pt">${bidangLabel(bidang, persenAgregasi)}</td></tr>`;
       } else {
         kpBody += `<tr><td class="num">${n++}</td>` +
           `<td>${it['indikator'] ?? '—'}</td>` +
           `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
           `<td class="num">${it['satuan'] ?? '—'}</td>` +
-          `<td class="num">${it['bobot'] ?? '—'}</td>` +
+          `<td class="num">${bobotShare(it['bobot'], persenAgregasi) || '—'}</td>` +
           `<td class="rt">${it['target'] ?? '—'}</td>` +
           `<td class="rw">${it['realisasi'] ?? '—'}</td>` +
-          `<td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+          `<td class="num" style="font-size:7pt">${bidangLabel(bidang, persenAgregasi)}</td></tr>`;
       }
     }
     let body = catRow('A. KANTOR INDUK') + kpBody;
@@ -636,6 +672,22 @@ export function ApprovalsPage() {
       let uG6 = false, uG9 = false, uS6 = 0, uS9 = 0;
       const slU = (j: number) => String.fromCharCode(97 + j);
       for (const { it, bidang } of uSorted) {
+        const persenAgregasi = getPersenAgregasi(it);
+        const subs = getSubIndicators(it);
+        if (subs.length > 0) {
+          body += `<tr><td class="num">${n++}</td>` +
+            `<td colspan="6" style="font-weight:700">${it['indikator'] ?? '—'} <span style="font-weight:400;font-style:italic">(Komposit — ${subs.length} sub-indikator)</span></td>` +
+            `<td class="num" style="font-size:7pt">${bidangLabel(bidang, persenAgregasi)}</td></tr>`;
+          subs.forEach((si, j) => {
+            body += `<tr><td class="num" style="font-size:7pt">${subLetter(j)}.</td>` +
+              `<td style="padding-left:10pt">${si['nama'] ?? '—'}</td>` +
+              `<td style="font-size:7pt;color:#444">${si['formula'] ?? '—'}</td>` +
+              `<td class="num">${si['satuan'] ?? '—'}</td><td class="num">${bobotShare(si['bobot'], persenAgregasi) || '—'}</td>` +
+              `<td class="rt">${si['target2'] ?? si['target'] ?? '—'}</td><td class="rw">${si['realisasi'] ?? '—'}</td>` +
+              `<td class="num" style="font-size:7pt">${bidangLabel(bidang, persenAgregasi)}</td></tr>`;
+          });
+          continue;
+        }
         const ord = getUpmkOrdR(String(it['indikator'] ?? ''));
         const iG6 = ord === 61 || ord === 62;
         const iG9 = ord === 91 || ord === 92 || ord === 93;
@@ -654,9 +706,9 @@ export function ApprovalsPage() {
           body += `<tr><td class="num" style="font-size:7pt">${slU(uS6++)}.</td>` +
             `<td style="padding-left:10pt">${si}</td>` +
             `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
-            `<td class="num">${it['satuan'] ?? '—'}</td><td class="num">${it['bobot'] ?? '—'}</td>` +
+            `<td class="num">${it['satuan'] ?? '—'}</td><td class="num">${bobotShare(it['bobot'], persenAgregasi) || '—'}</td>` +
             `<td class="rt">${it['target'] ?? '—'}</td><td class="rw">${it['realisasi'] ?? '—'}</td>` +
-            `<td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+            `<td class="num" style="font-size:7pt">${bidangLabel(bidang, persenAgregasi)}</td></tr>`;
         } else if (iG9) {
           const si = String(it['indikator'] ?? '')
             .replace(/^Pengurang\s*[-–]\s*/i, '')
@@ -664,15 +716,15 @@ export function ApprovalsPage() {
           body += `<tr><td class="num" style="font-size:7pt">${slU(uS9++)}.</td>` +
             `<td style="padding-left:10pt">${si}</td>` +
             `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
-            `<td class="num">${it['satuan'] ?? '—'}</td><td class="num">${it['bobot'] ?? '—'}</td>` +
+            `<td class="num">${it['satuan'] ?? '—'}</td><td class="num">${bobotShare(it['bobot'], persenAgregasi) || '—'}</td>` +
             `<td class="rt">${it['target'] ?? '—'}</td><td class="rw">${it['realisasi'] ?? '—'}</td>` +
-            `<td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+            `<td class="num" style="font-size:7pt">${bidangLabel(bidang, persenAgregasi)}</td></tr>`;
         } else {
           body += `<tr><td class="num">${n++}</td><td>${it['indikator'] ?? '—'}</td>` +
             `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
-            `<td class="num">${it['satuan'] ?? '—'}</td><td class="num">${it['bobot'] ?? '—'}</td>` +
+            `<td class="num">${it['satuan'] ?? '—'}</td><td class="num">${bobotShare(it['bobot'], persenAgregasi) || '—'}</td>` +
             `<td class="rt">${it['target'] ?? '—'}</td><td class="rw">${it['realisasi'] ?? '—'}</td>` +
-            `<td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+            `<td class="num" style="font-size:7pt">${bidangLabel(bidang, persenAgregasi)}</td></tr>`;
         }
       }
       if (uSorted.length === 0) {
@@ -756,7 +808,7 @@ export function ApprovalsPage() {
       const sortedFlat = [...allFlat].sort(
         (a, b) => getItemOrder(String(a.it['indikator'] ?? '')) - getItemOrder(String(b.it['indikator'] ?? ''))
       );
-      const totalBobot = allFlat.reduce((s, { it }) => s + (Number(it['bobot']) || 0), 0);
+      const totalBobot = allFlat.reduce((s, { it }) => s + bobotShare(it['bobot'], getPersenAgregasi(it)), 0);
       let n = 1;
       let grp8Emitted = false;
       let grp12Emitted = false;
@@ -765,6 +817,24 @@ export function ApprovalsPage() {
       const subLtr = (i: number) => String.fromCharCode(97 + i);
       let body = '';
       for (const { it, bidang } of sortedFlat) {
+        const persenAgregasi = getPersenAgregasi(it);
+        const subs = getSubIndicators(it);
+        if (subs.length > 0) {
+          body += `<tr><td class="num">${n++}</td>` +
+            `<td colspan="6" style="font-weight:700">${it['indikator'] ?? '—'} <span style="font-weight:400;font-style:italic">(Komposit — ${subs.length} sub-indikator)</span></td>` +
+            `<td class="num" style="font-size:7pt">${bidangLabel(bidang, persenAgregasi)}</td></tr>`;
+          subs.forEach((si, j) => {
+            body += `<tr><td class="num" style="font-size:7pt">${subLetter(j)}.</td>` +
+              `<td style="padding-left:10pt">${si['nama'] ?? '—'}</td>` +
+              `<td style="font-size:7pt;color:#444">${si['formula'] ?? '—'}</td>` +
+              `<td class="num">${si['satuan'] ?? '—'}</td>` +
+              `<td class="num">${bobotShare(si['bobot'], persenAgregasi) || '—'}</td>` +
+              `<td class="rt">${si['target'] ?? '—'}</td>` +
+              `<td class="rw">${si['target2'] ?? '—'}</td>` +
+              `<td class="num" style="font-size:7pt">${bidangLabel(bidang, persenAgregasi)}</td></tr>`;
+          });
+          continue;
+        }
         const ord = getItemOrder(String(it['indikator'] ?? ''));
         const isGrp8 = ord === 81 || ord === 82;
         const isGrp12 = ord === 121 || ord === 122 || ord === 123;
@@ -786,29 +856,29 @@ export function ApprovalsPage() {
             `<td style="padding-left:10pt">${subInd}</td>` +
             `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
             `<td class="num">${it['satuan'] ?? '—'}</td>` +
-            `<td class="num">${it['bobot'] ?? '—'}</td>` +
+            `<td class="num">${bobotShare(it['bobot'], persenAgregasi) || '—'}</td>` +
             `<td class="rt">${it['target'] ?? '—'}</td>` +
             `<td class="rw">${it['target2'] ?? '—'}</td>` +
-            `<td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+            `<td class="num" style="font-size:7pt">${bidangLabel(bidang, persenAgregasi)}</td></tr>`;
         } else if (isGrp12) {
           const subInd = String(it['indikator'] ?? '').replace(/^Pengurang\s*[-–]\s*/i, '');
           body += `<tr><td class="num" style="font-size:7pt">${subLtr(sub12++)}.</td>` +
             `<td style="padding-left:10pt">${subInd}</td>` +
             `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
             `<td class="num">${it['satuan'] ?? '—'}</td>` +
-            `<td class="num">${it['bobot'] ?? '—'}</td>` +
+            `<td class="num">${bobotShare(it['bobot'], persenAgregasi) || '—'}</td>` +
             `<td class="rt">${it['target'] ?? '—'}</td>` +
             `<td class="rw">${it['target2'] ?? '—'}</td>` +
-            `<td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+            `<td class="num" style="font-size:7pt">${bidangLabel(bidang, persenAgregasi)}</td></tr>`;
         } else {
           body += `<tr><td class="num">${n++}</td>` +
             `<td>${it['indikator'] ?? '—'}</td>` +
             `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
             `<td class="num">${it['satuan'] ?? '—'}</td>` +
-            `<td class="num">${it['bobot'] ?? '—'}</td>` +
+            `<td class="num">${bobotShare(it['bobot'], persenAgregasi) || '—'}</td>` +
             `<td class="rt">${it['target'] ?? '—'}</td>` +
             `<td class="rw">${it['target2'] ?? '—'}</td>` +
-            `<td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+            `<td class="num" style="font-size:7pt">${bidangLabel(bidang, persenAgregasi)}</td></tr>`;
         }
       }
       body += `<tr class="tot">` +
@@ -873,6 +943,22 @@ export function ApprovalsPage() {
         const sl = (i: number) => String.fromCharCode(97 + i);
         let rows = '';
         for (const { it, bidang } of sorted) {
+          const persenAgregasi = getPersenAgregasi(it);
+          const subs = getSubIndicators(it);
+          if (subs.length > 0) {
+            rows += `<tr><td class="num">${n++}</td>` +
+              `<td colspan="6" style="font-weight:700">${it['indikator'] ?? '—'} <span style="font-weight:400;font-style:italic">(Komposit — ${subs.length} sub-indikator)</span></td>` +
+              `<td class="num" style="font-size:7pt">${bidangLabel(bidang, persenAgregasi)}</td></tr>`;
+            subs.forEach((si, j) => {
+              rows += `<tr><td class="num" style="font-size:7pt">${subLetter(j)}.</td>` +
+                `<td style="padding-left:10pt">${si['nama'] ?? '—'}</td>` +
+                `<td style="font-size:7pt;color:#444">${si['formula'] ?? '—'}</td>` +
+                `<td class="num">${si['satuan'] ?? '—'}</td><td class="num">${bobotShare(si['bobot'], persenAgregasi) || '—'}</td>` +
+                `<td class="rt">${si['target'] ?? '—'}</td><td class="rw">${si['target2'] ?? '—'}</td>` +
+                `<td class="num" style="font-size:7pt">${bidangLabel(bidang, persenAgregasi)}</td></tr>`;
+            });
+            continue;
+          }
           const ord = getUpmkOrd(String(it['indikator'] ?? ''));
           const iG6 = ord === 61 || ord === 62;
           const iG9 = ord === 91 || ord === 92 || ord === 93;
@@ -891,9 +977,9 @@ export function ApprovalsPage() {
             rows += `<tr><td class="num" style="font-size:7pt">${sl(s6++)}.</td>` +
               `<td style="padding-left:10pt">${si}</td>` +
               `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
-              `<td class="num">${it['satuan'] ?? '—'}</td><td class="num">${it['bobot'] ?? '—'}</td>` +
+              `<td class="num">${it['satuan'] ?? '—'}</td><td class="num">${bobotShare(it['bobot'], persenAgregasi) || '—'}</td>` +
               `<td class="rt">${it['target'] ?? '—'}</td><td class="rw">${it['target2'] ?? '—'}</td>` +
-              `<td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+              `<td class="num" style="font-size:7pt">${bidangLabel(bidang, persenAgregasi)}</td></tr>`;
           } else if (iG9) {
             const si = String(it['indikator'] ?? '')
               .replace(/^Pengurang\s*[-–]\s*/i, '')
@@ -901,15 +987,15 @@ export function ApprovalsPage() {
             rows += `<tr><td class="num" style="font-size:7pt">${sl(s9++)}.</td>` +
               `<td style="padding-left:10pt">${si}</td>` +
               `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
-              `<td class="num">${it['satuan'] ?? '—'}</td><td class="num">${it['bobot'] ?? '—'}</td>` +
+              `<td class="num">${it['satuan'] ?? '—'}</td><td class="num">${bobotShare(it['bobot'], persenAgregasi) || '—'}</td>` +
               `<td class="rt">${it['target'] ?? '—'}</td><td class="rw">${it['target2'] ?? '—'}</td>` +
-              `<td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+              `<td class="num" style="font-size:7pt">${bidangLabel(bidang, persenAgregasi)}</td></tr>`;
           } else {
             rows += `<tr><td class="num">${n++}</td><td>${it['indikator'] ?? '—'}</td>` +
               `<td style="font-size:7pt;color:#444">${it['formula'] ?? '—'}</td>` +
-              `<td class="num">${it['satuan'] ?? '—'}</td><td class="num">${it['bobot'] ?? '—'}</td>` +
+              `<td class="num">${it['satuan'] ?? '—'}</td><td class="num">${bobotShare(it['bobot'], persenAgregasi) || '—'}</td>` +
               `<td class="rt">${it['target'] ?? '—'}</td><td class="rw">${it['target2'] ?? '—'}</td>` +
-              `<td class="num" style="font-size:7pt">${bidang}</td></tr>`;
+              `<td class="num" style="font-size:7pt">${bidangLabel(bidang, persenAgregasi)}</td></tr>`;
           }
         }
         if (rows === '') rows = `<tr><td class="num">—</td><td colspan="7" style="color:#999;font-style:italic">Tidak ada data KPI</td></tr>`;
