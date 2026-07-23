@@ -178,7 +178,12 @@ function DefinisiKpiTab({ onGoToDokumen }: { onGoToDokumen: () => void }) {
     setShowForm(true); setFormError(null);
   };
 
-  const addAssignment = () => setAssignments((prev) => [...prev, emptyAssignment()]);
+  const addAssignment = () => setAssignments((prev) => {
+    const next = [...prev, emptyAssignment()];
+    // Dari 1 assignment (Bobot Agregasi otomatis 100%) ke 2+ — reset ke kosong, wajib diisi
+    // manual (hindari asumsi split yang mungkin salah, mis. bila baris lama masih bernilai 100).
+    return prev.length === 1 ? next.map((a) => ({ ...a, persenAgregasi: 0 })) : next;
+  });
   const removeAssignment = (i: number) => setAssignments((prev) => (prev.length <= 1 ? prev : prev.filter((_, idx) => idx !== i)));
   const updateAssignment = (i: number, field: Exclude<keyof Assignment, 'persenAgregasi' | 'reviewerSlots'>, value: string) =>
     setAssignments((prev) => prev.map((a, idx) => (idx === i ? { ...a, [field]: value } : a)));
@@ -195,8 +200,11 @@ function DefinisiKpiTab({ onGoToDokumen }: { onGoToDokumen: () => void }) {
     const n = value === '' ? 0 : Number(value);
     setAssignments((prev) => prev.map((a, idx) => (idx === i ? { ...a, persenAgregasi: Number.isFinite(n) ? n : a.persenAgregasi } : a)));
   };
-  const totalPersenForm = assignments.reduce((s, a) => s + (a.persenAgregasi || 0), 0);
-  const anyPersenSet = assignments.some((a) => (a.persenAgregasi || 0) > 0);
+  // 1 assignment saja → tak ada yang perlu dibagi, Bobot Agregasi otomatis 100% (tak diminta
+  // diisi manual). Baru relevan & wajib diisi manual saat assignment-nya lebih dari satu.
+  const isSingleAssignment = assignments.length === 1;
+  const totalPersenForm = isSingleAssignment ? 100 : assignments.reduce((s, a) => s + (a.persenAgregasi || 0), 0);
+  const anyPersenSet = isSingleAssignment || assignments.some((a) => (a.persenAgregasi || 0) > 0);
 
   const fetchRollup = async (masterId: string) => {
     setRollupLoading(masterId);
@@ -232,8 +240,11 @@ function DefinisiKpiTab({ onGoToDokumen }: { onGoToDokumen: () => void }) {
     }
     setFormError(null); setBusy(true);
     try {
+      const assignmentsToSave = isSingleAssignment && aggregationMethod === 'weighted'
+        ? assignments.map((a) => ({ ...a, persenAgregasi: 100 }))
+        : assignments;
       await kpiMaster.save({
-        id: editingId ?? undefined, kmType, aggregationMethod, indikator: indikator.trim(), formula, satuan, bobotKm, targetParent, assignments,
+        id: editingId ?? undefined, kmType, aggregationMethod, indikator: indikator.trim(), formula, satuan, bobotKm, targetParent, assignments: assignmentsToSave,
         subIndicators: isComposite ? subIndicators : undefined,
       });
       resetForm();
@@ -424,7 +435,11 @@ function DefinisiKpiTab({ onGoToDokumen }: { onGoToDokumen: () => void }) {
               </div>
               <p style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-muted)', margin: '0 0 var(--space-2)' }}>
                 {aggregationMethod === 'weighted' ? (
-                  <><b>Bobot Agregasi</b>: persentase kontribusi realisasi tiap unit/bidang ke nilai KPI parent (rollup). Kosongkan semua bila belum dikonfigurasi, atau isi hingga total tepat 100%.</>
+                  isSingleAssignment ? (
+                    <>Hanya 1 assignment — <b>Bobot Agregasi</b> otomatis 100%, tak perlu diisi manual.</>
+                  ) : (
+                    <><b>Bobot Agregasi</b>: persentase kontribusi realisasi tiap unit/bidang ke nilai KPI parent (rollup). Kosongkan semua bila belum dikonfigurasi, atau isi hingga total tepat 100%.</>
+                  )
                 ) : (
                   <>Metode <b>SUM</b>: nilai parent = jumlah polos realisasi tiap unit/bidang (cocok untuk KPI penalti/pengurang lintas bidang). Tidak perlu Bobot Agregasi.</>
                 )}
@@ -435,7 +450,7 @@ function DefinisiKpiTab({ onGoToDokumen }: { onGoToDokumen: () => void }) {
                     <tr>
                       <th>Unit</th><th>Bidang</th><th>Penanggung Jawab</th>
                       <th>Target Sem I</th><th>Target {CURRENT_YEAR}</th>
-                      {aggregationMethod === 'weighted' && <th className="num">Bobot Agregasi (%)</th>}
+                      {aggregationMethod === 'weighted' && !isSingleAssignment && <th className="num">Bobot Agregasi (%)</th>}
                       <th style={{ width: 40 }} />
                     </tr>
                   </thead>
@@ -468,7 +483,7 @@ function DefinisiKpiTab({ onGoToDokumen }: { onGoToDokumen: () => void }) {
                             <input className="form-input form-input-sm" value={a.target2} onChange={(e) => updateAssignment(i, 'target2', e.target.value)} placeholder="Target tahun" />
                           )}
                         </td>
-                        {aggregationMethod === 'weighted' && (
+                        {aggregationMethod === 'weighted' && !isSingleAssignment && (
                           <td>
                             <input
                               type="number" min={0} max={100} step={1}
@@ -483,7 +498,7 @@ function DefinisiKpiTab({ onGoToDokumen }: { onGoToDokumen: () => void }) {
                       </tr>
                       </Fragment>
                     ))}
-                    {aggregationMethod === 'weighted' && anyPersenSet && (
+                    {aggregationMethod === 'weighted' && !isSingleAssignment && anyPersenSet && (
                       <tr style={{ background: 'var(--color-surface-2)' }}>
                         <td colSpan={5} style={{ textAlign: 'right', fontWeight: 700, fontSize: 'var(--text-xs)' }}>Total Bobot Agregasi:</td>
                         <td className="num" style={{ fontWeight: 700, color: Math.abs(totalPersenForm - 100) < 0.01 ? 'var(--color-success)' : 'var(--color-danger)' }}>

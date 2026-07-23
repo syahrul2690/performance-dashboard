@@ -492,10 +492,16 @@ export class KpiMasterService {
     // pakai persenAgregasi (Σ=100% wajib bila diisi) — perilaku Fase B, default.
     const aggregationMethod = dto.aggregationMethod === 'sum' ? 'sum' : 'weighted';
     if (aggregationMethod === 'weighted') {
-      const totalPersen = dto.assignments.reduce((s, a) => s + (Number(a.persenAgregasi) || 0), 0);
-      const anyPersenSet = dto.assignments.some((a) => Number(a.persenAgregasi) > 0);
-      if (anyPersenSet && Math.abs(totalPersen - 100) > 0.01) {
-        throw new BadRequestException(`Total bobot agregasi harus 100%, saat ini ${totalPersen}%`);
+      // 1 assignment saja → tak ada yang perlu dibagi, paksa 100% (tak bergantung pada apa
+      // yang dikirim klien — konsisten dengan default FE, sekaligus jaga-jaga klien lama/API langsung).
+      if (dto.assignments.length === 1) {
+        dto.assignments[0].persenAgregasi = 100;
+      } else {
+        const totalPersen = dto.assignments.reduce((s, a) => s + (Number(a.persenAgregasi) || 0), 0);
+        const anyPersenSet = dto.assignments.some((a) => Number(a.persenAgregasi) > 0);
+        if (anyPersenSet && Math.abs(totalPersen - 100) > 0.01) {
+          throw new BadRequestException(`Total bobot agregasi harus 100%, saat ini ${totalPersen}%`);
+        }
       }
     }
 
