@@ -1,6 +1,6 @@
 import { useEffect, useState, Fragment } from 'react';
 import { kpiMaster, inputKontrak } from '../lib/api';
-import type { ReviewerSlots } from '../lib/api';
+import type { ReviewerSlot, ReviewerSlots, SubIndicatorInput } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { usePeriod } from '../context/PeriodContext';
 import {
@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { SkeletonTable, EmptyState, ErrorState } from '../components/LoadState';
 import ReviewerPickerModal from '../components/ReviewerPickerModal';
+import type { ReviewerCandidate } from '../components/ReviewerPickerModal';
 import type { KontrakManajemen } from '../lib/types';
 
 const UNIT_OPTIONS = [
@@ -27,6 +28,7 @@ const BIDANG_OPTIONS = [
 const UPMK_BIDANG_OPTIONS = ['Bagian Pembangkit', 'Bagian Jaringan', 'Bagian KKU'];
 const bidangOptionsFor = (unitCode: string) => (unitCode === 'KP' ? BIDANG_OPTIONS : UPMK_BIDANG_OPTIONS);
 const CURRENT_YEAR = new Date().getFullYear();
+// KPI Master (definisi lintas-bidang/unit) dipersempit ke RPC — lihat kpi-master.service.ts save().
 const RPC_BIDANG = 'Perencanaan & Project Control';
 
 // ============================ Shell: Manajemen KPI (3 tab) ============================
@@ -92,7 +94,11 @@ type KpiMasterRow = {
   effectiveMonth: string; version: number; status: string; previousVersionId: string | null;
   isPending: boolean; isCurrent: boolean;
   aggregationMethod: 'weighted' | 'sum';
+  subIndicators: SubIndicatorInput[] | null;
 };
+const emptySubIndicator = (): SubIndicatorInput => ({ nama: '', satuan: '', bobot: '', target: '', target2: '', formula: '' });
+const ROLE_LABEL: Record<string, string> = { ASMAN: 'ASMAN', MANAJER: 'Manajer', SRMANAJER: 'Senior Manajer', GM: 'General Manager' };
+const candDesc = (c: ReviewerCandidate) => `${ROLE_LABEL[c.role] ?? c.role}${c.unit && c.unit !== 'KP' ? ' · ' + (UNIT_NAMES[c.unit] ?? c.unit) : ''}`;
 type RollupBreakdown = { unitCode: string; bidang: string; persenAgregasi: number; realisasi: number | null; kontribusi: number; hasData: boolean };
 type Rollup = {
   masterId: string; indikator: string; targetParent: string; periodId: string; periodLabel: string;
@@ -105,7 +111,8 @@ const emptyAssignment = (): Assignment => ({ unitCode: 'UPMK1', bidang: UPMK_BID
 function DefinisiKpiTab({ onGoToDokumen }: { onGoToDokumen: () => void }) {
   const { user } = useAuth();
   const { periodId } = usePeriod();
-  const canAuthor = user?.unit === 'KP';
+  const canAuthor = user?.role === 'GM' || user?.role === 'SUPERADMIN' || user?.role === 'DEVELOPER'
+    || (user?.unit === 'KP' && user?.bidang === RPC_BIDANG);
 
   const [masters, setMasters] = useState<KpiMasterRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -129,6 +136,17 @@ function DefinisiKpiTab({ onGoToDokumen }: { onGoToDokumen: () => void }) {
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // Sub-indikator (opt-in, generik) — KPI apa pun boleh ditandai "komposit" & diisi sub-indikator
+  // di sini; tidak dibatasi ke nama indikator tertentu. Non-kosong → bobotKm assignment jadi
+  // turunan (Σ bobot sub), realisasi diisi per-sub belakangan di Input Realisasi.
+  const [isComposite, setIsComposite] = useState(false);
+  const [subIndicators, setSubIndicators] = useState<SubIndicatorInput[]>([]);
+  const addSubIndicator = () => setSubIndicators((prev) => [...prev, emptySubIndicator()]);
+  const removeSubIndicator = (i: number) => setSubIndicators((prev) => prev.filter((_, idx) => idx !== i));
+  const updateSubIndicator = (i: number, field: keyof SubIndicatorInput, value: string) =>
+    setSubIndicators((prev) => prev.map((s, idx) => (idx === i ? { ...s, [field]: value } : s)));
+  const totalSubBobot = subIndicators.reduce((s, si) => s + (Number(String(si.bobot).replace(',', '.')) || 0), 0);
+
   const load = () => {
     setLoading(true);
     kpiMaster.list()
@@ -142,6 +160,7 @@ function DefinisiKpiTab({ onGoToDokumen }: { onGoToDokumen: () => void }) {
     setEditingId(null); setEditingIsPending(false); setKmType('draft'); setAggregationMethod('weighted');
     setIndikator(''); setFormula(''); setSatuan(''); setBobotKm('');
     setTargetParent(''); setAssignments([emptyAssignment()]); setFormError(null); setShowForm(false);
+    setIsComposite(false); setSubIndicators([]);
   };
 
   const handleEdit = (m: KpiMasterRow) => {
@@ -154,6 +173,8 @@ function DefinisiKpiTab({ onGoToDokumen }: { onGoToDokumen: () => void }) {
       reviewerSlots: a.reviewerSlots ?? null,
     })));
     setEditingIsPending(m.isPending);
+    setIsComposite(!!(m.subIndicators && m.subIndicators.length > 0));
+    setSubIndicators(m.subIndicators ? m.subIndicators.map((s) => ({ ...s })) : []);
     setShowForm(true); setFormError(null);
   };
 
@@ -198,10 +219,22 @@ function DefinisiKpiTab({ onGoToDokumen }: { onGoToDokumen: () => void }) {
       setFormError(`Total bobot agregasi harus 100%, saat ini ${totalPersenForm}%.`);
       return;
     }
+    if (isComposite) {
+      if (subIndicators.length === 0) { setFormError('Tambahkan minimal satu sub-indikator, atau matikan mode Komposit.'); return; }
+      const subNames = new Set<string>();
+      for (const s of subIndicators) {
+        if (!s.nama.trim()) { setFormError('Nama setiap sub-indikator wajib diisi.'); return; }
+        if (subNames.has(s.nama.trim())) { setFormError(`Sub-indikator "${s.nama}" terpilih ganda.`); return; }
+        subNames.add(s.nama.trim());
+        if (!s.bobot.trim() || Number(String(s.bobot).replace(',', '.')) <= 0) { setFormError(`Bobot sub-indikator "${s.nama}" harus angka > 0.`); return; }
+        if (!s.target.trim()) { setFormError(`Target sub-indikator "${s.nama}" wajib diisi.`); return; }
+      }
+    }
     setFormError(null); setBusy(true);
     try {
       await kpiMaster.save({
         id: editingId ?? undefined, kmType, aggregationMethod, indikator: indikator.trim(), formula, satuan, bobotKm, targetParent, assignments,
+        subIndicators: isComposite ? subIndicators : undefined,
       });
       resetForm();
       load();
@@ -313,7 +346,11 @@ function DefinisiKpiTab({ onGoToDokumen }: { onGoToDokumen: () => void }) {
               </div>
               <div>
                 <label className="form-label">Bobot KM (poin)</label>
-                <input className="form-input" value={bobotKm} onChange={(e) => setBobotKm(e.target.value)} placeholder="poin" />
+                {isComposite ? (
+                  <input className="form-input" value={totalSubBobot || 0} disabled title="Turunan — Σ bobot sub-indikator" />
+                ) : (
+                  <input className="form-input" value={bobotKm} onChange={(e) => setBobotKm(e.target.value)} placeholder="poin" />
+                )}
               </div>
               <div>
                 <label className="form-label">Target Gabungan (Parent)</label>
@@ -326,6 +363,57 @@ function DefinisiKpiTab({ onGoToDokumen }: { onGoToDokumen: () => void }) {
                 <option value="weighted">Rata-rata Tertimbang (KPI positif — pakai Bobot Agregasi %, total 100%)</option>
                 <option value="sum">Jumlah / SUM (KPI penalti-pengurang — tanpa syarat 100%)</option>
               </select>
+            </div>
+
+            {/* Sub-indikator (opt-in, generik) */}
+            <div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 'var(--text-sm)', fontWeight: 600 }}>
+                <input
+                  type="checkbox" checked={isComposite}
+                  onChange={(e) => { setIsComposite(e.target.checked); if (e.target.checked && subIndicators.length === 0) addSubIndicator(); }}
+                />
+                <Boxes size={14} /> KPI Komposit (punya sub-indikator)
+              </label>
+              <p style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-muted)', margin: '4px 0 0' }}>
+                Aktifkan bila indikator ini terdiri dari beberapa sub-indikator bernama (mis. "Pengendalian
+                Anggaran" = OPEX + Investasi; "Kepatuhan, Maturity Level & Tata Kelola" = SMAP + ESG + GCG).
+                Bisa dipakai untuk KPI apa pun — nilai induk = jumlah nilai tiap sub, bobot KM tiap assignment
+                jadi otomatis (Σ bobot sub).
+              </p>
+              {isComposite && (
+                <div className="table-wrap" style={{ marginTop: 'var(--space-2)' }}>
+                  <table className="data-table compact">
+                    <thead>
+                      <tr>
+                        <th>Nama Sub-Indikator</th><th>Formula / Cara Pengukuran</th><th>Satuan</th>
+                        <th className="num">Bobot (poin)</th><th>Target Sem I</th><th>Target {CURRENT_YEAR}</th>
+                        <th style={{ width: 40 }} />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {subIndicators.map((s, i) => (
+                        <tr key={i}>
+                          <td><input className="form-input form-input-sm" value={s.nama} onChange={(e) => updateSubIndicator(i, 'nama', e.target.value)} placeholder="mis. OPEX vs RKAP" /></td>
+                          <td><input className="form-input form-input-sm" value={s.formula ?? ''} onChange={(e) => updateSubIndicator(i, 'formula', e.target.value)} placeholder="Rumus / cara pengukuran sub ini" /></td>
+                          <td><input className="form-input form-input-sm" value={s.satuan ?? ''} onChange={(e) => updateSubIndicator(i, 'satuan', e.target.value)} placeholder="%, Rp M, dsb" /></td>
+                          <td><input className="form-input form-input-sm" style={{ textAlign: 'center' }} value={s.bobot} onChange={(e) => updateSubIndicator(i, 'bobot', e.target.value)} placeholder="poin" /></td>
+                          <td><input className="form-input form-input-sm" value={s.target} onChange={(e) => updateSubIndicator(i, 'target', e.target.value)} placeholder="Target Sem I" /></td>
+                          <td><input className="form-input form-input-sm" value={s.target2 ?? ''} onChange={(e) => updateSubIndicator(i, 'target2', e.target.value)} placeholder="Target tahun" /></td>
+                          <td>
+                            <button className="btn btn-ghost btn-sm" disabled={subIndicators.length <= 1} onClick={() => removeSubIndicator(i)} style={{ color: 'var(--color-danger)' }}><Trash2 size={13} /></button>
+                          </td>
+                        </tr>
+                      ))}
+                      <tr style={{ background: 'var(--color-surface-2)' }}>
+                        <td colSpan={3} style={{ textAlign: 'right', fontWeight: 700, fontSize: 'var(--text-xs)' }}>Total Bobot (= Bobot KM assignment):</td>
+                        <td className="num" style={{ fontWeight: 700 }}>{totalSubBobot || 0}</td>
+                        <td colSpan={3} />
+                      </tr>
+                    </tbody>
+                  </table>
+                  <button className="btn btn-ghost btn-sm" onClick={addSubIndicator} style={{ marginTop: 4 }}><Plus size={12} /> Tambah Sub-Indikator</button>
+                </div>
+              )}
             </div>
 
             {/* Assignments */}
@@ -366,8 +454,20 @@ function DefinisiKpiTab({ onGoToDokumen }: { onGoToDokumen: () => void }) {
                           </select>
                         </td>
                         <td><input className="form-input form-input-sm" value={a.holder} onChange={(e) => updateAssignment(i, 'holder', e.target.value)} placeholder="Nama PJ" /></td>
-                        <td><input className="form-input form-input-sm" value={a.target} onChange={(e) => updateAssignment(i, 'target', e.target.value)} placeholder="Target Sem I" /></td>
-                        <td><input className="form-input form-input-sm" value={a.target2} onChange={(e) => updateAssignment(i, 'target2', e.target.value)} placeholder="Target tahun" /></td>
+                        <td>
+                          {isComposite ? (
+                            <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }} title="Komposit — target diisi per sub-indikator">— (per sub)</span>
+                          ) : (
+                            <input className="form-input form-input-sm" value={a.target} onChange={(e) => updateAssignment(i, 'target', e.target.value)} placeholder="Target Sem I" />
+                          )}
+                        </td>
+                        <td>
+                          {isComposite ? (
+                            <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>— (per sub)</span>
+                          ) : (
+                            <input className="form-input form-input-sm" value={a.target2} onChange={(e) => updateAssignment(i, 'target2', e.target.value)} placeholder="Target tahun" />
+                          )}
+                        </td>
                         {aggregationMethod === 'weighted' && (
                           <td>
                             <input
@@ -432,6 +532,11 @@ function DefinisiKpiTab({ onGoToDokumen }: { onGoToDokumen: () => void }) {
                         {m.aggregationMethod === 'sum' && (
                           <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, color: 'var(--color-text-muted)', border: '1px solid var(--color-border)', borderRadius: 4, padding: '1px 4px' }} title="Metode agregasi: SUM (jumlah polos)">
                             Σ SUM
+                          </span>
+                        )}
+                        {m.subIndicators && m.subIndicators.length > 0 && (
+                          <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, color: 'var(--color-accent)', border: '1px solid var(--color-accent)', borderRadius: 4, padding: '1px 4px' }} title={`Komposit — ${m.subIndicators.length} sub-indikator`}>
+                            Komposit ({m.subIndicators.length})
                           </span>
                         )}
                       </td>
@@ -588,7 +693,11 @@ function DokumenKmTab() {
 
   const myBidang = user?.bidang ?? null;
   const myUnit = user?.unit ?? null;
-  const canSeeAllKm = user?.role === 'GM';
+  // RPC (pemilik definisi KPI Master lintas-bidang) & Admin bisa MELIHAT semua dokumen KM —
+  // meniru pola yang sudah otomatis benar utk UPMK (fan-out RPC selalu terlihat submitter-nya
+  // sendiri). Ini hanya visibility; tombol aksi/submit tetap dijaga terpisah oleh canActOnRow().
+  const canSeeAllKm = user?.role === 'GM' || user?.role === 'SUPERADMIN' || user?.role === 'DEVELOPER'
+    || (user?.unit === 'KP' && user?.bidang === RPC_BIDANG);
   // Kirim dokumen KM hanya wewenang PIC Kinerja (Staff RPC) — penyusun dokumen hasil fan-out
   // (via Definisi KPI, juga RPC-only), berlaku lintas semua bidang. PIC bidang/bagian terkait
   // hanya melihat status dokumennya, tidak dapat mengirim.
@@ -644,11 +753,11 @@ function DokumenKmTab() {
       setDefaultReviewers({ checkerIds: [], approverId: null });
     }
   };
-  const handleConfirmSubmit = async (checkerIds: string[], approverId: string) => {
+  const handleConfirmSubmit = async (checkerIds: string[], approverIds: string[]) => {
     if (!submitTargetId) return;
     setSubmitting(true);
     try {
-      await inputKontrak.submit(submitTargetId, checkerIds, approverId);
+      await inputKontrak.submit(submitTargetId, checkerIds, approverIds);
       setSubmitTargetId(null);
       setSubmitted(true);
       await loadData();
@@ -669,7 +778,7 @@ function DokumenKmTab() {
     for (const k of readyDocs) {
       const d = docDefaults[k.id];
       if (!d || d.checkerIds.length === 0 || !d.approverId) { fail++; continue; }
-      try { await inputKontrak.submit(k.id, d.checkerIds, d.approverId); ok++; }
+      try { await inputKontrak.submit(k.id, d.checkerIds, [d.approverId]); ok++; }
       catch { fail++; }
     }
     await loadData();
@@ -868,7 +977,8 @@ function DokumenKmTab() {
         onConfirm={handleConfirmSubmit}
         onCancel={() => setSubmitTargetId(null)}
         initialCheckerIds={defaultReviewers.checkerIds}
-        initialApproverId={defaultReviewers.approverId ?? undefined}
+        initialApproverIds={defaultReviewers.approverId ? [defaultReviewers.approverId] : undefined}
+        bidang={kontrakList.find((k) => k.id === submitTargetId)?.bidang}
       />
     </>
   );

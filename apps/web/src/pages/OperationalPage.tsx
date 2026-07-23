@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Fragment } from 'react';
 import { operational, kinerja } from '../lib/api';
 import { usePeriod } from '../context/PeriodContext';
 import { Target, ShieldAlert, ClipboardCheck, GitCompare } from 'lucide-react';
@@ -9,11 +9,15 @@ interface RekapKpi { indikator: string; satuan: string; bobot: number; target: n
 interface RekapUnit { code: string; name: string; score: number; status: string; kpis: RekapKpi[]; }
 interface Rekap { hasData: boolean; overall: number | null; units: RekapUnit[]; }
 
+// Sub-indikator KPI komposit (opt-in, generik) — lihat common/capaian.ts breakdownComposite.
+type SubBreakdownItem = { nama: string; satuan: string; bobot: number; target: number; actual: number; capaian: number; nilai: number; formula?: string };
+
 type Kpi = {
   id: string; no?: string; label?: string; name?: string; indikator?: string; formula?: string;
   target: number; actual?: number; realisasi?: number; bobot: number;
   achievement?: number; nilai?: number; status: string; satuan?: string; unit?: string;
   polarity?: string; polaritas?: string; ytd?: boolean; note?: string; commentary?: string;
+  subBreakdown?: SubBreakdownItem[]; // non-kosong = KPI ini komposit (bobot/nilai turunan dari sub)
 };
 
 type Summary = {
@@ -146,16 +150,25 @@ export function OperationalPage() {
               const actual = k.actual ?? k.realisasi ?? 0;
               const ach = k.achievement ?? (k.target ? (actual / k.target) * 100 : 0);
               const nilai = k.nilai ?? 0;
+              const isComposite = !!k.subBreakdown && k.subBreakdown.length > 0;
               return (
-                <tr key={i}>
+                <Fragment key={i}>
+                <tr>
                   <td style={{ color: 'var(--color-text-muted)' }}>{k.no ?? k.id}</td>
                   <td>
-                    <div style={{ fontWeight: 600, color: 'var(--color-text)', fontSize: 'var(--text-xs)' }}>{k.name ?? k.label}</div>
+                    <div style={{ fontWeight: 600, color: 'var(--color-text)', fontSize: 'var(--text-xs)' }}>
+                      {k.name ?? k.label}
+                      {isComposite && (
+                        <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, color: 'var(--color-accent)', border: '1px solid var(--color-accent)', borderRadius: 4, padding: '1px 4px' }} title={`Komposit — ${k.subBreakdown!.length} sub-indikator`}>
+                          Komposit
+                        </span>
+                      )}
+                    </div>
                     {(k.formula ?? k.commentary) && <div style={{ fontSize: 10, color: 'var(--color-text-subtle)', marginTop: 2 }}>{k.formula ?? k.commentary}</div>}
                   </td>
                   <td style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>{k.satuan ?? k.unit ?? '—'}</td>
-                  <td className="num">{fmt(k.target, 1)}</td>
-                  <td className="num" style={{ fontWeight: 700 }}>{fmt(actual, 2)}</td>
+                  <td className="num">{isComposite ? '—' : fmt(k.target, 1)}</td>
+                  <td className="num" style={{ fontWeight: 700 }}>{isComposite ? '—' : fmt(actual, 2)}</td>
                   <td className="num">{k.bobot}</td>
                   <td className={`num ${ach >= 100 ? 'delta-positive' : ach >= 90 ? '' : 'delta-negative'}`} style={{ fontWeight: 700 }}>
                     {fmt(ach, 1)}%
@@ -163,6 +176,23 @@ export function OperationalPage() {
                   <td className="num" style={{ fontWeight: 700 }}>{fmt(nilai, 2)}</td>
                   <td>{statusPill(k.status)}</td>
                 </tr>
+                {isComposite && k.subBreakdown!.map((si, j) => (
+                  <tr key={`${i}.${j}`} style={{ background: 'var(--color-surface-2)' }}>
+                    <td />
+                    <td style={{ paddingLeft: 'var(--space-4)' }}>
+                      <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>↳ {si.nama}</span>
+                      {si.formula && <div style={{ fontSize: 10, color: 'var(--color-text-subtle)', marginTop: 2, paddingLeft: 12 }}>{si.formula}</div>}
+                    </td>
+                    <td style={{ color: 'var(--color-text-muted)' }}>{si.satuan || '—'}</td>
+                    <td className="num">{fmt(si.target, 1)}</td>
+                    <td className="num">{fmt(si.actual, 2)}</td>
+                    <td className="num">{si.bobot}</td>
+                    <td className={`num ${si.capaian >= 100 ? 'delta-positive' : si.capaian >= 90 ? '' : 'delta-negative'}`}>{fmt(si.capaian, 1)}%</td>
+                    <td className="num">{fmt(si.nilai, 2)}</td>
+                    <td />
+                  </tr>
+                ))}
+                </Fragment>
               );
             })}
           </tbody>

@@ -16,11 +16,16 @@ const BIDANG_SORT: Record<string, number> = {
   'Bagian Pembangkit': 0, 'Bagian Jaringan': 1, 'Bagian KKU': 2,
 };
 
+// Sub-indikator KPI komposit (opt-in, generik) — lihat kpi-master.service.ts SubIndicatorInput.
+// Definisi target/bobot dari dokumen KM; `realisasi` diisi di sini saat submit.
+type SubIndicatorItem = { nama: string; satuan?: string; bobot: string; target: string; target2?: string; realisasi?: number | string; formula?: string };
+
 type KpiItem = {
   no?: number; indikator?: string; formula?: string; satuan?: string;
   bobot?: number | string; target?: number | string; target2?: number | string;
   bidang?: string; realisasi?: number | string;
   masterKpiId?: string; // tautan ke KpiAssignment untuk resolusi living target (KM Sementara)
+  subIndicators?: SubIndicatorItem[]; // non-kosong = item ini "komposit" — realisasi diisi per-sub
 };
 
 // Fase 5: RevisionLog field='values' menyimpan seluruh blob values lama/baru — tampilkan
@@ -191,7 +196,7 @@ export function InputRealisasiPage() {
     setPickerOpen(true);
   };
 
-  const handleConfirmSubmit = async (checkerIds: string[], approverId: string) => {
+  const handleConfirmSubmit = async (checkerIds: string[], approverIds: string[]) => {
     if (!user) return;
     setSubmitting(true);
     try {
@@ -202,10 +207,19 @@ export function InputRealisasiPage() {
         const b = kpi.bidang ?? '';
         if (!byBidang.has(b)) byBidang.set(b, {});
         const bucket = byBidang.get(b)!;
-        bucket[`kpi_${i}`] = { ...kpi, realisasi: values[String(i)] ?? '' };
+        // Item komposit: realisasi diisi PER SUB-INDIKATOR (bukan satu angka induk) — nilai
+        // induk digulung server-side dari sub (lihat common/capaian.ts scoreCompositeItem).
+        if (kpi.subIndicators && kpi.subIndicators.length > 0) {
+          bucket[`kpi_${i}`] = {
+            ...kpi,
+            subIndicators: kpi.subIndicators.map((si, j) => ({ ...si, realisasi: values[`${i}.${j}`] ?? '' })),
+          };
+        } else {
+          bucket[`kpi_${i}`] = { ...kpi, realisasi: values[String(i)] ?? '' };
+        }
       });
       for (const [bidang, payload] of byBidang) {
-        await inputRealisasi.submit(selectedUnit, bidang, payload, checkerIds, approverId, selectedPeriodId);
+        await inputRealisasi.submit(selectedUnit, bidang, payload, checkerIds, approverIds, selectedPeriodId);
       }
       setPickerOpen(false);
       setSubmitted(true);
@@ -244,7 +258,13 @@ export function InputRealisasiPage() {
 
   if (error && kpiList.length === 0) return <ErrorState title="Gagal memuat data" message={error} />;
 
-  const filledCount = Object.values(values).filter(v => v.trim() !== '').length;
+  // Item komposit terisi bila SETIDAKNYA satu sub-indikatornya sudah diisi (konsisten dgn
+  // longgarnya cek item biasa — belum wajib semua sub terisi untuk terhitung "disentuh").
+  const isItemFilled = (kpi: KpiItem, i: number): boolean =>
+    kpi.subIndicators && kpi.subIndicators.length > 0
+      ? kpi.subIndicators.some((_, j) => (values[`${i}.${j}`] ?? '').trim() !== '')
+      : (values[String(i)] ?? '').trim() !== '';
+  const filledCount = kpiList.reduce((n, kpi, i) => n + (isItemFilled(kpi, i) ? 1 : 0), 0);
   const completionPct = kpiList.length > 0 ? Math.round((filledCount / kpiList.length) * 100) : 0;
   const selectedPeriod = periods.find((p) => p.id === selectedPeriodId);
   const selectedPeriodLabel = selectedPeriod?.label ?? 'Tahun Berjalan';
@@ -412,19 +432,27 @@ export function InputRealisasiPage() {
               </thead>
               <tbody>
                 {kpiList.map((kpi, i) => {
-                  const val = values[String(i)] ?? '';
-                  const hasVal = val.trim() !== '';
+                  const isComposite = !!kpi.subIndicators && kpi.subIndicators.length > 0;
+                  const hasVal = isItemFilled(kpi, i);
                   const lt = livingTargetFor(kpi);
                   return (
-                    <tr key={i} style={{ background: hasVal ? 'rgba(34,197,94,0.03)' : 'transparent' }}>
+                    <Fragment key={i}>
+                    <tr style={{ background: hasVal ? 'rgba(34,197,94,0.03)' : 'transparent' }}>
                       <td style={{ color: 'var(--color-text-muted)' }}>{kpi.no ?? i + 1}</td>
                       <td style={{ fontSize: 11, color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>{kpi.bidang ?? '—'}</td>
-                      <td style={{ maxWidth: 220, fontWeight: 500 }}>{kpi.indikator ?? '—'}</td>
+                      <td style={{ maxWidth: 220, fontWeight: 500 }}>
+                        {kpi.indikator ?? '—'}
+                        {isComposite && (
+                          <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, color: 'var(--color-accent)', border: '1px solid var(--color-accent)', borderRadius: 4, padding: '1px 4px' }} title="Komposit — isi realisasi per sub-indikator di bawah">
+                            Komposit
+                          </span>
+                        )}
+                      </td>
                       <td style={{ fontSize: 10, color: 'var(--color-text-muted)', maxWidth: 200 }}>{kpi.formula ?? '—'}</td>
                       <td style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>{kpi.satuan ?? '—'}</td>
                       <td className="num" style={{ fontWeight: 700, color: 'var(--color-accent)' }}>{kpi.bobot ?? '—'}</td>
-                      <td className="num">{kpi.target ?? '—'}</td>
-                      <td className="num">{kpi.target2 ?? '—'}</td>
+                      <td className="num">{isComposite ? '— (per sub)' : (kpi.target ?? '—')}</td>
+                      <td className="num">{isComposite ? '— (per sub)' : (kpi.target2 ?? '—')}</td>
                       {anyLivingTarget && (
                         <td className="num" style={{ whiteSpace: 'nowrap' }}>
                           {lt ? (
@@ -442,17 +470,51 @@ export function InputRealisasiPage() {
                       )}
                       <td style={{ minWidth: 140 }}>
                         {formOpen ? (
-                          <input
-                            type="text"
-                            className="form-input form-input-sm"
-                            style={{ borderColor: hasVal ? 'rgba(34,197,94,0.5)' : undefined }}
-                            value={val}
-                            onChange={e => setValues(v => ({ ...v, [String(i)]: e.target.value }))}
-                            placeholder={`Target: ${kpi.target ?? '—'}`}
-                          />
+                          isComposite ? (
+                            <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>Isi di bawah ↓</span>
+                          ) : (
+                            <input
+                              type="text"
+                              className="form-input form-input-sm"
+                              style={{ borderColor: hasVal ? 'rgba(34,197,94,0.5)' : undefined }}
+                              value={values[String(i)] ?? ''}
+                              onChange={e => setValues(v => ({ ...v, [String(i)]: e.target.value }))}
+                              placeholder={`Target: ${kpi.target ?? '—'}`}
+                            />
+                          )
                         ) : <span style={{ color: 'var(--color-text-subtle)' }}>—</span>}
                       </td>
                     </tr>
+                    {isComposite && kpi.subIndicators!.map((si, j) => {
+                      const subVal = values[`${i}.${j}`] ?? '';
+                      const subHasVal = subVal.trim() !== '';
+                      return (
+                        <tr key={`${i}.${j}`} style={{ background: subHasVal ? 'rgba(34,197,94,0.03)' : 'var(--color-surface-2)' }}>
+                          <td />
+                          <td />
+                          <td style={{ paddingLeft: 'var(--space-4)', fontSize: 12, color: 'var(--color-text-muted)' }}>↳ {si.nama}</td>
+                          <td style={{ fontSize: 10, color: 'var(--color-text-muted)', maxWidth: 200 }}>{si.formula ?? '—'}</td>
+                          <td style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>{si.satuan ?? '—'}</td>
+                          <td className="num">{si.bobot}</td>
+                          <td className="num">{si.target}</td>
+                          <td className="num">{si.target2 ?? '—'}</td>
+                          {anyLivingTarget && <td />}
+                          <td style={{ minWidth: 140 }}>
+                            {formOpen ? (
+                              <input
+                                type="text"
+                                className="form-input form-input-sm"
+                                style={{ borderColor: subHasVal ? 'rgba(34,197,94,0.5)' : undefined }}
+                                value={subVal}
+                                onChange={e => setValues(v => ({ ...v, [`${i}.${j}`]: e.target.value }))}
+                                placeholder={`Target: ${si.target ?? '—'}`}
+                              />
+                            ) : <span style={{ color: 'var(--color-text-subtle)' }}>{subVal || '—'}</span>}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    </Fragment>
                   );
                 })}
               </tbody>
@@ -618,6 +680,7 @@ export function InputRealisasiPage() {
         fetchCandidates={() => inputRealisasi.reviewerCandidates(selectedUnit, kpiList[0]?.bidang)}
         onConfirm={handleConfirmSubmit}
         onCancel={() => setPickerOpen(false)}
+        bidang={user?.bidang ?? undefined}
       />
     </div>
   );
