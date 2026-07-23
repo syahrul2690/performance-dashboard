@@ -19,7 +19,7 @@ function SlaBadge({ days }: { days?: number | null }) {
   const color = overdue ? 'var(--color-danger)' : urgent ? 'var(--color-warning)' : 'var(--color-success)';
   const bg = overdue ? 'var(--color-danger-tint)' : urgent ? 'var(--color-warning-tint)' : 'var(--color-success-tint)';
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 700, color, background: bg, padding: '2px 8px', borderRadius: 8, whiteSpace: 'nowrap' }}>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 700, color, background: bg, padding: '2px 8px', borderRadius: 8, whiteSpace: 'nowrap' }}>
       <Timer size={11} />
       {overdue ? `Telat ${Math.abs(days)} hari` : days === 0 ? 'Jatuh tempo hari ini' : `${days} hari lagi`}
     </span>
@@ -110,11 +110,11 @@ const ACTION_LABEL: Record<string, string> = {
 };
 function ApprovalTimeline({ history }: { history: unknown }) {
   const entries = Array.isArray(history) ? (history as HistEntry[]) : [];
-  if (entries.length === 0) return <div style={{ fontSize: 11, color: 'var(--color-text-muted)', padding: 'var(--space-3)' }}>Belum ada riwayat persetujuan.</div>;
+  if (entries.length === 0) return <div style={{ fontSize: 13, color: 'var(--color-text-muted)', padding: 'var(--space-3)' }}>Belum ada riwayat persetujuan.</div>;
   return (
     <div style={{ padding: 'var(--space-3) var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
       {entries.map((e, i) => (
-        <div key={i} style={{ display: 'flex', gap: 'var(--space-3)', fontSize: 11, alignItems: 'flex-start' }}>
+        <div key={i} style={{ display: 'flex', gap: 'var(--space-3)', fontSize: 13, alignItems: 'flex-start' }}>
           <MessageSquare size={12} style={{ marginTop: 2, color: 'var(--color-text-muted)', flexShrink: 0 }} />
           <div>
             <div style={{ fontWeight: 600 }}>
@@ -1290,7 +1290,7 @@ export function ApprovalsPage() {
                     return (
                       <Fragment key={k.id}>
                         <tr>
-                          <td><span className="status-pill" style={{ fontSize: 9, background: 'var(--color-accent-tint)', color: 'var(--color-accent)', fontWeight: 700 }}>KM Sementara</span></td>
+                          <td><span className="status-pill" style={{ fontSize: 11, background: 'var(--color-accent-tint)', color: 'var(--color-accent)', fontWeight: 700 }}>KM Sementara</span></td>
                           <td style={{ fontWeight: 600 }}>{UNIT_NAMES[k.unitCode] ?? k.unitCode}</td>
                           <td>{k.bidang}</td>
                           <td style={{ color: 'var(--color-text-muted)' }}>{k.submitter}</td>
@@ -1306,14 +1306,14 @@ export function ApprovalsPage() {
                             <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 3 }}>
                               {ksteps.map((_, idx) => (
                                 <div key={idx} title={ksteps[idx]?.label} style={{
-                                  width: 16, height: 16, borderRadius: '50%', fontSize: 8, fontWeight: 700,
+                                  width: 16, height: 16, borderRadius: '50%', fontSize: 10, fontWeight: 700,
                                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                                   background: idx < kci ? 'var(--color-success)' : idx === kci ? 'var(--color-accent)' : 'var(--color-surface-2)',
                                   color: idx <= kci ? '#fff' : 'var(--color-text-muted)',
                                 }}>{idx < kci ? '✓' : idx + 1}</div>
                               ))}
                             </div>
-                            <div style={{ fontSize: 10, color: 'var(--color-accent)', fontWeight: 600 }}>
+                            <div style={{ fontSize: 12, color: 'var(--color-accent)', fontWeight: 600 }}>
                               Langkah {kci}/{ksteps.length - 1}: {kk.stepLabel ?? ksteps[kci]?.label ?? '—'}
                             </div>
                           </td>
@@ -1429,9 +1429,9 @@ export function ApprovalsPage() {
                     return (
                       <Fragment key={rl.id}>
                         <tr>
-                          <td><span className="status-pill" style={{ fontSize: 9, background: 'var(--color-info-tint)', color: 'var(--color-info)', fontWeight: 700 }}>Realisasi</span></td>
+                          <td><span className="status-pill" style={{ fontSize: 11, background: 'var(--color-info-tint)', color: 'var(--color-info)', fontWeight: 700 }}>Realisasi</span></td>
                           <td style={{ fontWeight: 600 }}>{UNIT_NAMES[rl.unitCode] ?? rl.unitCode}</td>
-                          <td style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{(rl as RealisasiKinerja & { bidang?: string }).bidang ?? '—'}</td>
+                          <td style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>{(rl as RealisasiKinerja & { bidang?: string }).bidang ?? '—'}</td>
                           <td style={{ color: 'var(--color-text-muted)' }}>{rl.submitter}</td>
                           <td>
                             <button className="btn btn-ghost btn-sm" onClick={() => setRealExpanded(realExpanded === rl.id ? null : rl.id)}>
@@ -1442,14 +1442,14 @@ export function ApprovalsPage() {
                             <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 3 }}>
                               {steps.map((_, idx) => (
                                 <div key={idx} title={steps[idx]?.label} style={{
-                                  width: 16, height: 16, borderRadius: '50%', fontSize: 8, fontWeight: 700,
+                                  width: 16, height: 16, borderRadius: '50%', fontSize: 10, fontWeight: 700,
                                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                                   background: idx < ci ? 'var(--color-success)' : idx === ci ? 'var(--color-info)' : 'var(--color-surface-2)',
                                   color: idx <= ci ? '#fff' : 'var(--color-text-muted)',
                                 }}>{idx < ci ? '✓' : idx + 1}</div>
                               ))}
                             </div>
-                            <div style={{ fontSize: 10, color: 'var(--color-info)', fontWeight: 600 }}>
+                            <div style={{ fontSize: 12, color: 'var(--color-info)', fontWeight: 600 }}>
                               Langkah {ci}/{stepCount - 1}: {rr.stepLabel ?? steps[ci]?.label ?? '—'}
                             </div>
                           </td>
@@ -1551,11 +1551,11 @@ export function ApprovalsPage() {
                   <div key={rl.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--space-2) var(--space-4)' }}>
                       <div style={{ fontSize: 'var(--text-sm)' }}>
-                        <span className="status-pill" style={{ fontSize: 9, marginRight: 6, background: 'var(--color-surface-2)' }}>
+                        <span className="status-pill" style={{ fontSize: 11, marginRight: 6, background: 'var(--color-surface-2)' }}>
                           {periods.find((p) => p.id === rl.periodId)?.label ?? rl.periodId}
                         </span>
                         <b>{UNIT_NAMES[rl.unitCode] ?? rl.unitCode}</b> — {bidang} <span style={{ color: 'var(--color-text-muted)' }}>· {rl.submitter}</span>
-                        {rl.reviewNote && <div style={{ fontSize: 10, color: 'var(--color-danger)', marginTop: 2 }}>Alasan reviewer: {rl.reviewNote}</div>}
+                        {rl.reviewNote && <div style={{ fontSize: 12, color: 'var(--color-danger)', marginTop: 2 }}>Alasan reviewer: {rl.reviewNote}</div>}
                       </div>
                       <button className="btn btn-ghost btn-sm" onClick={() => { setTfxExpanded(open ? null : rl.id); setTfxValues({}); setTfxNote(''); }}>
                         {open ? 'Tutup' : 'Koreksi Target'} <ChevronDown size={12} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />
@@ -1575,7 +1575,7 @@ export function ApprovalsPage() {
                               return (
                                 <tr key={idx}>
                                   <td style={{ maxWidth: 240 }}>{String(it['indikator'] ?? '—')}</td>
-                                  <td className="num">{pt ? pt.target : <span style={{ color: 'var(--color-text-subtle)' }} title="KPI tanpa assignment KM Sementara (legacy)">—</span>}{pt?.frozen && <span style={{ marginLeft: 4, fontSize: 9, color: 'var(--color-text-muted)' }}>(beku)</span>}</td>
+                                  <td className="num">{pt ? pt.target : <span style={{ color: 'var(--color-text-subtle)' }} title="KPI tanpa assignment KM Sementara (legacy)">—</span>}{pt?.frozen && <span style={{ marginLeft: 4, fontSize: 11, color: 'var(--color-text-muted)' }}>(beku)</span>}</td>
                                   <td className="num">{String(it['realisasi'] ?? '—')}</td>
                                   <td className="num">
                                     {editable ? (
@@ -1656,10 +1656,10 @@ export function ApprovalsPage() {
                 {kmBundleKP.components.map((c) => (
                   <Fragment key={c.id}>
                     <tr>
-                      <td style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{c.bidang}</td>
+                      <td style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>{c.bidang}</td>
                       <td style={{ color: 'var(--color-text-muted)' }}>{c.submitter}</td>
                       <td>
-                        <span className={`status-pill ${c.status === 'approved' ? 'completed' : c.status === 'ready' ? 'at-risk' : 'in-review'}`} style={{ fontSize: 10 }}>
+                        <span className={`status-pill ${c.status === 'approved' ? 'completed' : c.status === 'ready' ? 'at-risk' : 'in-review'}`} style={{ fontSize: 12 }}>
                           {c.status === 'ready' ? 'Siap (lolos SM RPC)' : c.status === 'approved' ? 'Disahkan GM' : c.status === 'submitted' ? 'Dalam proses review' : c.status}
                         </span>
                       </td>
@@ -1673,7 +1673,7 @@ export function ApprovalsPage() {
                     {kmBundleExpanded === c.id && (
                       <tr>
                         <td colSpan={4} style={{ background: 'var(--color-surface-2)', padding: 0 }}>
-                          <div style={{ padding: 'var(--space-2) var(--space-3)', fontSize: 11, color: 'var(--color-text-muted)' }}>
+                          <div style={{ padding: 'var(--space-2) var(--space-3)', fontSize: 13, color: 'var(--color-text-muted)' }}>
                             Penanggung Jawab: <strong style={{ color: 'var(--color-text)' }}>{c.holder ?? '—'}</strong>
                           </div>
                           <table className="data-table compact" style={{ margin: 0 }}>
@@ -1764,16 +1764,16 @@ export function ApprovalsPage() {
                             {UNIT_NAMES[unitCode] ?? unitCode}
                           </button>
                         </td>
-                        <td><span className={`status-pill ${aggregateCls}`} style={{ fontSize: 10 }}>{aggregateLabel}</span></td>
-                        <td style={{ color: 'var(--color-text-muted)', fontSize: 11 }}>{items.length} bidang</td>
+                        <td><span className={`status-pill ${aggregateCls}`} style={{ fontSize: 12 }}>{aggregateLabel}</span></td>
+                        <td style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>{items.length} bidang</td>
                       </tr>
                       {isOpen && sortByBidang(items).map((c) => (
                         <Fragment key={c.id}>
                           <tr style={{ background: 'var(--color-surface-2)' }}>
                             <td style={{ paddingLeft: 'var(--space-5)' }} />
-                            <td style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{c.bidang} · {c.submitter}</td>
+                            <td style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>{c.bidang} · {c.submitter}</td>
                             <td>
-                              <span className={`status-pill ${c.status === 'approved' ? 'completed' : c.status === 'ready' ? 'at-risk' : 'in-review'}`} style={{ fontSize: 10 }}>
+                              <span className={`status-pill ${c.status === 'approved' ? 'completed' : c.status === 'ready' ? 'at-risk' : 'in-review'}`} style={{ fontSize: 12 }}>
                                 {c.status === 'ready' ? 'Siap' : c.status === 'approved' ? 'Disahkan GM' : 'Dalam review'}
                               </span>
                             </td>
@@ -1787,7 +1787,7 @@ export function ApprovalsPage() {
                           {kmBundleExpanded === c.id && (
                             <tr>
                               <td colSpan={4} style={{ background: 'var(--color-surface-2)', padding: 0 }}>
-                                <div style={{ padding: 'var(--space-2) var(--space-3)', fontSize: 11, color: 'var(--color-text-muted)' }}>
+                                <div style={{ padding: 'var(--space-2) var(--space-3)', fontSize: 13, color: 'var(--color-text-muted)' }}>
                                   Penanggung Jawab: <strong style={{ color: 'var(--color-text)' }}>{c.holder ?? '—'}</strong>
                                 </div>
                                 <table className="data-table compact" style={{ margin: 0 }}>
@@ -1964,10 +1964,10 @@ export function ApprovalsPage() {
                 {bundle.components.filter((c) => c.unitCode === 'KP').map((c) => (
                   <tr key={c.id}>
                     <td style={{ fontWeight: 600 }}>{UNIT_NAMES[c.unitCode] ?? c.unitCode}</td>
-                    <td style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{c.bidang}</td>
+                    <td style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>{c.bidang}</td>
                     <td style={{ color: 'var(--color-text-muted)' }}>{c.submitter}</td>
                     <td>
-                      <span className={`status-pill ${c.status === 'approved' ? 'completed' : c.status === 'ready' ? 'at-risk' : 'in-review'}`} style={{ fontSize: 10 }}>
+                      <span className={`status-pill ${c.status === 'approved' ? 'completed' : c.status === 'ready' ? 'at-risk' : 'in-review'}`} style={{ fontSize: 12 }}>
                         {c.status === 'ready' ? 'Siap (lolos SM RPC)' : c.status === 'approved' ? 'Disetujui GM' : c.status === 'submitted' ? 'Dalam proses review' : c.status}
                       </span>
                     </td>
@@ -1995,16 +1995,16 @@ export function ApprovalsPage() {
                             {UNIT_NAMES[unitCode] ?? unitCode}
                           </button>
                         </td>
-                        <td style={{ color: 'var(--color-text-muted)', fontSize: 11 }}>{items.length} bidang</td>
-                        <td><span className={`status-pill ${aggrCls}`} style={{ fontSize: 10 }}>{aggrLabel}</span></td>
+                        <td style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>{items.length} bidang</td>
+                        <td><span className={`status-pill ${aggrCls}`} style={{ fontSize: 12 }}>{aggrLabel}</span></td>
                       </tr>
                       {isOpen && sortByBidang(items).map((c) => (
                         <tr key={c.id} style={{ background: 'var(--color-surface-2)' }}>
                           <td style={{ paddingLeft: 'var(--space-5)' }} />
-                          <td style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{c.bidang}</td>
-                          <td style={{ color: 'var(--color-text-muted)', fontSize: 11 }}>{c.submitter}</td>
+                          <td style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>{c.bidang}</td>
+                          <td style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>{c.submitter}</td>
                           <td>
-                            <span className={`status-pill ${c.status === 'approved' ? 'completed' : c.status === 'ready' ? 'at-risk' : 'in-review'}`} style={{ fontSize: 10 }}>
+                            <span className={`status-pill ${c.status === 'approved' ? 'completed' : c.status === 'ready' ? 'at-risk' : 'in-review'}`} style={{ fontSize: 12 }}>
                               {c.status === 'ready' ? 'Siap' : c.status === 'approved' ? 'Disetujui GM' : 'Dalam review'}
                             </span>
                           </td>
@@ -2139,21 +2139,21 @@ export function ApprovalsPage() {
                     <td style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>{periodMap[d.periodId] ?? '—'}</td>
                     <td style={{ whiteSpace: 'nowrap' }}>
                       {d.status === 'approved' ? (
-                        <span style={{ fontSize: 10, color: 'var(--color-success)', fontWeight: 600 }}>✓ Selesai ({d.stepCount}/{d.stepCount})</span>
+                        <span style={{ fontSize: 12, color: 'var(--color-success)', fontWeight: 600 }}>✓ Selesai ({d.stepCount}/{d.stepCount})</span>
                       ) : d.status === 'ready' ? (
-                        <span style={{ fontSize: 10, color: 'var(--color-warning)', fontWeight: 600 }}>Lolos rantai → bundle</span>
+                        <span style={{ fontSize: 12, color: 'var(--color-warning)', fontWeight: 600 }}>Lolos rantai → bundle</span>
                       ) : d.status === 'rejected' ? (
-                        <span style={{ fontSize: 10, color: 'var(--color-danger)' }}>Dikembalikan</span>
+                        <span style={{ fontSize: 12, color: 'var(--color-danger)' }}>Dikembalikan</span>
                       ) : (
-                        <span style={{ fontSize: 10, color: 'var(--color-accent)', fontWeight: 600 }}>Langkah {d.stepIndex}/{Math.max(0, d.stepCount - 1)}</span>
+                        <span style={{ fontSize: 12, color: 'var(--color-accent)', fontWeight: 600 }}>Langkah {d.stepIndex}/{Math.max(0, d.stepCount - 1)}</span>
                       )}
                     </td>
                     <td>
-                      <span className={`status-pill ${DOC_STATUS_PILL[d.status] ?? 'in-review'}`} style={{ fontSize: 10 }}>
+                      <span className={`status-pill ${DOC_STATUS_PILL[d.status] ?? 'in-review'}`} style={{ fontSize: 12 }}>
                         {DOC_STATUS_LABEL[d.status] ?? d.status}
                       </span>
                     </td>
-                    <td style={{ color: d.status === 'approved' ? 'var(--color-success)' : 'var(--color-text-muted)', fontSize: 11 }}>
+                    <td style={{ color: d.status === 'approved' ? 'var(--color-success)' : 'var(--color-text-muted)', fontSize: 13 }}>
                       {nextApproverLabel(d.status, d.stepLabel)}
                     </td>
                     <td>
@@ -2212,9 +2212,9 @@ export function ApprovalsPage() {
             {WORKFLOW_STATIC.map((w, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, minWidth: 80 }}>
-                  <div style={{ width: 32, height: 32, borderRadius: '50%', background: FASE_ACCENT[i], color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 12, flexShrink: 0 }}>{w.stage}</div>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: FASE_ACCENT[i], marginTop: 6, textAlign: 'center', whiteSpace: 'nowrap' }}>{w.fase}</div>
-                  <div style={{ fontSize: 10, color: 'var(--color-text-muted)', textAlign: 'center', whiteSpace: 'nowrap' }}>{w.deadline}</div>
+                  <div style={{ width: 32, height: 32, borderRadius: '50%', background: FASE_ACCENT[i], color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, flexShrink: 0 }}>{w.stage}</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: FASE_ACCENT[i], marginTop: 6, textAlign: 'center', whiteSpace: 'nowrap' }}>{w.fase}</div>
+                  <div style={{ fontSize: 12, color: 'var(--color-text-muted)', textAlign: 'center', whiteSpace: 'nowrap' }}>{w.deadline}</div>
                 </div>
                 {i < WORKFLOW_STATIC.length - 1 && (
                   <div style={{ flex: 1, height: 2, background: `linear-gradient(to right, ${FASE_ACCENT[i]}, ${FASE_ACCENT[i + 1]})`, minWidth: 16 }} />
@@ -2227,12 +2227,12 @@ export function ApprovalsPage() {
             {WORKFLOW_STATIC.map((w, i) => (
               <div key={i} style={{ border: '1px solid var(--color-border)', borderTop: `3px solid ${FASE_ACCENT[i]}`, borderRadius: 'var(--radius-md)', padding: 'var(--space-3) var(--space-4)', background: 'var(--color-surface)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: FASE_ACCENT[i], textTransform: 'uppercase', letterSpacing: '0.06em' }}>{w.fase} · {w.deadline}</span>
-                  <span style={{ fontSize: 10, background: 'var(--color-surface-2)', color: 'var(--color-text-muted)', padding: '1px 7px', borderRadius: 8 }}>SLA {w.slaHours}j</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: FASE_ACCENT[i], textTransform: 'uppercase', letterSpacing: '0.06em' }}>{w.fase} · {w.deadline}</span>
+                  <span style={{ fontSize: 12, background: 'var(--color-surface-2)', color: 'var(--color-text-muted)', padding: '1px 7px', borderRadius: 8 }}>SLA {w.slaHours}j</span>
                 </div>
                 <div style={{ fontWeight: 600, fontSize: 'var(--text-sm)', marginBottom: 'var(--space-1)' }}>{w.action}</div>
-                <div style={{ fontSize: 10, color: 'var(--color-accent)', marginBottom: 'var(--space-2)' }}>{STAGES[w.stage]}</div>
-                <ul style={{ margin: 0, paddingLeft: 14, fontSize: 10, color: 'var(--color-text-muted)', lineHeight: 1.75 }}>
+                <div style={{ fontSize: 12, color: 'var(--color-accent)', marginBottom: 'var(--space-2)' }}>{STAGES[w.stage]}</div>
+                <ul style={{ margin: 0, paddingLeft: 14, fontSize: 12, color: 'var(--color-text-muted)', lineHeight: 1.75 }}>
                   {w.checklist.map((c, ci) => <li key={ci}>{c}</li>)}
                 </ul>
               </div>
@@ -2260,13 +2260,13 @@ export function ApprovalsPage() {
                 borderLeft: '4px solid var(--color-accent)',
                 display: 'flex', flexDirection: 'column', gap: 4,
               }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-accent)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Peran Anda dalam Workflow</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-accent)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Peran Anda dalam Workflow</div>
                 <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700 }}>{RACI_COL_LABEL[myCol]}</div>
                 <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>{RACI_COL_TANGGUNG[myCol]}</div>
-                <div style={{ fontSize: 10, color: 'var(--color-text-subtle)', marginTop: 2 }}>Kolom yang disorot (🔵) pada tabel di bawah menunjukkan posisi Anda dalam matriks.</div>
+                <div style={{ fontSize: 12, color: 'var(--color-text-subtle)', marginTop: 2 }}>Kolom yang disorot (🔵) pada tabel di bawah menunjukkan posisi Anda dalam matriks.</div>
               </div>
             )}
-            <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap', padding: 'var(--space-3) var(--space-4)', fontSize: 10 }}>
+            <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap', padding: 'var(--space-3) var(--space-4)', fontSize: 12 }}>
               {[['R', 'var(--color-accent-tint)', 'var(--color-accent)', 'Responsible — pelaksana utama'],
                 ['A', 'rgba(16,185,129,0.12)', 'var(--color-success)', 'Accountable — pemegang tanggung jawab akhir'],
                 ['C', 'rgba(59,130,246,0.12)', 'var(--color-info)', 'Consulted — diminta masukan/persetujuan'],
@@ -2274,7 +2274,7 @@ export function ApprovalsPage() {
                 ['—', 'var(--color-surface-2)', 'var(--color-text-subtle)', 'Tidak terlibat pada alur ini'],
               ].map(([lbl, bg, clr, desc]) => (
                 <div key={lbl} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span style={{ display: 'inline-block', width: 22, height: 18, borderRadius: 3, lineHeight: '18px', textAlign: 'center', fontWeight: 700, background: bg as string, color: clr as string, fontSize: 10 }}>{lbl}</span>
+                  <span style={{ display: 'inline-block', width: 22, height: 18, borderRadius: 3, lineHeight: '18px', textAlign: 'center', fontWeight: 700, background: bg as string, color: clr as string, fontSize: 12 }}>{lbl}</span>
                   <span style={{ color: 'var(--color-text-muted)' }}>{desc}</span>
                 </div>
               ))}
@@ -2284,7 +2284,7 @@ export function ApprovalsPage() {
                 <thead>
                   <tr>
                     <th style={{ minWidth: 220 }}>Aktivitas</th>
-                    <th style={{ fontSize: 9, color: 'var(--color-text-muted)', fontWeight: 500, whiteSpace: 'nowrap', textAlign: 'center' }}>Ruang Lingkup</th>
+                    <th style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 500, whiteSpace: 'nowrap', textAlign: 'center' }}>Ruang Lingkup</th>
                     {RACI_COLS.map((col) => (
                       <th
                         key={col.key}
@@ -2295,10 +2295,10 @@ export function ApprovalsPage() {
                           borderBottom: myCol === col.key ? '2px solid var(--color-accent)' : undefined,
                         }}
                       >
-                        <div style={{ fontWeight: 700, fontSize: 11 }}>
+                        <div style={{ fontWeight: 700, fontSize: 13 }}>
                           {myCol === col.key ? '🔵 ' : ''}{col.label}
                         </div>
-                        <div style={{ fontSize: 9, fontWeight: 400, color: myCol === col.key ? 'var(--color-accent)' : 'var(--color-text-subtle)', marginTop: 2, whiteSpace: 'normal', lineHeight: 1.3 }}>
+                        <div style={{ fontSize: 11, fontWeight: 400, color: myCol === col.key ? 'var(--color-accent)' : 'var(--color-text-subtle)', marginTop: 2, whiteSpace: 'normal', lineHeight: 1.3 }}>
                           {col.sublabel}
                         </div>
                       </th>
@@ -2310,7 +2310,7 @@ export function ApprovalsPage() {
                     <tr key={i}>
                       <td style={{ fontWeight: 500, fontSize: 'var(--text-xs)' }}>{row.activity}</td>
                       <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
-                        <span style={{ fontSize: 9, background: 'var(--color-surface-2)', color: 'var(--color-text-muted)', padding: '1px 6px', borderRadius: 8 }}>{row.scope}</span>
+                        <span style={{ fontSize: 11, background: 'var(--color-surface-2)', color: 'var(--color-text-muted)', padding: '1px 6px', borderRadius: 8 }}>{row.scope}</span>
                       </td>
                       {RACI_COLS.map((col) => {
                         const v = row.values[col.key];
@@ -2341,7 +2341,7 @@ export function ApprovalsPage() {
                 </tbody>
               </table>
             </div>
-            <div style={{ padding: 'var(--space-3) var(--space-4)', fontSize: 10, color: 'var(--color-text-subtle)', borderTop: '1px solid var(--color-border)', lineHeight: 1.7 }}>
+            <div style={{ padding: 'var(--space-3) var(--space-4)', fontSize: 12, color: 'var(--color-text-subtle)', borderTop: '1px solid var(--color-border)', lineHeight: 1.7 }}>
               <strong style={{ color: 'var(--color-text-muted)' }}>Catatan alur:</strong>{' '}
               Dokumen dari <strong>UPMK</strong> melewati review internal (ASMAN + MUP) sebelum masuk rantai Kantor Induk.{' '}
               Dokumen dari <strong>Kantor Induk</strong> langsung ke rantai bidang KI.{' '}

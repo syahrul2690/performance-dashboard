@@ -247,7 +247,7 @@ export function LoginPage() {
                     </optgroup>
                   ))}
                 </select>
-                <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 8 }}>
+                <div style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 8 }}>
                   Password semua akun demo: <code>{DEMO_PASSWORD}</code>
                 </div>
               </div>

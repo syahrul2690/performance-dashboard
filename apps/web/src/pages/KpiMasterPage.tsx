@@ -471,14 +471,14 @@ function DefinisiKpiTab({ onGoToDokumen }: { onGoToDokumen: () => void }) {
                         <td><input className="form-input form-input-sm" value={a.holder} onChange={(e) => updateAssignment(i, 'holder', e.target.value)} placeholder="Nama PJ" /></td>
                         <td>
                           {isComposite ? (
-                            <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }} title="Komposit — target diisi per sub-indikator">— (per sub)</span>
+                            <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }} title="Komposit — target diisi per sub-indikator">— (per sub)</span>
                           ) : (
                             <input className="form-input form-input-sm" value={a.target} onChange={(e) => updateAssignment(i, 'target', e.target.value)} placeholder="Target Sem I" />
                           )}
                         </td>
                         <td>
                           {isComposite ? (
-                            <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>— (per sub)</span>
+                            <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>— (per sub)</span>
                           ) : (
                             <input className="form-input form-input-sm" value={a.target2} onChange={(e) => updateAssignment(i, 'target2', e.target.value)} placeholder="Target tahun" />
                           )}
@@ -545,19 +545,19 @@ function DefinisiKpiTab({ onGoToDokumen }: { onGoToDokumen: () => void }) {
                       <td style={{ fontWeight: 600 }}>
                         {m.indikator}
                         {m.aggregationMethod === 'sum' && (
-                          <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, color: 'var(--color-text-muted)', border: '1px solid var(--color-border)', borderRadius: 4, padding: '1px 4px' }} title="Metode agregasi: SUM (jumlah polos)">
+                          <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', border: '1px solid var(--color-border)', borderRadius: 4, padding: '1px 4px' }} title="Metode agregasi: SUM (jumlah polos)">
                             Σ SUM
                           </span>
                         )}
                         {m.subIndicators && m.subIndicators.length > 0 && (
-                          <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, color: 'var(--color-accent)', border: '1px solid var(--color-accent)', borderRadius: 4, padding: '1px 4px' }} title={`Komposit — ${m.subIndicators.length} sub-indikator`}>
+                          <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 700, color: 'var(--color-accent)', border: '1px solid var(--color-accent)', borderRadius: 4, padding: '1px 4px' }} title={`Komposit — ${m.subIndicators.length} sub-indikator`}>
                             Komposit ({m.subIndicators.length})
                           </span>
                         )}
                       </td>
-                      <td><span className={`status-pill ${m.kmType === 'final' ? 'completed' : 'at-risk'}`} style={{ fontSize: 10 }}>{m.kmType === 'final' ? 'Final' : 'Draft'}</span></td>
+                      <td><span className={`status-pill ${m.kmType === 'final' ? 'completed' : 'at-risk'}`} style={{ fontSize: 12 }}>{m.kmType === 'final' ? 'Final' : 'Draft'}</span></td>
                       <td>
-                        <span className={`status-pill ${m.isPending ? 'in-review' : 'completed'}`} style={{ fontSize: 10 }} title={`Berlaku mulai ${m.effectiveMonth}`}>
+                        <span className={`status-pill ${m.isPending ? 'in-review' : 'completed'}`} style={{ fontSize: 12 }} title={`Berlaku mulai ${m.effectiveMonth}`}>
                           v{m.version} · {m.isPending ? `mulai ${m.effectiveMonth}` : 'berlaku'}
                         </span>
                       </td>
@@ -575,7 +575,7 @@ function DefinisiKpiTab({ onGoToDokumen }: { onGoToDokumen: () => void }) {
                           {m.assignments.length} unit <ChevronDown size={12} style={{ transform: expanded === m.id ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />
                         </button>
                       </td>
-                      <td style={{ color: 'var(--color-text-muted)', fontSize: 11 }}>{m.createdBy}</td>
+                      <td style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>{m.createdBy}</td>
                       <td>
                         {canAuthor && (
                           <div style={{ display: 'flex', gap: 4 }}>
@@ -596,7 +596,7 @@ function DefinisiKpiTab({ onGoToDokumen }: { onGoToDokumen: () => void }) {
                               {m.assignments.map((a) => (
                                 <tr key={a.id}>
                                   <td style={{ fontWeight: 600 }}>{UNIT_NAMES[a.unitCode] ?? a.unitCode}</td>
-                                  <td style={{ fontSize: 11 }}>{a.bidang}</td>
+                                  <td style={{ fontSize: 13 }}>{a.bidang}</td>
                                   <td style={{ color: 'var(--color-text-muted)' }}>{a.holder || '—'}</td>
                                   <td>{a.target || '—'}</td>
                                   <td>{a.target2 || '—'}</td>
@@ -630,7 +630,7 @@ function DefinisiKpiTab({ onGoToDokumen }: { onGoToDokumen: () => void }) {
                                     {rollups[m.id].breakdown.map((b, i) => (
                                       <tr key={i}>
                                         <td style={{ fontWeight: 600 }}>{UNIT_NAMES[b.unitCode] ?? b.unitCode}</td>
-                                        <td style={{ fontSize: 11 }}>{b.bidang}</td>
+                                        <td style={{ fontSize: 13 }}>{b.bidang}</td>
                                         <td className="num">{b.persenAgregasi}%</td>
                                         <td className="num">{b.hasData ? b.realisasi : <span style={{ color: 'var(--color-text-subtle)' }}>belum ada</span>}</td>
                                         <td className="num" style={{ fontWeight: 700 }}>{b.kontribusi}</td>
@@ -891,10 +891,10 @@ function DokumenKmTab() {
                       {k.status === 'submitted' && (() => {
                         const kk = k as KontrakManajemen & { steps?: { label: string }[]; currentStepIndex?: number };
                         const lbl = (kk.steps ?? [])[kk.currentStepIndex ?? 0]?.label ?? 'tahap review';
-                        return <div style={{ fontSize: 10, color: 'var(--color-text-muted)', marginTop: 2 }}>di {lbl}</div>;
+                        return <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>di {lbl}</div>;
                       })()}
-                      {k.status === 'ready' && <div style={{ fontSize: 10, color: 'var(--color-warning)', marginTop: 2 }}>lolos rantai → menunggu bundle GM</div>}
-                      {k.status === 'rejected' && k.reviewNote && <div style={{ fontSize: 10, color: 'var(--color-danger)', marginTop: 2, maxWidth: 220 }}>{k.reviewNote}</div>}
+                      {k.status === 'ready' && <div style={{ fontSize: 12, color: 'var(--color-warning)', marginTop: 2 }}>lolos rantai → menunggu bundle GM</div>}
+                      {k.status === 'rejected' && k.reviewNote && <div style={{ fontSize: 12, color: 'var(--color-danger)', marginTop: 2, maxWidth: 220 }}>{k.reviewNote}</div>}
                     </td>
                     <td style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
                       {new Date(k.submittedAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
@@ -952,7 +952,7 @@ function DokumenKmTab() {
                           {k.kpiItems.length} indikator <ChevronDown size={12} style={{ transform: approvedExpanded === k.id ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />
                         </button>
                       </td>
-                      <td><span className="status-pill completed" style={{ fontSize: 10 }}>{k.reviewer ?? 'GM'}</span></td>
+                      <td><span className="status-pill completed" style={{ fontSize: 12 }}>{k.reviewer ?? 'GM'}</span></td>
                       <td style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
                         {k.reviewedAt ? new Date(k.reviewedAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
                       </td>
@@ -1107,16 +1107,16 @@ export function ReviewPerKpiTab() {
             <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               <Layers size={14} /> {it.indikator}
               {it.aggregationMethod === 'sum' && (
-                <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--color-text-muted)', border: '1px solid var(--color-border)', borderRadius: 4, padding: '1px 4px' }} title="Metode agregasi: SUM (jumlah polos)">Σ SUM</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', border: '1px solid var(--color-border)', borderRadius: 4, padding: '1px 4px' }} title="Metode agregasi: SUM (jumlah polos)">Σ SUM</span>
               )}
-              <span className={`status-pill ${it.kmType === 'final' ? 'completed' : 'at-risk'}`} style={{ fontSize: 10 }}>{it.kmType === 'final' ? 'Final' : 'Draft'}</span>
-              {it.isPending && <span className="status-pill in-review" style={{ fontSize: 10 }} title={`Berlaku mulai ${it.effectiveMonth}`}>v{it.version} · mulai {it.effectiveMonth}</span>}
-              {cs?.status === 'approved' && <span className="status-pill completed" style={{ fontSize: 10 }} title={`Disetujui ${cs.reviewer ?? ''}`}>✓ Konsolidasi Final</span>}
-              {cs?.status === 'rejected' && <span className="status-pill delayed" style={{ fontSize: 10 }}>Konsolidasi Ditolak</span>}
-              {!cs && it.readyForConsolidation && <span className="status-pill at-risk" style={{ fontSize: 10 }}>Siap Konsolidasi</span>}
+              <span className={`status-pill ${it.kmType === 'final' ? 'completed' : 'at-risk'}`} style={{ fontSize: 12 }}>{it.kmType === 'final' ? 'Final' : 'Draft'}</span>
+              {it.isPending && <span className="status-pill in-review" style={{ fontSize: 12 }} title={`Berlaku mulai ${it.effectiveMonth}`}>v{it.version} · mulai {it.effectiveMonth}</span>}
+              {cs?.status === 'approved' && <span className="status-pill completed" style={{ fontSize: 12 }} title={`Disetujui ${cs.reviewer ?? ''}`}>✓ Konsolidasi Final</span>}
+              {cs?.status === 'rejected' && <span className="status-pill delayed" style={{ fontSize: 12 }}>Konsolidasi Ditolak</span>}
+              {!cs && it.readyForConsolidation && <span className="status-pill at-risk" style={{ fontSize: 12 }}>Siap Konsolidasi</span>}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
-              <span className={`status-pill ${it.allApproved ? 'completed' : 'at-risk'}`} style={{ fontSize: 10 }}>
+              <span className={`status-pill ${it.allApproved ? 'completed' : 'at-risk'}`} style={{ fontSize: 12 }}>
                 {it.approvedCount}/{it.totalAssignments} bidang disetujui
               </span>
               <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-muted)' }}>
@@ -1165,12 +1165,12 @@ export function ReviewPerKpiTab() {
                 {it.slices.map((s, i) => (
                   <tr key={i} style={{ opacity: s.isApproved ? 1 : 0.72 }}>
                     <td style={{ fontWeight: 600 }}>{UNIT_NAMES[s.unitCode] ?? s.unitCode}</td>
-                    <td style={{ fontSize: 11 }}>{s.bidang}</td>
-                    <td style={{ color: 'var(--color-text-muted)', fontSize: 11 }}>{s.holder || '—'}</td>
+                    <td style={{ fontSize: 13 }}>{s.bidang}</td>
+                    <td style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>{s.holder || '—'}</td>
                     {it.aggregationMethod === 'weighted' && <td className="num">{s.persenAgregasi ? `${s.persenAgregasi}%` : '—'}</td>}
                     <td className="num">{s.hasData ? s.realisasi : <span style={{ color: 'var(--color-text-subtle)' }}>belum ada</span>}</td>
-                    <td><span className={`status-pill ${REAL_STATUS_PILL[s.status] ?? 'in-review'}`} style={{ fontSize: 10 }}>{REAL_STATUS_LABEL[s.status] ?? s.status}</span></td>
-                    <td style={{ color: 'var(--color-text-muted)', fontSize: 11 }}>{s.reviewer || '—'}</td>
+                    <td><span className={`status-pill ${REAL_STATUS_PILL[s.status] ?? 'in-review'}`} style={{ fontSize: 12 }}>{REAL_STATUS_LABEL[s.status] ?? s.status}</span></td>
+                    <td style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>{s.reviewer || '—'}</td>
                     <td className="num" style={{ fontWeight: 700, color: s.isApproved ? 'var(--color-text)' : 'var(--color-text-subtle)' }}>
                       {s.isApproved ? s.kontribusi : '—'}
                     </td>

@@ -329,19 +329,19 @@ export function InputRealisasiPage() {
               ) : (
                 <span style={{ fontWeight: 700, color: 'var(--color-accent)' }}>
                   {UNIT_OPTIONS.find((u) => u.code === lockedUnit)?.name ?? lockedUnit}
-                  <span style={{ fontSize: 9, color: 'var(--color-text-subtle)', marginLeft: 4 }}>(dikunci ke unit Anda)</span>
+                  <span style={{ fontSize: 11, color: 'var(--color-text-subtle)', marginLeft: 4 }}>(dikunci ke unit Anda)</span>
                 </span>
               )}
               <span>· {kpiList.length} indikator KM{isStaff && user?.bidang ? ` · Bidang: ${user.bidang}` : ''}</span>
               {fillWindow && (
                 windowOpen ? (
-                  <span className="status-pill at-risk" style={{ fontSize: 10 }}>
+                  <span className="status-pill at-risk" style={{ fontSize: 12 }}>
                     {fillWindow.overrideActive
                       ? 'Window dibuka manual oleh Admin/GM'
                       : `Window terbuka · tutup ${fmtDate(fillWindow.end)} (${fillWindow.daysUntilClose} hari lagi)`}
                   </span>
                 ) : (
-                  <span className="status-pill delayed" style={{ fontSize: 10 }}>
+                  <span className="status-pill delayed" style={{ fontSize: 12 }}>
                     {fillWindow.daysUntilOpen > 0
                       ? `Window belum dibuka · mulai ${fmtDate(fillWindow.start)}`
                       : `Window pengisian telah ditutup ${fmtDate(fillWindow.end)}`}
@@ -354,7 +354,7 @@ export function InputRealisasiPage() {
             <div style={{ textAlign: 'right', flexShrink: 0 }}>
               <div style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Progress Isi</div>
               <div style={{ fontSize: 'var(--text-xl)', fontWeight: 800, color: completionPct === 100 ? 'var(--color-success)' : 'var(--color-accent)' }}>{completionPct}%</div>
-              <div style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>{filledCount}/{kpiList.length} terisi</div>
+              <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{filledCount}/{kpiList.length} terisi</div>
             </div>
           )}
         </div>
@@ -388,7 +388,7 @@ export function InputRealisasiPage() {
           <CheckCircle size={18} color="var(--color-accent)" />
           <strong>
             Realisasi bidang Anda untuk {selectedPeriodLabel} sudah dikirim — status:{' '}
-            <span className={`status-pill ${STATUS_PILL[myActiveStatus ?? ''] ?? 'in-review'}`} style={{ fontSize: 10 }}>
+            <span className={`status-pill ${STATUS_PILL[myActiveStatus ?? ''] ?? 'in-review'}`} style={{ fontSize: 12 }}>
               {STATUS_LABEL[myActiveStatus ?? ''] ?? myActiveStatus}
             </span>
             . Form input ditutup sampai package ini selesai direview atau dikembalikan.
@@ -439,16 +439,16 @@ export function InputRealisasiPage() {
                     <Fragment key={i}>
                     <tr style={{ background: hasVal ? 'rgba(34,197,94,0.03)' : 'transparent' }}>
                       <td style={{ color: 'var(--color-text-muted)' }}>{kpi.no ?? i + 1}</td>
-                      <td style={{ fontSize: 11, color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>{kpi.bidang ?? '—'}</td>
+                      <td style={{ fontSize: 13, color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>{kpi.bidang ?? '—'}</td>
                       <td style={{ maxWidth: 220, fontWeight: 500 }}>
                         {kpi.indikator ?? '—'}
                         {isComposite && (
-                          <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, color: 'var(--color-accent)', border: '1px solid var(--color-accent)', borderRadius: 4, padding: '1px 4px' }} title="Komposit — isi realisasi per sub-indikator di bawah">
+                          <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 700, color: 'var(--color-accent)', border: '1px solid var(--color-accent)', borderRadius: 4, padding: '1px 4px' }} title="Komposit — isi realisasi per sub-indikator di bawah">
                             Komposit
                           </span>
                         )}
                       </td>
-                      <td style={{ fontSize: 10, color: 'var(--color-text-muted)', maxWidth: 200 }}>{kpi.formula ?? '—'}</td>
+                      <td style={{ fontSize: 12, color: 'var(--color-text-muted)', maxWidth: 200 }}>{kpi.formula ?? '—'}</td>
                       <td style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>{kpi.satuan ?? '—'}</td>
                       <td className="num" style={{ fontWeight: 700, color: 'var(--color-accent)' }}>{kpi.bobot ?? '—'}</td>
                       <td className="num">{isComposite ? '— (per sub)' : (kpi.target ?? '—')}</td>
@@ -460,7 +460,7 @@ export function InputRealisasiPage() {
                               <span style={{ fontWeight: 700 }}>{lt.frozen ? (lt.frozenTarget ?? lt.target) : lt.target}</span>
                               <span
                                 title={lt.frozen ? 'Sudah dibekukan (bundle GM disetujui / deadline / restatement)' : lt.source === 'carried' ? 'Dibawa dari bulan lalu (belum diubah)' : 'Diinput/diubah bulan ini'}
-                                style={{ marginLeft: 4, fontSize: 9, fontWeight: 700, padding: '1px 4px', borderRadius: 4, border: '1px solid var(--color-border)', color: lt.frozen ? 'var(--color-text-muted)' : lt.source === 'carried' ? 'var(--color-warning)' : 'var(--color-accent)' }}
+                                style={{ marginLeft: 4, fontSize: 11, fontWeight: 700, padding: '1px 4px', borderRadius: 4, border: '1px solid var(--color-border)', color: lt.frozen ? 'var(--color-text-muted)' : lt.source === 'carried' ? 'var(--color-warning)' : 'var(--color-accent)' }}
                               >
                                 {lt.frozen ? 'BEKU' : lt.source === 'carried' ? 'CARRY' : 'HIDUP'}
                               </span>
@@ -471,7 +471,7 @@ export function InputRealisasiPage() {
                       <td style={{ minWidth: 140 }}>
                         {formOpen ? (
                           isComposite ? (
-                            <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>Isi di bawah ↓</span>
+                            <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Isi di bawah ↓</span>
                           ) : (
                             <input
                               type="text"
@@ -492,8 +492,8 @@ export function InputRealisasiPage() {
                         <tr key={`${i}.${j}`} style={{ background: subHasVal ? 'rgba(34,197,94,0.03)' : 'var(--color-surface-2)' }}>
                           <td />
                           <td />
-                          <td style={{ paddingLeft: 'var(--space-4)', fontSize: 12, color: 'var(--color-text-muted)' }}>↳ {si.nama}</td>
-                          <td style={{ fontSize: 10, color: 'var(--color-text-muted)', maxWidth: 200 }}>{si.formula ?? '—'}</td>
+                          <td style={{ paddingLeft: 'var(--space-4)', fontSize: 14, color: 'var(--color-text-muted)' }}>↳ {si.nama}</td>
+                          <td style={{ fontSize: 12, color: 'var(--color-text-muted)', maxWidth: 200 }}>{si.formula ?? '—'}</td>
                           <td style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>{si.satuan ?? '—'}</td>
                           <td className="num">{si.bobot}</td>
                           <td className="num">{si.target}</td>
@@ -569,17 +569,17 @@ export function InputRealisasiPage() {
                     <Fragment key={i}>
                     <tr>
                       <td style={{ fontWeight: 600 }}>{item.unitCode as string ?? '—'}</td>
-                      <td style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{item.bidang as string ?? '—'}</td>
+                      <td style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>{item.bidang as string ?? '—'}</td>
                       <td>{item.submitter as string ?? '—'}</td>
                       <td>
-                        <span className={`status-pill ${STATUS_PILL[status] ?? 'in-review'}`} style={{ fontSize: 10 }}>
+                        <span className={`status-pill ${STATUS_PILL[status] ?? 'in-review'}`} style={{ fontSize: 12 }}>
                           {STATUS_LABEL[status] ?? status}
                         </span>
                         {status === 'submitted' && stepLabel && (
-                          <div style={{ fontSize: 10, color: 'var(--color-text-muted)', marginTop: 2 }}>di {stepLabel}</div>
+                          <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>di {stepLabel}</div>
                         )}
                         {status === 'rejected' && item.reviewNote ? (
-                          <div style={{ fontSize: 10, color: 'var(--color-danger)', marginTop: 2, maxWidth: 240 }}>{item.reviewNote as string}</div>
+                          <div style={{ fontSize: 12, color: 'var(--color-danger)', marginTop: 2, maxWidth: 240 }}>{item.reviewNote as string}</div>
                         ) : null}
                       </td>
                       <td style={{ color: 'var(--color-text-muted)' }}>
@@ -604,13 +604,13 @@ export function InputRealisasiPage() {
                     {evidOpen === rid && (
                       <tr>
                         <td colSpan={6} style={{ background: 'var(--color-surface-2)', padding: 'var(--space-3)' }}>
-                          <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6 }}>Evidence Realisasi</div>
+                          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Evidence Realisasi</div>
                           {atts.length === 0 ? (
-                            <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 6 }}>Belum ada berkas.</div>
+                            <div style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 6 }}>Belum ada berkas.</div>
                           ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 }}>
                               {atts.map((a) => (
-                                <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11 }}>
+                                <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
                                   <Paperclip size={12} style={{ color: 'var(--color-text-muted)' }} />
                                   <a href={inputRealisasi.evidenceUrl(rid, a.id)} target="_blank" rel="noreferrer" style={{ color: 'var(--color-accent)' }}>{a.name}</a>
                                   <span style={{ color: 'var(--color-text-subtle)' }}>({fmtSize(a.size)})</span>
@@ -623,7 +623,7 @@ export function InputRealisasiPage() {
                           <button className="btn btn-secondary btn-sm" disabled={evidBusy || atts.length >= 5} onClick={() => evidInputRef.current?.click()}>
                             <Upload size={12} /> {evidBusy ? 'Mengunggah…' : 'Unggah Evidence'}
                           </button>
-                          <span style={{ fontSize: 10, color: 'var(--color-text-muted)', marginLeft: 8 }}>
+                          <span style={{ fontSize: 12, color: 'var(--color-text-muted)', marginLeft: 8 }}>
                             Maks 5 berkas · ≤ 10 MB/berkas · PDF, Excel, Word, JPG/PNG {atts.length >= 5 ? '· (batas tercapai)' : ''}
                           </span>
                         </td>
@@ -632,17 +632,17 @@ export function InputRealisasiPage() {
                     {revOpen === rid && (
                       <tr>
                         <td colSpan={6} style={{ background: 'var(--color-surface-2)', padding: 'var(--space-3)' }}>
-                          <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6 }}>Riwayat Revisi (Target & Nilai Realisasi)</div>
+                          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Riwayat Revisi (Target & Nilai Realisasi)</div>
                           {revLoading ? (
-                            <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>Memuat…</div>
+                            <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Memuat…</div>
                           ) : revisions.length === 0 ? (
-                            <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>Belum ada revisi tercatat untuk package ini.</div>
+                            <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Belum ada revisi tercatat untuk package ini.</div>
                           ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                               {revisions.map((rv) => (
-                                <div key={rv.id} style={{ display: 'flex', gap: 8, fontSize: 11, alignItems: 'flex-start', borderLeft: `2px solid ${rv.entity === 'period_target' ? 'var(--color-accent)' : 'var(--color-warning)'}`, paddingLeft: 8 }}>
+                                <div key={rv.id} style={{ display: 'flex', gap: 8, fontSize: 13, alignItems: 'flex-start', borderLeft: `2px solid ${rv.entity === 'period_target' ? 'var(--color-accent)' : 'var(--color-warning)'}`, paddingLeft: 8 }}>
                                   <span
-                                    style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4, whiteSpace: 'nowrap', background: rv.entity === 'period_target' ? 'var(--color-accent-tint)' : 'var(--color-warning-tint)', color: rv.entity === 'period_target' ? 'var(--color-accent)' : 'var(--color-warning)' }}
+                                    style={{ fontSize: 11, fontWeight: 700, padding: '1px 5px', borderRadius: 4, whiteSpace: 'nowrap', background: rv.entity === 'period_target' ? 'var(--color-accent-tint)' : 'var(--color-warning-tint)', color: rv.entity === 'period_target' ? 'var(--color-accent)' : 'var(--color-warning)' }}
                                   >
                                     {rv.entity === 'period_target' ? 'TARGET (PIC REN)' : 'REALISASI (KI)'}
                                   </span>
@@ -652,7 +652,7 @@ export function InputRealisasiPage() {
                                     ) : (
                                       <RealisasiDiff oldValue={rv.oldValue} newValue={rv.newValue} />
                                     )}
-                                    <div style={{ color: 'var(--color-text-muted)', fontSize: 10, marginTop: 2 }}>
+                                    <div style={{ color: 'var(--color-text-muted)', fontSize: 12, marginTop: 2 }}>
                                       {rv.actor} · {new Date(rv.createdAt).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                       {rv.note && ` · "${rv.note}"`}
                                     </div>

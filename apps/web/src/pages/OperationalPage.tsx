@@ -159,12 +159,12 @@ export function OperationalPage() {
                     <div style={{ fontWeight: 600, color: 'var(--color-text)', fontSize: 'var(--text-xs)' }}>
                       {k.name ?? k.label}
                       {isComposite && (
-                        <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, color: 'var(--color-accent)', border: '1px solid var(--color-accent)', borderRadius: 4, padding: '1px 4px' }} title={`Komposit — ${k.subBreakdown!.length} sub-indikator`}>
+                        <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 700, color: 'var(--color-accent)', border: '1px solid var(--color-accent)', borderRadius: 4, padding: '1px 4px' }} title={`Komposit — ${k.subBreakdown!.length} sub-indikator`}>
                           Komposit
                         </span>
                       )}
                     </div>
-                    {(k.formula ?? k.commentary) && <div style={{ fontSize: 10, color: 'var(--color-text-subtle)', marginTop: 2 }}>{k.formula ?? k.commentary}</div>}
+                    {(k.formula ?? k.commentary) && <div style={{ fontSize: 12, color: 'var(--color-text-subtle)', marginTop: 2 }}>{k.formula ?? k.commentary}</div>}
                   </td>
                   <td style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>{k.satuan ?? k.unit ?? '—'}</td>
                   <td className="num">{isComposite ? '—' : fmt(k.target, 1)}</td>
@@ -180,8 +180,8 @@ export function OperationalPage() {
                   <tr key={`${i}.${j}`} style={{ background: 'var(--color-surface-2)' }}>
                     <td />
                     <td style={{ paddingLeft: 'var(--space-4)' }}>
-                      <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>↳ {si.nama}</span>
-                      {si.formula && <div style={{ fontSize: 10, color: 'var(--color-text-subtle)', marginTop: 2, paddingLeft: 12 }}>{si.formula}</div>}
+                      <span style={{ fontSize: 14, color: 'var(--color-text-muted)' }}>↳ {si.nama}</span>
+                      {si.formula && <div style={{ fontSize: 12, color: 'var(--color-text-subtle)', marginTop: 2, paddingLeft: 12 }}>{si.formula}</div>}
                     </td>
                     <td style={{ color: 'var(--color-text-muted)' }}>{si.satuan || '—'}</td>
                     <td className="num">{fmt(si.target, 1)}</td>

@@ -2,28 +2,14 @@ import { useEffect, useState, type CSSProperties, type ComponentType, type React
 import { executive, kinerja, operational } from '../lib/api';
 import { usePeriod } from '../context/PeriodContext';
 import {
-  BarChart3, LineChart, Trophy, Layers, TrendingUp, ShieldCheck,
-  Compass, Cpu, Leaf, Users, GitBranch, ClipboardList, HardHat, CheckCircle2,
+  BarChart3, LineChart, Trophy, Layers, ShieldCheck,
+  GitBranch, ClipboardList, HardHat, CheckCircle2,
   ChevronDown, Target, ShieldAlert, ClipboardCheck, GitCompare,
 } from 'lucide-react';
 import { UnitTrendChart } from '../components/UnitTrendChart';
 import { SkeletonKpiCards, SkeletonChart, SkeletonTable, EmptyState, ErrorState } from '../components/LoadState';
 import { PhaseControls, type SnapshotPhase } from '../components/PhaseControls';
 import type { ExecutiveData } from '../lib/types';
-
-const PILLARS: Array<{
-  id: 'growth' | 'digital' | 'nze' | 'enabler';
-  name: string;
-  tag: string;
-  icon: ComponentType<{ size?: number }>;
-  value: number;
-  target: string;
-}> = [
-  { id: 'growth',  name: 'Growth',            tag: 'Pertumbuhan Layanan', icon: TrendingUp, value: 78, target: 'Target 2026 · 100%' },
-  { id: 'digital', name: 'Digital',           tag: 'BIM & Digitalisasi',  icon: Cpu,        value: 92, target: 'Target 2026 · 100%' },
-  { id: 'nze',     name: 'Net Zero Emission', tag: 'Proyek Hijau & ESG',  icon: Leaf,       value: 64, target: 'Roadmap NZE 2060' },
-  { id: 'enabler', name: 'Enabler',           tag: 'SDM, GCG & K3L',      icon: Users,      value: 85, target: 'Target 2026 · 100%' },
-];
 
 const LIFECYCLE_ICON: Record<string, ComponentType<{ size?: number }>> = {
   'clipboard-list': ClipboardList,
@@ -97,7 +83,7 @@ export function ExecutivePage() {
   // Living-target: fase snapshot yang diminta (undefined = otomatis; default backend = final bila ada).
   const [phaseReq, setPhaseReq] = useState<SnapshotPhase | undefined>(undefined);
 
-  const { periodId, mode } = usePeriod();
+  const { periodId, mode, label: periodLabel } = usePeriod();
 
   useEffect(() => {
     setLoading(true);
@@ -207,7 +193,7 @@ export function ExecutivePage() {
               return (
                 <tr key={i}>
                   <td style={{ color: 'var(--color-text-muted)' }}>{k.no ?? k.id}</td>
-                  <td><div style={{ fontWeight: 600, fontSize: 'var(--text-xs)' }}>{k.name ?? k.label}</div>{(k.formula ?? k.commentary) && <div style={{ fontSize: 10, color: 'var(--color-text-subtle)', marginTop: 2 }}>{k.formula ?? k.commentary}</div>}</td>
+                  <td><div style={{ fontWeight: 600, fontSize: 'var(--text-xs)' }}>{k.name ?? k.label}</div>{(k.formula ?? k.commentary) && <div style={{ fontSize: 12, color: 'var(--color-text-subtle)', marginTop: 2 }}>{k.formula ?? k.commentary}</div>}</td>
                   <td style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>{k.satuan ?? k.unit ?? '—'}</td>
                   <td className="num">{fmt(k.target, 1)}</td>
                   <td className="num" style={{ fontWeight: 700 }}>{fmt(actual, 2)}</td>
@@ -230,7 +216,7 @@ export function ExecutivePage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Executive Summary</h1>
-          <p className="page-subtitle">Dashboard Kinerja PUSMANPRO — Februari 2026</p>
+          <p className="page-subtitle">Dashboard Kinerja PUSMANPRO{periodLabel ? ` — ${periodLabel}` : ''}</p>
         </div>
         <div className="page-meta" style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', flexWrap: 'wrap' }}>
           {isLive && (
@@ -274,7 +260,7 @@ export function ExecutivePage() {
           <div>
             <div className="hero-health-title" style={{ fontSize: 'var(--text-lg)' }}>{String(hs.label ?? 'Total Nilai Kinerja PUSMANPRO')}</div>
             <div className="hero-health-subtitle" style={{ marginTop: 4, fontSize: 'var(--text-xs)' }}>
-              Agregat 14 indikator RKM 2026 — Kantor Induk + 5 UPMK bulan Februari 2026
+              Agregat {kpis.length} indikator RKM {currentYear} — Kantor Induk + 5 UPMK{periodLabel ? ` bulan ${periodLabel}` : ''}
             </div>
           </div>
 
@@ -282,16 +268,16 @@ export function ExecutivePage() {
           {upmkTrack && (
             <div style={{ display: 'flex', gap: 'var(--space-4)', alignItems: 'center', flexWrap: 'wrap', padding: 'var(--space-2) var(--space-3)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)' }}>
               <div>
-                <div style={{ fontSize: 10, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: 0.3 }}>KI Adjusted <span title="Otoritatif — hasil evaluasi berjenjang (values)">ⓘ</span></div>
+                <div style={{ fontSize: 12, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: 0.3 }}>KI Adjusted <span title="Otoritatif — hasil evaluasi berjenjang (values)">ⓘ</span></div>
                 <div style={{ fontSize: 'var(--text-xl)', fontWeight: 800, color: 'var(--color-accent)' }}>{fmt(kiOverall)}</div>
               </div>
               <div style={{ fontSize: 'var(--text-md)', color: 'var(--color-text-muted)' }}>vs</div>
               <div>
-                <div style={{ fontSize: 10, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: 0.3 }}>UPMK Version <span title="Self-report unit (self-assessment)">ⓘ</span></div>
+                <div style={{ fontSize: 12, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: 0.3 }}>UPMK Version <span title="Self-report unit (self-assessment)">ⓘ</span></div>
                 <div style={{ fontSize: 'var(--text-xl)', fontWeight: 800 }}>{fmt(upmkTrack.overall)}</div>
               </div>
               <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
-                <div style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>Selisih (adjustment REN PIC)</div>
+                <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>Selisih (adjustment REN PIC)</div>
                 <div style={{ fontSize: 'var(--text-md)', fontWeight: 700, color: Math.abs(divergence) <= 2 ? 'var(--color-success)' : Math.abs(divergence) <= 5 ? 'var(--color-warning)' : 'var(--color-danger)' }}>
                   {divergence > 0 ? '+' : ''}{fmt(divergence)}
                 </div>
@@ -322,13 +308,24 @@ export function ExecutivePage() {
         </div>
       </div>
 
-      {/* Status banner */}
-      <div className="status-banner success">
-        <ShieldCheck size={18} style={{color:'var(--color-success)',flexShrink:0}} />
-        <div>
-          <strong>Tidak ada pengurang aktif</strong> — Semua Pengurang (Keterlambatan COD, Temuan BPK, Fatality) dalam kondisi aman.
-        </div>
-      </div>
+      {/* Status banner — mencerminkan data kepatuhan sebenarnya (bukan teks statis) */}
+      {hasOpData && (
+        penalty === 0 ? (
+          <div className="status-banner success">
+            <ShieldCheck size={18} style={{color:'var(--color-success)',flexShrink:0}} />
+            <div>
+              <strong>Tidak ada pengurang aktif</strong>{kepatuhan.length > 0 ? ` — Semua Pengurang (${kepatuhan.map((k) => k.name).join(', ')}) dalam kondisi aman.` : '.'}
+            </div>
+          </div>
+        ) : (
+          <div className="status-banner danger">
+            <ShieldAlert size={18} style={{color:'var(--color-danger)',flexShrink:0}} />
+            <div>
+              <strong>Ada pengurang aktif ({penalty} poin)</strong> — {kepatuhan.filter((k) => k.applied < 0).map((k) => k.name).join(', ') || 'lihat rincian di tabel Pengurang Kepatuhan'}.
+            </div>
+          </div>
+        )
+      )}
 
       {/* ── OPERATIONAL KPIs (merged) ── */}
       {hasOpData && (
@@ -390,19 +387,6 @@ export function ExecutivePage() {
           )}
         </FoldCard>
       )}
-
-      {/* 4 Pilar Strategis */}
-      <FoldCard title="4 Pilar Strategis — Next Chapter of Transformation" icon={<Compass size={14} />} right={<span className="card-meta">Sumber: Profil Organisasi PUSMANPRO</span>}>
-        <div className="pillars-strip" style={{padding:'var(--space-4) var(--space-5) var(--space-5)'}}>
-          {PILLARS.map((p) => { const Icon = p.icon; return (
-            <div key={p.id} className={`pillar-card ${p.id}`}>
-              <div className="pillar-head"><span className="pillar-icon"><Icon size={16} /></span><div><div className="pillar-name">{p.name}</div><div className="pillar-tag">{p.tag}</div></div></div>
-              <div className="pillar-progress-row"><span className="pillar-progress-val">{p.value}%</span><span className="pillar-progress-target">{p.target}</span></div>
-              <div className="pillar-bar"><span style={{ width: `${p.value}%` }} /></div>
-            </div>
-          ); })}
-        </div>
-      </FoldCard>
 
       {/* Project Lifecycle Funnel */}
       {(() => {
