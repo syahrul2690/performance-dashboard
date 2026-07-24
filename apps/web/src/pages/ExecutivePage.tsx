@@ -1,31 +1,15 @@
-import { useEffect, useState, type CSSProperties, type ComponentType, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { executive, kinerja, operational } from '../lib/api';
 import { usePeriod } from '../context/PeriodContext';
+import { useAuth } from '../context/AuthContext';
 import {
   BarChart3, LineChart, Trophy, Layers, ShieldCheck,
-  GitBranch, ClipboardList, HardHat, CheckCircle2,
   ChevronDown, Target, ShieldAlert, ClipboardCheck, GitCompare,
 } from 'lucide-react';
 import { UnitTrendChart } from '../components/UnitTrendChart';
 import { SkeletonKpiCards, SkeletonChart, SkeletonTable, EmptyState, ErrorState } from '../components/LoadState';
 import { PhaseControls, type SnapshotPhase } from '../components/PhaseControls';
 import type { ExecutiveData } from '../lib/types';
-
-const LIFECYCLE_ICON: Record<string, ComponentType<{ size?: number }>> = {
-  'clipboard-list': ClipboardList,
-  'hard-hat': HardHat,
-  'check-circle-2': CheckCircle2,
-  'trophy': Trophy,
-};
-
-interface LifecycleStage {
-  stage: string;
-  code: string;
-  count: number;
-  icon: string;
-  color: string;
-  desc: string;
-}
 
 // Operational types (merged from OperationalPage)
 type OpKpi = { id: string; no?: string; label?: string; name?: string; formula?: string; target: number; actual?: number; realisasi?: number; bobot: number; achievement?: number; nilai?: number; status: string; satuan?: string; unit?: string; commentary?: string; };
@@ -84,6 +68,14 @@ export function ExecutivePage() {
   const [phaseReq, setPhaseReq] = useState<SnapshotPhase | undefined>(undefined);
 
   const { periodId, mode, label: periodLabel } = usePeriod();
+  const { user } = useAuth();
+  // devOnly: sejumlah field snapshot masih peninggalan data prototipe (belum ada sumber data
+  // asli di backend, tak berubah per bulan) — sembunyikan dari user biasa, tetap tampil untuk
+  // Super Admin/Developer sebagai referensi. Pola sama dengan AppShell.tsx isPrivileged (pakai
+  // role akun asli, BUKAN role simulasi "View As", supaya demo-mode tak bisa membuka ini).
+  const isPrivileged = user?.role === 'SUPERADMIN' || user?.role === 'DEVELOPER';
+  // KPI tanpa sumber data asli — nilainya statis dari seed, tak pernah berubah per bulan/realisasi.
+  const PROTOTYPE_KPI_IDS = new Set(['totalprojects', 'capacity', 'bim']);
 
   useEffect(() => {
     setLoading(true);
@@ -143,7 +135,7 @@ export function ExecutivePage() {
 
   const d = data.data;
   const hs = d.healthScore ?? {};
-  const kpis = d.kpis ?? [];
+  const kpis = (d.kpis ?? []).filter((k) => isPrivileged || !PROTOTYPE_KPI_IDS.has(String(k.id)));
   const selectedKpi = kpis[activeKpi];
 
   // Integrasi C: bila ada realisasi DISETUJUI, pakai data nyata (live); jika belum, fallback ke seed.
@@ -388,32 +380,6 @@ export function ExecutivePage() {
         </FoldCard>
       )}
 
-      {/* Project Lifecycle Funnel */}
-      {(() => {
-        const lifecycle = (d as unknown as { projectLifecycle?: LifecycleStage[] }).projectLifecycle ?? [];
-        const total = lifecycle.reduce((s, x) => s + (x.count ?? 0), 0);
-        if (!lifecycle.length) return null;
-        return (
-          <FoldCard title={`Project Lifecycle — ${total} Proyek Aktif PUSMANPRO`} icon={<GitBranch size={14} />} right={<span className="card-meta">Pra-Pelaksanaan → Pelaksanaan → TOC → FAC</span>}>
-            <div className="lifecycle-funnel" style={{padding:'var(--space-4)'}}>
-              {lifecycle.map((s) => {
-                const pct = total > 0 ? Math.round((s.count / total) * 100) : 0;
-                const Icon = LIFECYCLE_ICON[s.icon] ?? ClipboardList;
-                return (
-                  <div key={s.code} className="lifecycle-stage" style={{ ['--stage-color' as string]: s.color } as CSSProperties}>
-                    <div className="lifecycle-pct">{pct}%</div>
-                    <div className="lifecycle-head"><Icon size={14} />{s.code.toUpperCase()}</div>
-                    <div><span className="lifecycle-count">{s.count}</span><span className="lifecycle-count-unit">proyek</span></div>
-                    <div className="lifecycle-stage-name">{s.stage}</div>
-                    <div className="lifecycle-stage-desc">{s.desc}</div>
-                  </div>
-                );
-              })}
-            </div>
-          </FoldCard>
-        );
-      })()}
-
       {/* KPI Master-Detail */}
       <FoldCard title={`Indikator Kinerja PUSMANPRO — ${kpis.length} KPI RKM ${currentYear}`} icon={<BarChart3 size={14} />} right={<span className="card-meta">Klik KPI untuk lihat detail</span>}>
         <div className="kpi-md-section" style={{ gridTemplateColumns: '1fr 1fr', marginBottom: 0 }}>
@@ -523,7 +489,7 @@ export function ExecutivePage() {
                       <td className="num" style={{fontWeight:800,color:'var(--color-brand)'}}>{fmt(score)}</td>
                       <td className="num" style={{color:'var(--color-text-muted)'}}>{fmt(target)}</td>
                       <td><span className={`status-pill ${stCls}`}>{r.status}</span></td>
-                      <td style={{fontSize:'var(--text-xs)',color:'var(--color-text-muted)'}}>{r.criticalKpi ?? '—'}</td>
+                      <td style={{fontSize:'var(--text-xs)',color:'var(--color-text-muted)'}}>{isPrivileged ? (r.criticalKpi ?? '—') : '—'}</td>
                     </tr>
                   );
                 })}
@@ -534,7 +500,7 @@ export function ExecutivePage() {
       )}
 
       {/* Strategic Initiatives */}
-      {d.initiatives && d.initiatives.length > 0 && (
+      {isPrivileged && d.initiatives && d.initiatives.length > 0 && (
         <FoldCard title={`Strategic Initiatives (${d.initiatives.length})`} icon={<Layers size={14} />} right={<span className="card-meta">RKM {currentYear}</span>}>
           <div className="table-wrap">
             <table className="data-table compact">
