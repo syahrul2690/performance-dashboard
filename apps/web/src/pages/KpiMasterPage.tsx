@@ -234,7 +234,12 @@ function DefinisiKpiTab({ onGoToDokumen }: { onGoToDokumen: () => void }) {
         if (!s.nama.trim()) { setFormError('Nama setiap sub-indikator wajib diisi.'); return; }
         if (subNames.has(s.nama.trim())) { setFormError(`Sub-indikator "${s.nama}" terpilih ganda.`); return; }
         subNames.add(s.nama.trim());
-        if (!s.bobot.trim() || Number(String(s.bobot).replace(',', '.')) <= 0) { setFormError(`Bobot sub-indikator "${s.nama}" harus angka > 0.`); return; }
+        const bobotNum = Number(String(s.bobot).replace(',', '.'));
+        if (aggregationMethod === 'sum') {
+          if (!s.bobot.trim() || !Number.isFinite(bobotNum) || bobotNum >= 0) { setFormError(`Max penalti sub-indikator "${s.nama}" harus angka negatif (mis. -3).`); return; }
+        } else if (!s.bobot.trim() || !Number.isFinite(bobotNum) || bobotNum <= 0) {
+          setFormError(`Bobot sub-indikator "${s.nama}" harus angka > 0.`); return;
+        }
         if (!s.target.trim()) { setFormError(`Target sub-indikator "${s.nama}" wajib diisi.`); return; }
       }
     }
@@ -390,6 +395,9 @@ function DefinisiKpiTab({ onGoToDokumen }: { onGoToDokumen: () => void }) {
                 Anggaran" = OPEX + Investasi; "Kepatuhan, Maturity Level & Tata Kelola" = SMAP + ESG + GCG).
                 Bisa dipakai untuk KPI apa pun — nilai induk = jumlah nilai tiap sub, bobot KM tiap assignment
                 jadi otomatis (Σ bobot sub).
+                {aggregationMethod === 'sum' && (
+                  <> Metode <b>SUM</b> aktif (KPI penalti/pengurang) — isi tiap sub dengan <b>max penalti negatif</b> (mis. -3), bukan poin positif.</>
+                )}
               </p>
               {isComposite && (
                 <div className="table-wrap" style={{ marginTop: 'var(--space-2)' }}>
@@ -397,7 +405,7 @@ function DefinisiKpiTab({ onGoToDokumen }: { onGoToDokumen: () => void }) {
                     <thead>
                       <tr>
                         <th>Nama Sub-Indikator</th><th>Formula / Cara Pengukuran</th><th>Satuan</th>
-                        <th className="num">Bobot (poin)</th><th>Target Sem I</th><th>Target {CURRENT_YEAR}</th>
+                        <th className="num">{aggregationMethod === 'sum' ? 'Max Penalti (poin)' : 'Bobot (poin)'}</th><th>Target Sem I</th><th>Target {CURRENT_YEAR}</th>
                         <th style={{ width: 40 }} />
                       </tr>
                     </thead>
@@ -407,7 +415,7 @@ function DefinisiKpiTab({ onGoToDokumen }: { onGoToDokumen: () => void }) {
                           <td><input className="form-input form-input-sm" value={s.nama} onChange={(e) => updateSubIndicator(i, 'nama', e.target.value)} placeholder="mis. OPEX vs RKAP" /></td>
                           <td><input className="form-input form-input-sm" value={s.formula ?? ''} onChange={(e) => updateSubIndicator(i, 'formula', e.target.value)} placeholder="Rumus / cara pengukuran sub ini" /></td>
                           <td><input className="form-input form-input-sm" value={s.satuan ?? ''} onChange={(e) => updateSubIndicator(i, 'satuan', e.target.value)} placeholder="%, Rp M, dsb" /></td>
-                          <td><input className="form-input form-input-sm" style={{ textAlign: 'center' }} value={s.bobot} onChange={(e) => updateSubIndicator(i, 'bobot', e.target.value)} placeholder="poin" /></td>
+                          <td><input className="form-input form-input-sm" style={{ textAlign: 'center' }} value={s.bobot} onChange={(e) => updateSubIndicator(i, 'bobot', e.target.value)} placeholder={aggregationMethod === 'sum' ? '-3' : 'poin'} /></td>
                           <td><input className="form-input form-input-sm" value={s.target} onChange={(e) => updateSubIndicator(i, 'target', e.target.value)} placeholder="Target Sem I" /></td>
                           <td><input className="form-input form-input-sm" value={s.target2 ?? ''} onChange={(e) => updateSubIndicator(i, 'target2', e.target.value)} placeholder="Target tahun" /></td>
                           <td>
@@ -416,7 +424,7 @@ function DefinisiKpiTab({ onGoToDokumen }: { onGoToDokumen: () => void }) {
                         </tr>
                       ))}
                       <tr style={{ background: 'var(--color-surface-2)' }}>
-                        <td colSpan={3} style={{ textAlign: 'right', fontWeight: 700, fontSize: 'var(--text-xs)' }}>Total Bobot (= Bobot KM assignment):</td>
+                        <td colSpan={3} style={{ textAlign: 'right', fontWeight: 700, fontSize: 'var(--text-xs)' }}>{aggregationMethod === 'sum' ? 'Total Max Penalti (= Bobot KM assignment):' : 'Total Bobot (= Bobot KM assignment):'}</td>
                         <td className="num" style={{ fontWeight: 700 }}>{totalSubBobot || 0}</td>
                         <td colSpan={3} />
                       </tr>

@@ -148,7 +148,12 @@ export class KpiMasterService {
 
   // Validasi & normalisasi sub-indikator (opt-in, generik — lihat SubIndicatorInput). Array
   // kosong/tak ada → null (KPI ini bukan komposit). Melempar bila ada baris tak valid.
-  private sanitizeSubIndicators(input: unknown): SubIndicatorInput[] | null {
+  // aggregationMethod menentukan tanda bobot yang sah: 'sum' (KPI penalti/pengurang, mis.
+  // "Kepatuhan, Maturity Level & Tata Kelola") → bobot = max penalti, harus NEGATIF (mis. -3);
+  // 'weighted' (KPI positif biasa) → bobot = poin, harus POSITIF. Rumus nilai (breakdownComposite
+  // di common/capaian.ts) tak berubah — tetap (capaian% × bobot), jadi bobot negatif otomatis
+  // menghasilkan nilai negatif proporsional ke capaian.
+  private sanitizeSubIndicators(input: unknown, aggregationMethod: 'weighted' | 'sum'): SubIndicatorInput[] | null {
     if (!Array.isArray(input) || input.length === 0) return null;
     const seen = new Set<string>();
     const out: SubIndicatorInput[] = [];
@@ -160,7 +165,11 @@ export class KpiMasterService {
       seen.add(nama);
       const bobotStr = String(r?.bobot ?? '').trim();
       const bobotNum = Number(bobotStr.replace(',', '.'));
-      if (!Number.isFinite(bobotNum) || bobotNum <= 0) throw new BadRequestException(`Bobot sub-indikator "${nama}" harus angka > 0`);
+      if (aggregationMethod === 'sum') {
+        if (!Number.isFinite(bobotNum) || bobotNum >= 0) throw new BadRequestException(`Max penalti sub-indikator "${nama}" harus angka negatif (mis. -3)`);
+      } else if (!Number.isFinite(bobotNum) || bobotNum <= 0) {
+        throw new BadRequestException(`Bobot sub-indikator "${nama}" harus angka > 0`);
+      }
       const target = String(r?.target ?? '').trim();
       if (!target) throw new BadRequestException(`Target sub-indikator "${nama}" wajib diisi`);
       out.push({
@@ -544,7 +553,7 @@ export class KpiMasterService {
     // Sub-indikator (opt-in, generik): non-kosong → KPI ini "komposit". bobotKm (kini data
     // parent di KpiMaster, sama untuk semua assignment) jadi TURUNAN (Σ bobot sub) — override
     // input user.
-    const subIndicators = this.sanitizeSubIndicators(dto.subIndicators);
+    const subIndicators = this.sanitizeSubIndicators(dto.subIndicators, aggregationMethod);
     if (subIndicators) {
       const compositeBobot = subIndicators.reduce((s, si) => s + (Number(String(si.bobot).replace(',', '.')) || 0), 0);
       dto.bobotKm = String(compositeBobot);
