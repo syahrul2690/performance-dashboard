@@ -31,12 +31,8 @@ export class OperationalService {
       return (await this.prisma.operationalSnapshot.findUnique({ where: { periodId_phase: { periodId: pid, phase: 'final' } } }))
         ?? this.prisma.operationalSnapshot.findUnique({ where: { periodId_phase: { periodId: pid, phase: 'sementara' } } });
     };
-    let snap = await pick(period.id);
-    // Fallback baseline ke snapshot periode aktif bila periode terpilih belum punya snapshot.
-    if (!snap) {
-      const active = await this.prisma.period.findFirst({ where: { isActive: true } });
-      if (active && active.id !== period.id) snap = await pick(active.id);
-    }
+    // Tidak ada fallback ke snapshot periode lain — lihat catatan di ExecutiveService.getSummary().
+    const snap = await pick(period.id);
     const result = { period, data: snap?.data ?? null, phase: snap?.phase ?? (phase ?? 'sementara') };
     await this.cache.set(cacheKey, result);
     return result;

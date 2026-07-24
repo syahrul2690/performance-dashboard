@@ -31,13 +31,10 @@ export class ExecutiveService {
       return (await this.prisma.executiveSnapshot.findUnique({ where: { periodId_phase: { periodId: pid, phase: 'final' } } }))
         ?? this.prisma.executiveSnapshot.findUnique({ where: { periodId_phase: { periodId: pid, phase: 'sementara' } } });
     };
-    let snap = await pick(period.id);
-    // Fallback: bila periode terpilih belum punya snapshot naratif, pakai snapshot periode aktif
-    // sebagai baseline. Angka kinerja LIVE tetap mengikuti realisasi periode terpilih (via /kinerja/rekap).
-    if (!snap) {
-      const active = await this.prisma.period.findFirst({ where: { isActive: true } });
-      if (active && active.id !== period.id) snap = await pick(active.id);
-    }
+    // Tidak ada fallback ke snapshot periode lain — periode tanpa snapshot sendiri berarti
+    // benar-benar belum ada data kinerja utk periode itu (FE tampilkan empty state), bukan
+    // menampilkan angka periode lain seolah-olah itu data periode terpilih.
+    const snap = await pick(period.id);
     const result = { period, data: snap?.data ?? null, phase: snap?.phase ?? (phase ?? 'sementara') };
     await this.cache.set(cacheKey, result);
     return result;
