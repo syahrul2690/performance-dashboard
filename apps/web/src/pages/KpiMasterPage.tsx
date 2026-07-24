@@ -119,6 +119,9 @@ function DefinisiKpiTab({ onGoToDokumen }: { onGoToDokumen: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [continuePrompt, setContinuePrompt] = useState(false);
+  // Modal blocking — target belum diisi (assignment biasa ATAU sub-indikator komposit). Diisi
+  // dengan daftar item yang bermasalah; null = modal tertutup.
+  const [missingTargetItems, setMissingTargetItems] = useState<string[] | null>(null);
   const [rollups, setRollups] = useState<Record<string, Rollup>>({});
   const [rollupLoading, setRollupLoading] = useState<string | null>(null);
 
@@ -227,6 +230,13 @@ function DefinisiKpiTab({ onGoToDokumen }: { onGoToDokumen: () => void }) {
       setFormError(`Total bobot agregasi harus 100%, saat ini ${totalPersenForm}%.`);
       return;
     }
+    // Target wajib diisi — KPI tanpa target diam-diam dilewati dari penilaian tanpa peringatan
+    // (lihat catatan sama di kpi-master.service.ts save()). Blocking modal (bukan banner biasa)
+    // karena mudah terlewat & user diminta lengkapi dulu sebelum bisa disimpan sama sekali.
+    const missingTargets = isComposite
+      ? subIndicators.filter((s) => !s.target.trim()).map((s) => `Sub-indikator "${s.nama.trim() || '(tanpa nama)'}"`)
+      : assignments.filter((a) => !a.target.trim()).map((a) => `${UNIT_NAMES[a.unitCode] ?? a.unitCode} — ${a.bidang}`);
+    if (missingTargets.length > 0) { setMissingTargetItems(missingTargets); return; }
     if (isComposite) {
       if (subIndicators.length === 0) { setFormError('Tambahkan minimal satu sub-indikator, atau matikan mode Komposit.'); return; }
       const subNames = new Set<string>();
@@ -240,7 +250,6 @@ function DefinisiKpiTab({ onGoToDokumen }: { onGoToDokumen: () => void }) {
         } else if (!s.bobot.trim() || !Number.isFinite(bobotNum) || bobotNum <= 0) {
           setFormError(`Bobot sub-indikator "${s.nama}" harus angka > 0.`); return;
         }
-        if (!s.target.trim()) { setFormError(`Target sub-indikator "${s.nama}" wajib diisi.`); return; }
       }
     }
     setFormError(null); setBusy(true);
@@ -304,6 +313,32 @@ function DefinisiKpiTab({ onGoToDokumen }: { onGoToDokumen: () => void }) {
                 <button className="btn btn-primary" onClick={() => { setContinuePrompt(false); onGoToDokumen(); }}>
                   <FileText size={15} /> Ke Dokumen KM
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {missingTargetItems && (
+        <div
+          role="dialog" aria-modal="true"
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 'var(--space-4)' }}
+          onClick={() => setMissingTargetItems(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="card"
+            style={{ maxWidth: 440, width: '100%', margin: 0 }}
+          >
+            <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', alignItems: 'flex-start' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--color-warning)' }}>
+                <AlertCircle size={20} /> <strong>Target belum diisi</strong>
+              </div>
+              <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
+                Target wajib diisi sebelum bisa disimpan. Lengkapi dulu: <b>{missingTargetItems.join(' & ')}</b>
+              </p>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>
+                <button className="btn btn-primary" onClick={() => setMissingTargetItems(null)}>Mengerti, saya lengkapi</button>
               </div>
             </div>
           </div>
@@ -792,6 +827,19 @@ function DokumenKmTab() {
     }
   };
 
+  // Hapus dokumen KM draft/rejected — backend menolak status submitted/approved. Sama seperti
+  // fan-out otomatis, dokumen ini bisa muncul lagi kalau Definisi KPI-nya masih ada; hapus di
+  // sini murni membuang dokumen kosong/keliru, bukan alternatif menghapus KPI Master-nya.
+  const handleDeleteKm = async (k: KontrakManajemen) => {
+    if (!confirm(`Hapus dokumen KM ${UNIT_NAMES[k.unitCode] ?? k.unitCode} — ${k.bidang}? Tindakan ini tidak bisa dibatalkan.`)) return;
+    try {
+      await inputKontrak.delete(k.id);
+      await loadData();
+    } catch (e) {
+      setError((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? (e as Error)?.message ?? 'Gagal menghapus dokumen');
+    }
+  };
+
   // Borongan: kirim semua dokumen yang punya default reviewer lengkap.
   const handleBulkSubmit = async () => {
     if (readyDocs.length === 0) return;
@@ -884,7 +932,7 @@ function DokumenKmTab() {
             <table className="data-table compact">
               <thead>
                 <tr>
-                  <th>Unit</th><th>Bidang</th><th>Penanggung Jawab</th><th>Jumlah KPI</th><th>Status</th><th>Tanggal</th><th style={{ width: 140 }}>Aksi</th>
+                  <th>Unit</th><th>Bidang</th><th>Penanggung Jawab</th><th>Jumlah KPI</th><th>Status</th><th>Tanggal</th><th style={{ width: 180 }}>Aksi</th>
                 </tr>
               </thead>
               <tbody>
@@ -911,9 +959,14 @@ function DokumenKmTab() {
                       <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
                         {(k.status === 'draft' || k.status === 'rejected') ? (
                           canActOnRow(k) ? (
-                            <button className="btn btn-primary btn-sm" onClick={() => handleSubmit(k.id)} disabled={submitting} title={isDocReady(k.id) ? 'Alur reviewer default siap' : 'Belum ada default reviewer — pilih manual'}>
-                              <Send size={14} /> Kirim
-                            </button>
+                            <>
+                              <button className="btn btn-primary btn-sm" onClick={() => handleSubmit(k.id)} disabled={submitting} title={isDocReady(k.id) ? 'Alur reviewer default siap' : 'Belum ada default reviewer — pilih manual'}>
+                                <Send size={14} /> Kirim
+                              </button>
+                              <button className="btn btn-ghost btn-sm" onClick={() => handleDeleteKm(k)} disabled={submitting} title="Hapus dokumen KM" style={{ color: 'var(--color-danger)' }}>
+                                <Trash2 size={14} />
+                              </button>
+                            </>
                           ) : (
                             <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-subtle)' }}>Hanya PIC Kinerja (RPC) — lihat saja</span>
                           )

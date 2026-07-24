@@ -496,6 +496,15 @@ export class KpiMasterService {
       if (keys.has(k)) throw new BadRequestException(`Assignment ganda untuk ${a.unitCode} — ${a.bidang}`);
       keys.add(k);
     }
+    // Target wajib diisi — KPI tanpa target diam-diam dilewati dari penilaian (scoreItems di
+    // common/capaian.ts, target<=0 → item dilewati) tanpa peringatan. Komposit taruh target di
+    // level sub-indikator (divalidasi di sanitizeSubIndicators), bukan di assignment.
+    const isCompositeDto = Array.isArray(dto.subIndicators) && dto.subIndicators.length > 0;
+    if (!isCompositeDto) {
+      for (const a of dto.assignments) {
+        if (!a.target?.trim()) throw new BadRequestException(`Target Sem I wajib diisi untuk ${a.unitCode} — ${a.bidang}`);
+      }
+    }
     // Metode agregasi (Fase E) — dipilih per-KPI. 'sum' = jumlah polos tiap kontribusi
     // (KPI penalti/pengurang, tanpa syarat Σ=100%). 'weighted' = rata-rata tertimbang
     // pakai persenAgregasi (Σ=100% wajib bila diisi) — perilaku Fase B, default.
