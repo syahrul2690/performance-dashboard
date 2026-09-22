@@ -19,6 +19,7 @@ import type {
   KontrakManajemenItem,
   DocRow,
   PaginatedDocRows,
+  DocStatusSummary,
 } from "../lib/types";
 import {
   CheckCircle,
@@ -262,6 +263,9 @@ const ACTION_LABEL: Record<string, string> = {
   approved: "Disetujui",
   returned: "Dikembalikan ke konseptor",
   returned_step: "Dikembalikan 1 tahap",
+  revised_item_after_reject: "Indikator KPI direvisi (sebagian)",
+  revised_after_reject:
+    "Seluruh Indikator KPI direvisi — dikembalikan ke Draft",
 };
 function ApprovalTimeline({ history }: { history: unknown }) {
   const entries = Array.isArray(history) ? (history as HistEntry[]) : [];
@@ -747,12 +751,25 @@ export function ApprovalsPage() {
   >(null);
   // Draft dan Final adalah dua bundle KM independen — tab ini menentukan mana yang ditinjau GM.
   const [kmBundleType, setKmBundleType] = useState<"draft" | "final">("draft");
+  const [trackerKmType, setTrackerKmType] = useState<string>("all");
   const [filteredDocRows, setFilteredDocRows] = useState<DocRow[]>([]);
   const [docKpiExpanded, setDocKpiExpanded] = useState<string | null>(null);
+  const [subIndicatorsExpanded, setSubIndicatorsExpanded] = useState<
+    number | null
+  >(null);
+  const [subIndicatorsExpandedRi, setSubIndicatorsExpandedRi] = useState<
+    number | null
+  >(null);
   const [docPagination, setDocPagination] = useState<
     PaginatedDocRows["pagination"]
   >({ currentPage: 1, perPage: 10, totalData: 0, totalPage: 0 });
   const [docPage, setDocPage] = useState(1);
+  const [docSummary, setDocSummary] = useState<DocStatusSummary>({
+    submitted: 0,
+    ready: 0,
+    approved: 0,
+    rejected: 0,
+  });
 
   const { paginate, indexOfFirstProject, indexOfLastProject } =
     usePaginationHelpers(docPagination, docPage, setDocPage);
@@ -831,16 +848,21 @@ export function ApprovalsPage() {
         type: trackerType,
         status: trackerStatus,
         periodId: trackerPeriod,
+        kmType: trackerKmType,
         currentPage: docPage,
         perPage: 10,
       })
       .then((res: PaginatedDocRows) => {
         setFilteredDocRows(res.data);
         setDocPagination(res.pagination);
+        setDocSummary(res.summary);
       })
       .catch(() => {});
-  }, [trackerType, trackerStatus, trackerPeriod, docPage]);
-  useEffect(() => setDocPage(1), [trackerType, trackerStatus, trackerPeriod]);
+  }, [trackerType, trackerStatus, trackerPeriod, trackerKmType, docPage]);
+  useEffect(
+    () => setDocPage(1),
+    [trackerType, trackerStatus, trackerPeriod, trackerKmType],
+  );
 
   // Package berstatus 'target_fix' (menunggu koreksi target PIC REN) — SEMUA periode, bukan
   // hanya periode yang sedang dipilih di navbar (finding: koreksi Januari harus tetap tampil
@@ -2157,6 +2179,8 @@ export function ApprovalsPage() {
     ...realList.map((r): QueueEntry => ({ kind: "real", data: r })),
   ].sort((a, b) => slaOf(a) - slaOf(b));
 
+  const showKmType = trackerType === "all" || trackerType === "km";
+
   return (
     <div className="page approvals-page">
       <div style={{ marginBottom: "var(--space-5)" }}>
@@ -2246,7 +2270,7 @@ export function ApprovalsPage() {
               className="table-wrap"
               style={{ paddingBottom: "var(--space-7)" }}>
               <div
-                className={`table-scroll ${kmList.length > 0 && "able-scroll"}`}>
+                className={`table-scroll ${queueEntries.length > 0 && "able-scroll"}`}>
                 <table className="data-table compact">
                   <thead>
                     <tr>
@@ -2258,7 +2282,7 @@ export function ApprovalsPage() {
                       <th>Jenjang Persetujuan</th>
                       <th>SLA</th>
                       <th>Tanggal</th>
-                      <th style={{ width: 260 }}>Tindakan</th>
+                      <th style={{ width: 260 }} className="num">Tindakan</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2285,7 +2309,7 @@ export function ApprovalsPage() {
                                     <span
                                       className="status-pill"
                                       style={{
-                                        fontSize: 11,
+                                        fontSize: 12,
                                         background: "var(--color-accent-tint)",
                                         color: "var(--color-accent)",
                                         fontWeight: 700,
@@ -2515,6 +2539,7 @@ export function ApprovalsPage() {
                                           display: "flex",
                                           gap: "var(--space-2)",
                                           flexWrap: "wrap",
+                                         justifyContent: "center",
                                         }}>
                                         <button
                                           className="btn btn-secondary btn-sm"
@@ -2604,88 +2629,207 @@ export function ApprovalsPage() {
                                               string,
                                               string
                                             >;
+
+                                            const subIndicators =
+                                              (
+                                                it as {
+                                                  subIndicators?: unknown[];
+                                                }
+                                              ).subIndicators ?? [];
+                                            const hasSubIndicators =
+                                              subIndicators.length > 0;
+                                            const countSubsIndicator =
+                                              subIndicators.length;
+
                                             return (
-                                              <tr key={idx}>
-                                                <td>{idx + 1}</td>
-                                                <td>{itStr.indikator}</td>
-                                                <td>{itStr.formula}</td>
-                                                <td>{itStr.satuan}</td>
-                                                <td className="num">
-                                                  {itStr.bobot}
-                                                </td>
-                                                <td
-                                                  style={{
-                                                    fontWeight: editing
-                                                      ? 700
-                                                      : undefined,
-                                                  }}>
-                                                  {editing ? (
-                                                    <input
-                                                      type="text"
-                                                      className="form-input form-input-sm"
-                                                      style={{ width: 90 }}
-                                                      value={String(
-                                                        kmEditItems[idx]
-                                                          ?.target ?? "",
-                                                      )}
-                                                      onChange={(e) =>
-                                                        setKmEditItems(
-                                                          (items) =>
-                                                            items.map(
-                                                              (item, i) =>
-                                                                i === idx
-                                                                  ? {
-                                                                      ...item,
-                                                                      target:
-                                                                        e.target
-                                                                          .value,
-                                                                    }
-                                                                  : item,
-                                                            ),
-                                                        )
-                                                      }
-                                                    />
-                                                  ) : (
-                                                    itStr.target
+                                              <>
+                                                <tr key={idx}>
+                                                  <td>{idx + 1}</td>
+                                                  <td>
+                                                    {itStr.indikator || "—"}
+                                                  </td>
+                                                  <td>
+                                                    {itStr.formula || "—"}
+                                                  </td>
+                                                  <td>{itStr.satuan || "—"}</td>
+                                                  <td className="num">
+                                                    {itStr.bobot || "—"}
+                                                  </td>
+                                                  <td
+                                                    style={{
+                                                      fontWeight: editing
+                                                        ? 700
+                                                        : undefined,
+                                                    }}>
+                                                    {editing ? (
+                                                      <input
+                                                        type="text"
+                                                        className="form-input form-input-sm"
+                                                        style={{ width: 90 }}
+                                                        value={String(
+                                                          kmEditItems[idx]
+                                                            ?.target ?? "",
+                                                        )}
+                                                        onChange={(e) =>
+                                                          setKmEditItems(
+                                                            (items) =>
+                                                              items.map(
+                                                                (item, i) =>
+                                                                  i === idx
+                                                                    ? {
+                                                                        ...item,
+                                                                        target:
+                                                                          e
+                                                                            .target
+                                                                            .value,
+                                                                      }
+                                                                    : item,
+                                                              ),
+                                                          )
+                                                        }
+                                                      />
+                                                    ) : hasSubIndicators ? (
+                                                      <button
+                                                        className="btn btn-ghost btn-sm"
+                                                        onClick={() =>
+                                                          setSubIndicatorsExpanded(
+                                                            subIndicatorsExpanded ===
+                                                              idx
+                                                              ? null
+                                                              : idx,
+                                                          )
+                                                        }
+                                                        title="Lihat target tiap sub-indikator">
+                                                        {countSubsIndicator} sub{" "}
+                                                        <ChevronDown
+                                                          size={12}
+                                                          style={{
+                                                            transform:
+                                                              subIndicatorsExpanded ===
+                                                              idx
+                                                                ? "rotate(180deg)"
+                                                                : "none",
+                                                            transition:
+                                                              "transform .2s",
+                                                          }}
+                                                        />
+                                                      </button>
+                                                    ) : (
+                                                      itStr.target
+                                                    )}
+                                                  </td>
+                                                  <td
+                                                    style={{
+                                                      fontWeight: editing
+                                                        ? 700
+                                                        : undefined,
+                                                    }}>
+                                                    {editing ? (
+                                                      <input
+                                                        type="text"
+                                                        className="form-input form-input-sm"
+                                                        style={{ width: 90 }}
+                                                        value={String(
+                                                          kmEditItems[idx]
+                                                            ?.target2 ?? "",
+                                                        )}
+                                                        onChange={(e) =>
+                                                          setKmEditItems(
+                                                            (items) =>
+                                                              items.map(
+                                                                (item, i) =>
+                                                                  i === idx
+                                                                    ? {
+                                                                        ...item,
+                                                                        target2:
+                                                                          e
+                                                                            .target
+                                                                            .value,
+                                                                      }
+                                                                    : item,
+                                                              ),
+                                                          )
+                                                        }
+                                                      />
+                                                    ) : (
+                                                      itStr.target2 || "-"
+                                                    )}
+                                                  </td>
+                                                </tr>
+                                                {hasSubIndicators &&
+                                                  subIndicatorsExpanded ===
+                                                    idx && (
+                                                    <tr>
+                                                      <td
+                                                        colSpan={7}
+                                                        style={{
+                                                          background:
+                                                            "var(--color-surface-2)",
+                                                          padding: 0,
+                                                        }}>
+                                                        <table
+                                                          className="data-table table-expanded"
+                                                          style={{ margin: 0 }}>
+                                                          <thead>
+                                                            <tr>
+                                                              <th>
+                                                                Sub-Indikator
+                                                              </th>
+                                                              <th>Formula</th>
+                                                              <th>Polaritas</th>
+                                                              <th>Satuan</th>
+
+                                                              <th className="num">
+                                                                Target Sem I
+                                                              </th>
+                                                              <th className="num">
+                                                                Target Tahun
+                                                                {new Date().getFullYear()}
+                                                              </th>
+                                                            </tr>
+                                                          </thead>
+                                                          <tbody>
+                                                            {subIndicators.map(
+                                                              (
+                                                                sub: any,
+                                                                j: number,
+                                                              ) => (
+                                                                <tr key={j}>
+                                                                  <td>
+                                                                    ↳{" "}
+                                                                    {sub.nama ||
+                                                                      `Sub ${j + 1}`}
+                                                                  </td>
+                                                                  <td>
+                                                                    {sub.formula ||
+                                                                      "—"}
+                                                                  </td>
+                                                                  <td className="num">
+                                                                    {sub.polaritas ||
+                                                                      "—"}
+                                                                  </td>
+                                                                  <td className="num">
+                                                                    {sub.satuan ||
+                                                                      "—"}
+                                                                  </td>
+                                                                  <td className="num">
+                                                                    {sub.target ||
+                                                                      "—"}
+                                                                  </td>
+
+                                                                  <td className="num">
+                                                                    {sub.target2 ||
+                                                                      "—"}
+                                                                  </td>
+                                                                </tr>
+                                                              ),
+                                                            )}
+                                                          </tbody>
+                                                        </table>
+                                                      </td>
+                                                    </tr>
                                                   )}
-                                                </td>
-                                                <td
-                                                  style={{
-                                                    fontWeight: editing
-                                                      ? 700
-                                                      : undefined,
-                                                  }}>
-                                                  {editing ? (
-                                                    <input
-                                                      type="text"
-                                                      className="form-input form-input-sm"
-                                                      style={{ width: 90 }}
-                                                      value={String(
-                                                        kmEditItems[idx]
-                                                          ?.target2 ?? "",
-                                                      )}
-                                                      onChange={(e) =>
-                                                        setKmEditItems(
-                                                          (items) =>
-                                                            items.map(
-                                                              (item, i) =>
-                                                                i === idx
-                                                                  ? {
-                                                                      ...item,
-                                                                      target2:
-                                                                        e.target
-                                                                          .value,
-                                                                    }
-                                                                  : item,
-                                                            ),
-                                                        )
-                                                      }
-                                                    />
-                                                  ) : (
-                                                    itStr.target2
-                                                  )}
-                                                </td>
-                                              </tr>
+                                              </>
                                             );
                                           })}
                                         </tbody>
@@ -2700,15 +2844,18 @@ export function ApprovalsPage() {
                             const rl = entry.data;
                             const entries = Object.values(rl.values ?? {});
                             const rr = rl as RealisasiKinerja & {
-                              steps?: { label: string }[];
+                              reviewSteps?: { label: string; kind?: string }[];
+                              reviewStepIndex?: number;
                               currentStepIndex?: number;
                               stepLabel?: string;
                             };
-                            const steps = rr.steps ?? [];
-                            const ci = rr.currentStepIndex ?? 0;
+                            const steps = rr.reviewSteps ?? [];
+                            const ci = rr.reviewStepIndex ?? 0;
+                            const csi = rr.currentStepIndex ?? 0;
                             const stepCount = steps.length;
                             const isLastStep = ci >= stepCount - 1;
                             const prevLabel = steps[ci - 1]?.label;
+
                             return (
                               <Fragment key={rl.id}>
                                 <tr>
@@ -2716,7 +2863,7 @@ export function ApprovalsPage() {
                                     <span
                                       className="status-pill"
                                       style={{
-                                        fontSize: 11,
+                                        fontSize: 12,
                                         background: "var(--color-info-tint)",
                                         color: "var(--color-info)",
                                         fontWeight: 700,
@@ -2727,11 +2874,7 @@ export function ApprovalsPage() {
                                   <td style={{ fontWeight: 600 }}>
                                     {UNIT_NAMES[rl.unitCode] ?? rl.unitCode}
                                   </td>
-                                  <td
-                                    style={{
-                                      fontSize: 13,
-                                      color: "var(--color-text-muted)",
-                                    }}>
+                                  <td>
                                     {(
                                       rl as RealisasiKinerja & {
                                         bidang?: string;
@@ -2746,7 +2889,7 @@ export function ApprovalsPage() {
                                   </td>
                                   <td>
                                     <button
-                                      className="btn btn-ghost btn-sm"
+                                      className="btn btn-ghost btn-sm num"
                                       onClick={() =>
                                         setRealExpanded(
                                           realExpanded === rl.id ? null : rl.id,
@@ -2807,7 +2950,7 @@ export function ApprovalsPage() {
                                         color: "var(--color-info)",
                                         fontWeight: 600,
                                       }}>
-                                      Langkah {ci}/{stepCount - 1}:{" "}
+                                      Langkah {csi}/{stepCount}:{" "}
                                       {rr.stepLabel ?? steps[ci]?.label ?? "—"}
                                     </div>
                                   </td>
@@ -2860,64 +3003,36 @@ export function ApprovalsPage() {
                                             gap: "var(--space-2)",
                                             flexWrap: "wrap",
                                           }}>
-                                          <button
-                                            className="btn btn-sm"
+                                          <div
                                             style={{
-                                              background:
-                                                "var(--color-success)",
-                                              color: "#fff",
-                                            }}
-                                            disabled={realBusy}
-                                            onClick={() =>
-                                              handleRealReview(rl.id, "approve")
-                                            }>
-                                            <CheckCircle size={12} />{" "}
-                                            {isLastStep
-                                              ? "Setujui (Selesai → Bundle)"
-                                              : "Setujui & Teruskan"}
-                                          </button>
-                                          <button
-                                            className="btn btn-sm"
-                                            style={{
-                                              background: "var(--color-danger)",
-                                              color: "#fff",
-                                            }}
-                                            disabled={realBusy}
-                                            onClick={() =>
-                                              handleRealReview(
-                                                rl.id,
-                                                "reject",
-                                                "konseptor",
-                                              )
-                                            }
-                                            title="Masalah pada REALISASI → kembali ke penyusun (PIC)">
-                                            <XCircle size={12} /> Masalah
-                                            Realisasi → Konseptor
-                                          </button>
-                                          <button
-                                            className="btn btn-sm"
-                                            style={{
-                                              background: "var(--color-accent)",
-                                              color: "#fff",
-                                            }}
-                                            disabled={realBusy}
-                                            onClick={() =>
-                                              handleRealReview(
-                                                rl.id,
-                                                "reject",
-                                                "target",
-                                              )
-                                            }
-                                            title="Masalah pada TARGET (KM Sementara) → routing ke PIC REN untuk koreksi target">
-                                            <XCircle size={12} /> Masalah Target
-                                            → PIC REN
-                                          </button>
-                                          {ci >= 2 && (
+                                              display: "flex",
+                                              gap: "var(--space-2)",
+                                              flexDirection: "row",
+                                            }}>
                                             <button
                                               className="btn btn-sm"
                                               style={{
                                                 background:
-                                                  "var(--color-warning)",
+                                                  "var(--color-success)",
+                                                color: "#fff",
+                                              }}
+                                              disabled={realBusy}
+                                              onClick={() =>
+                                                handleRealReview(
+                                                  rl.id,
+                                                  "approve",
+                                                )
+                                              }>
+                                              <CheckCircle size={12} />{" "}
+                                              {isLastStep
+                                                ? "Setujui (Selesai → Bundle)"
+                                                : "Setujui & Teruskan"}
+                                            </button>
+                                            <button
+                                              className="btn btn-sm"
+                                              style={{
+                                                background:
+                                                  "var(--color-danger)",
                                                 color: "#fff",
                                               }}
                                               disabled={realBusy}
@@ -2925,23 +3040,85 @@ export function ApprovalsPage() {
                                                 handleRealReview(
                                                   rl.id,
                                                   "reject",
-                                                  "previous",
+                                                  "konseptor",
                                                 )
-                                              }>
-                                              <XCircle size={12} /> Kembalikan
-                                              ke{" "}
-                                              {prevLabel ??
-                                                "langkah sebelumnya"}
+                                              }
+                                              title="Masalah pada REALISASI → kembali ke penyusun (PIC)">
+                                              <XCircle size={12} /> Masalah
+                                              Realisasi → Konseptor
                                             </button>
+                                          </div>
+                                          {csi >= 2 ? (
+                                            <div
+                                              style={{
+                                                display: "flex",
+                                                flexDirection: "row",
+                                                gap: "var(--space-2)",
+                                              }}>
+                                              <button
+                                                className="btn btn-sm"
+                                                style={{
+                                                  background:
+                                                    "var(--color-warning)",
+                                                  color: "#fff",
+                                                }}
+                                                disabled={realBusy}
+                                                onClick={() =>
+                                                  handleRealReview(
+                                                    rl.id,
+                                                    "reject",
+                                                    "previous",
+                                                  )
+                                                }>
+                                                <XCircle size={12} /> Kembalikan
+                                                ke{" "}
+                                                {prevLabel ??
+                                                  "langkah sebelumnya"}
+                                              </button>
+                                              <button
+                                                className="btn btn-ghost btn-sm"
+                                                onClick={() => {
+                                                  setRealTarget(null);
+                                                  setRealNote("");
+                                                }}>
+                                                Batal
+                                              </button>
+                                            </div>
+                                          ) : (
+                                            <div
+                                              style={{
+                                                display: "flex",
+                                                gap: "var(--space-2)",
+                                              }}>
+                                              <button
+                                                className="btn btn-sm"
+                                                style={{
+                                                  background:
+                                                    "var(--color-accent)",
+                                                  color: "#fff",
+                                                }}
+                                                disabled={realBusy}
+                                                onClick={() =>
+                                                  handleRealReview(
+                                                    rl.id,
+                                                    "reject",
+                                                    "target",
+                                                  )
+                                                }
+                                                title="Masalah pada TARGET (KM Sementara) → routing ke PIC REN untuk koreksi target">
+                                                <XCircle size={12} /> Masalah
+                                                Target → PIC REN
+                                              </button>
+                                              <button
+                                                className="btn btn-ghost btn-sm"
+                                                onClick={() => {
+                                                  setRealTarget(null);
+                                                  setRealNote("");
+                                                }}>
+                                                Batal
+                                              </button>
+                                            </div>
                                           )}
-                                          <button
-                                            className="btn btn-ghost btn-sm"
-                                            onClick={() => {
-                                              setRealTarget(null);
-                                              setRealNote("");
-                                            }}>
-                                            Batal
-                                          </button>
                                         </div>
                                       </div>
                                     ) : (
@@ -2950,6 +3127,7 @@ export function ApprovalsPage() {
                                           display: "flex",
                                           gap: "var(--space-2)",
                                           flexWrap: "wrap",
+                                          justifyContent: "center",
                                         }}>
                                         <button
                                           className="btn btn-secondary btn-sm"
@@ -2994,25 +3172,155 @@ export function ApprovalsPage() {
                                                 target?: unknown;
                                                 realisasi?: unknown;
                                               };
+
+                                              const subIndicators =
+                                                (
+                                                  it as {
+                                                    subIndicators?: unknown[];
+                                                  }
+                                                ).subIndicators ?? [];
+                                              const hasSubIndicators =
+                                                subIndicators.length > 0;
+                                              const countSubsIndicator =
+                                                subIndicators.length;
+
+          
                                               return (
-                                                <tr key={key}>
-                                                  <td>{idx + 1}</td>
-                                                  <td>{it.indikator ?? "—"}</td>
-                                                  <td>{it.satuan ?? "—"}</td>
-                                                  <td className="num">
-                                                    {String(it.bobot ?? "—")}
-                                                  </td>
-                                                  <td className="num">
-                                                    {String(it.target ?? "—")}
-                                                  </td>
-                                                  <td
-                                                    className="num"
-                                                    style={{ fontWeight: 700 }}>
-                                                    {String(
-                                                      it.realisasi ?? "—",
+                                                <>
+                                                  <tr key={key}>
+                                                    <td>{idx + 1}</td>
+                                                    <td>
+                                                      {it.indikator ?? "—"}
+                                                    </td>
+                                                    <td>{it.satuan ?? "—"}</td>
+                                                    <td className="num">
+                                                      {String(it.bobot ?? "—")}
+                                                    </td>
+                                                    <td className="num">
+                                                      {hasSubIndicators ? (
+                                                        <button
+                                                          className="btn btn-ghost btn-sm"
+                                                          onClick={() =>
+                                                            setSubIndicatorsExpandedRi(
+                                                              subIndicatorsExpandedRi ===
+                                                                idx
+                                                                ? null
+                                                                : idx,
+                                                            )
+                                                          }
+                                                          title="Lihat target tiap sub-indikator">
+                                                          {countSubsIndicator}{" "}
+                                                          sub{" "}
+                                                          <ChevronDown
+                                                            size={12}
+                                                            style={{
+                                                              transform:
+                                                                subIndicatorsExpandedRi ===
+                                                                idx
+                                                                  ? "rotate(180deg)"
+                                                                  : "none",
+                                                              transition:
+                                                                "transform .2s",
+                                                            }}
+                                                          />
+                                                        </button>
+                                                      ) : (
+                                                        String(it.target ?? "—")
+                                                      )}
+                                                    </td>
+                                                    <td
+                                                      className="num"
+                                                      style={{
+                                                        fontWeight: 700,
+                                                      }}>
+                                                      {String(
+                                                        it.realisasi ?? "—",
+                                                      )}
+                                                    </td>
+                                                  </tr>
+                                                  {hasSubIndicators &&
+                                                    subIndicatorsExpandedRi ===
+                                                      idx && (
+                                                      <tr>
+                                                        <td
+                                                          colSpan={7}
+                                                          style={{
+                                                            background:
+                                                              "var(--color-surface-2)",
+                                                            padding: 0,
+                                                          }}>
+                                                          <table
+                                                            className="data-table table-expanded"
+                                                            style={{
+                                                              margin: 0,
+                                                            }}>
+                                                            <thead>
+                                                              <tr>
+                                                                <th>
+                                                                  Sub-Indikator
+                                                                </th>
+                                                                <th>Formula</th>
+                                                                <th>
+                                                                  Polaritas
+                                                                </th>
+                                                                <th>Satuan</th>
+                                                                <th>Bobot</th>
+
+                                                                <th className="num">
+                                                                  Target Sem I
+                                                                </th>
+                                                                <th className="num">
+                                                                  Target Tahun
+                                                                  {new Date().getFullYear()}
+                                                                </th>
+                                                              </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                              {subIndicators.map(
+                                                                (
+                                                                  sub: any,
+                                                                  j: number,
+                                                                ) => (
+                                                                  <tr key={j}>
+                                                                    <td>
+                                                                      ↳{" "}
+                                                                      {sub.nama ||
+                                                                        `Sub ${j + 1}`}
+                                                                    </td>
+                                                                    <td>
+                                                                      {sub.formula ||
+                                                                        "—"}
+                                                                    </td>
+                                                                    <td className="num">
+                                                                      {sub.polaritas ||
+                                                                        "—"}
+                                                                    </td>
+                                                                    <td className="num">
+                                                                      {sub.satuan ||
+                                                                        "—"}
+                                                                    </td>
+                                                                    <td className="num">
+                                                                      {sub.bobot ||
+                                                                        "—"}
+                                                                    </td>
+                                                                    <td className="num">
+                                                                      {sub.target ||
+                                                                        "—"}
+                                                                    </td>
+
+                                                                    <td className="num">
+                                                                      {sub.target2 ||
+                                                                        "—"}
+                                                                    </td>
+                                                                  </tr>
+                                                                ),
+                                                              )}
+                                                            </tbody>
+                                                          </table>
+                                                        </td>
+                                                      </tr>
                                                     )}
-                                                  </td>
-                                                </tr>
+                                                </>
                                               );
                                             },
                                           )}
@@ -3340,7 +3648,6 @@ export function ApprovalsPage() {
                       <tr>
                         <td
                           style={{
-                            
                             color: "var(--color-text-muted)",
                           }}>
                           {c.bidang}
@@ -3350,8 +3657,7 @@ export function ApprovalsPage() {
                         </td>
                         <td>
                           <span
-                            className={`status-pill ${c.status === "approved" ? "completed" : c.status === "ready" ? "at-risk" : "in-review"}`}
-                            >
+                            className={`status-pill ${c.status === "approved" ? "completed" : c.status === "ready" ? "at-risk" : "in-review"}`}>
                             {c.status === "ready"
                               ? "Siap (lolos SM RPC)"
                               : c.status === "approved"
@@ -4313,6 +4619,17 @@ export function ApprovalsPage() {
                 </option>
               ))}
             </select>
+            {showKmType && (
+              <select
+                className="form-input form-input-sm"
+                value={trackerKmType}
+                onChange={(e) => setTrackerKmType(e.target.value)}>
+                <option value="all">Semua tipe KM</option>
+                <option value="draft">KM Draft</option>
+                <option value="final">KM Final</option>
+              </select>
+            )}
+
             <select
               className="form-input form-input-sm"
               value={trackerPeriod}
@@ -4339,7 +4656,7 @@ export function ApprovalsPage() {
             <div
               className="metric-value"
               style={{ color: "var(--color-success)" }}>
-              {filteredDocRows.filter((d) => d.status === "approved").length}
+              {docSummary.approved}
             </div>
           </div>
           <div className="metric-card" style={{ maxWidth: "none" }}>
@@ -4347,7 +4664,7 @@ export function ApprovalsPage() {
             <div
               className="metric-value"
               style={{ color: "var(--color-warning)" }}>
-              {filteredDocRows.filter((d) => d.status === "submitted").length}
+              {docSummary.submitted}
             </div>
           </div>
           <div className="metric-card" style={{ maxWidth: "none" }}>
@@ -4355,13 +4672,13 @@ export function ApprovalsPage() {
             <div
               className="metric-value"
               style={{ color: "var(--color-danger)" }}>
-              {filteredDocRows.filter((d) => d.status === "rejected").length}
+              {docSummary.rejected}
             </div>
           </div>
         </div>
 
         <div className="table-wrap" style={{ marginBottom: "var(--space-4)" }}>
-          <div className={`table-scroll ${hasOpenKpiRow ? "able-scroll" : ""}`}>
+          <div className="table-scroll able-scroll">
             <table
               className="data-table compact"
               style={{ margin: 0, width: "100%" }}>
@@ -4371,6 +4688,7 @@ export function ApprovalsPage() {
                     Unit
                   </th>
                   <th>Jenis Dokumen</th>
+                  {showKmType && <th className="num">Tipe KM</th>}
                   <th>Periode</th>
                   <th>Jenjang</th>
                   <th>Status</th>
@@ -4412,6 +4730,7 @@ export function ApprovalsPage() {
                         </td>
                         <td>
                           {d.jenis}
+
                           {d.detail ? (
                             <span style={{ color: "var(--color-text-muted)" }}>
                               {" "}
@@ -4419,6 +4738,18 @@ export function ApprovalsPage() {
                             </span>
                           ) : null}
                         </td>
+                        {showKmType && (
+                          <td className="num">
+                            {d.kmType && (
+                              <span
+                                className={`status-pill ${d.kmType === "final" ? "completed" : "at-risk"}`}
+                                style={{ marginLeft: 6 }}>
+                                {d.kmType === "final" ? "Final" : "Draft"}
+                              </span>
+                            )}
+                          </td>
+                        )}
+
                         <td
                           style={{
                             color: "var(--color-text-muted)",
@@ -4510,7 +4841,7 @@ export function ApprovalsPage() {
                       {isOpen && hasKpiItems && (
                         <tr>
                           <td
-                            colSpan={8}
+                            colSpan={9}
                             style={{
                               background: "var(--color-surface-2)",
                               padding: 0,
@@ -4523,10 +4854,10 @@ export function ApprovalsPage() {
                                   <th>No</th>
                                   <th>Indikator Kinerja</th>
                                   <th>Formula</th>
-                                  <th>Satuan</th>
+                                  <th className="num">Satuan</th>
                                   <th className="num">Bobot</th>
-                                  <th>Target</th>
-                                  <th>
+                                  <th className="num">Target</th>
+                                  <th className="num">
                                     {d.jenis === "Kontrak Manajemen"
                                       ? `Target Tahun ${new Date().getFullYear()}`
                                       : "Realisasi"}
@@ -4537,22 +4868,125 @@ export function ApprovalsPage() {
                                 {(d.kpiItems as Record<string, unknown>[]).map(
                                   (it, idx) => {
                                     const itStr = it as Record<string, string>;
+                                    const subIndicators =
+                                      (it as { subIndicators?: unknown[] })
+                                        .subIndicators ?? [];
+                                    const hasSubIndicators =
+                                      subIndicators.length > 0;
+                                    const countSubsIndicator =
+                                      subIndicators.length;
                                     return (
-                                      <tr key={idx}>
-                                        <td>{idx + 1}</td>
-                                        <td>{itStr.indikator ?? "—"}</td>
-                                        <td>{itStr.formula ?? "—"}</td>
-                                        <td>{itStr.satuan ?? "—"}</td>
-                                        <td className="num">
-                                          {itStr.bobot ?? "—"}
-                                        </td>
-                                        <td>{itStr.target ?? "—"}</td>
-                                        <td>
-                                          {d.jenis === "Kontrak Manajemen"
-                                            ? (itStr.target2 ?? "—")
-                                            : (itStr.realisasi ?? "—")}
-                                        </td>
-                                      </tr>
+                                      <>
+                                        <tr key={idx}>
+                                          <td>{idx + 1}</td>
+                                          <td>{itStr.indikator || "—"}</td>
+                                          <td>{itStr.formula || "—"}</td>
+                                          <td className="num">
+                                            {itStr.satuan || "—"}
+                                          </td>
+                                          <td className="num">
+                                            {itStr.bobot || "—"}
+                                          </td>
+                                          <td className="num">
+                                            {hasSubIndicators ? (
+                                              <button
+                                                className="btn btn-ghost btn-sm"
+                                                onClick={() =>
+                                                  setSubIndicatorsExpanded(
+                                                    subIndicatorsExpanded ===
+                                                      idx
+                                                      ? null
+                                                      : idx,
+                                                  )
+                                                }
+                                                title="Lihat target tiap sub-indikator">
+                                                {countSubsIndicator} sub{" "}
+                                                <ChevronDown
+                                                  size={12}
+                                                  style={{
+                                                    transform:
+                                                      subIndicatorsExpanded ===
+                                                      idx
+                                                        ? "rotate(180deg)"
+                                                        : "none",
+                                                    transition: "transform .2s",
+                                                  }}
+                                                />
+                                              </button>
+                                            ) : (
+                                              itStr.target || "—"
+                                            )}
+                                          </td>
+                                          <td className="num">
+                                            {d.jenis === "Kontrak Manajemen"
+                                              ? itStr.target2 || "—"
+                                              : itStr.realisasi || "—"}
+                                          </td>
+                                        </tr>
+                                        {hasSubIndicators &&
+                                          subIndicatorsExpanded === idx && (
+                                            <tr>
+                                              <td
+                                                colSpan={7}
+                                                style={{
+                                                  background:
+                                                    "var(--color-surface-2)",
+                                                  padding: 0,
+                                                }}>
+                                                <table
+                                                  className="data-table table-expanded"
+                                                  style={{ margin: 0 }}>
+                                                  <thead>
+                                                    <tr>
+                                                      <th>Sub-Indikator</th>
+                                                      <th>Formula</th>
+                                                      <th>Polaritas</th>
+                                                      <th>Satuan</th>
+
+                                                      <th className="num">
+                                                        Target Sem I
+                                                      </th>
+                                                      <th className="num">
+                                                        Target Tahun
+                                                        {new Date().getFullYear()}
+                                                      </th>
+                                                    </tr>
+                                                  </thead>
+                                                  <tbody>
+                                                    {subIndicators.map(
+                                                      (sub: any, j: number) => (
+                                                        <tr key={j}>
+                                                          <td>
+                                                            ↳{" "}
+                                                            {sub.nama ||
+                                                              `Sub ${j + 1}`}
+                                                          </td>
+                                                          <td>
+                                                            {sub.formula || "—"}
+                                                          </td>
+                                                          <td className="num">
+                                                            {sub.polaritas ||
+                                                              "—"}
+                                                          </td>
+                                                          <td className="num">
+                                                            {sub.satuan || "—"}
+                                                          </td>
+                                                          <td className="num">
+                                                            {sub.target || "—"}
+                                                          </td>
+
+                                                          <td className="num">
+                                                            {sub.target2 || "—"}
+                                                          </td>
+                                                        </tr>
+                                                      ),
+                                                    )}
+                                                  </tbody>
+                                                </table>
+                                              </td>
+                                            </tr>
+                                          )}
+                                      </>
                                     );
                                   },
                                 )}
@@ -4564,7 +4998,7 @@ export function ApprovalsPage() {
                       {docExpanded === d.id && (
                         <tr>
                           <td
-                            colSpan={8}
+                            colSpan={9}
                             style={{
                               background: "var(--color-surface-2)",
                               padding: 0,
@@ -4578,7 +5012,7 @@ export function ApprovalsPage() {
                 })}
                 {filteredDocRows.length === 0 && (
                   <tr>
-                    <td colSpan={8}>
+                    <td colSpan={9}>
                       <EmptyState
                         title={
                           filteredDocRows.length === 0

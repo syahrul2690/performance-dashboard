@@ -7,6 +7,9 @@ import {
   Param,
   Query,
   UseGuards,
+  Put,
+  HttpCode,
+  HttpStatus,
 } from "@nestjs/common";
 import { KpiMasterService } from "./kpi-master.service";
 import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
@@ -51,8 +54,17 @@ class SubIndicatorDto {
   @IsOptional() @IsIn(["positive", "negative"]) polaritas?: string;
 }
 
-class SaveMasterDto {
-  @IsOptional() @IsString() id?: string;
+// ✅ new — bentuk override target sub-indikator per assignment (dipakai di
+// ReviseRejectedAssignmentDto & OtherAssignmentPersenDto). Sama longgarnya dengan
+// AssignmentDto.subIndicatorTargets di atas — validasi/normalisasi mendalam tetap di service
+// (sanitizeSubIndicatorTargets), di sini hanya terima bentuk {target?, target2?} per elemen.
+class SubIndicatorTargetOverrideDto {
+  @IsOptional() @IsString() target?: string;
+  @IsOptional() @IsString() target2?: string;
+}
+
+// Shared payload fields for create/save and update.
+class MasterFieldsDto {
   @IsOptional() @IsIn(["draft", "final"]) kmType?: string;
   @IsString() indikator!: string;
   @IsOptional() @IsString() formula?: string;
@@ -75,15 +87,84 @@ class SaveMasterDto {
   @ValidateNested({ each: true })
   @Type(() => SubIndicatorDto)
   subIndicators?: SubIndicatorDto[];
-  // Polaritas indikator induk non-komposit ('positive'|'negative') — lihat catatan di service.
+  // Polaritas indikator induk non-komposit ('positive'|'negative').
   @IsOptional() @IsIn(["positive", "negative"]) polaritas?: string;
 }
+
+// Existing endpoint (POST /kpi-master/save): base + optional id.
+class SaveMasterDto extends MasterFieldsDto {
+  @IsOptional() @IsString() id?: string;
+}
+
+// New endpoint (PUT /kpi-master/:id): base only. The id comes from the URL, so a body `id`
+// is rejected if your ValidationPipe uses `forbidNonWhitelisted: true`, and silently
+// stripped if it uses `whitelist: true`.
+class UpdateMasterDto extends MasterFieldsDto {}
 
 class ConsolidationReviewDto {
   @IsString() kpiMasterId!: string;
   @IsIn(["approve", "reject"]) action!: "approve" | "reject";
   @IsOptional() @IsString() note?: string;
   @IsOptional() @IsString() periodId?: string;
+}
+
+class OtherAssignmentPersenDto {
+  @IsString() id!: string;
+  @IsOptional() @IsString() holder?: string;
+  @IsOptional() @IsString() target?: string;
+  @IsOptional() @IsString() target2?: string;
+  @IsOptional() @IsNumber() persenAgregasi?: number;
+  // ✅ new — override target sub-indikator (KPI Komposit) utk assignment lain ini, opsional.
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => SubIndicatorTargetOverrideDto)
+  subIndicatorTargets?: SubIndicatorTargetOverrideDto[];
+}
+
+// Patch sempit utk reviseRejectedAssignment() — lihat catatan pembatasan field di service.
+class ReviseRejectedAssignmentDto {
+  // Field assignment UTAMA (holder/target/target2/persenAgregasi)
+  @IsOptional() @IsString() holder?: string;
+  @IsOptional() @IsString() target?: string;
+  @IsOptional() @IsString() target2?: string;
+  @IsOptional() @IsNumber() persenAgregasi?: number;
+  // ✅ new — override target sub-indikator (KPI Komposit) utk assignment yang sedang direvisi,
+  // opsional. Divalidasi/dinormalisasi lebih lanjut di service (sanitizeSubIndicatorTargets).
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => SubIndicatorTargetOverrideDto)
+  subIndicatorTargets?: SubIndicatorTargetOverrideDto[];
+
+  // Field definisi KpiMaster (SHARED lintas semua assignment KPI ini)
+  @IsOptional() @IsString() indikator?: string;
+  @IsOptional() @IsString() formula?: string;
+  @IsOptional() @IsString() satuan?: string;
+  @IsOptional() @IsString() bobotKm?: string;
+  @IsOptional() @IsString() targetParent?: string;
+  @IsOptional() @IsIn(["positive", "negative"]) polaritas?:
+    | "positive"
+    | "negative";
+  @IsOptional() @IsIn(["weighted", "sum"]) aggregationMethod?:
+    | "weighted"
+    | "sum";
+  @IsOptional() @IsIn(["draft", "final"]) kmType?: string;
+  // ✅ new — redefinisi TEMPLATE sub-indikator (opsional). Hanya berlaku bila KPI ini SUDAH
+  // komposit — lihat validasi di service (reviseRejectedAssignment menolak bila KPI belum
+  // komposit sebelumnya). Mengirim field ini otomatis menurunkan ulang bobotKm (Σ bobot sub).
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => SubIndicatorDto)
+  subIndicators?: SubIndicatorDto[];
+
+  // Assignment lain (unit/bidang lain) pada KPI Master yang sama, direvisi sekaligus -----
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => OtherAssignmentPersenDto)
+  otherAssignments?: OtherAssignmentPersenDto[];
 }
 
 @UseGuards(JwtAuthGuard)
@@ -148,6 +229,28 @@ export class KpiMasterController {
   @Post("save")
   save(@CurrentUser() user: User, @Body() dto: SaveMasterDto) {
     return this.svc.save(user, dto);
+  }
+
+  @Put(":id")
+  @HttpCode(HttpStatus.OK)
+  async update(
+    @CurrentUser() user: User,
+    @Param("id") id: string,
+    @Body() dto: UpdateMasterDto,
+  ) {
+    const data = await this.svc.update(user, id, dto);
+    return { success: true, message: "KPI Master berhasil diperbarui", data };
+  }
+
+  // Revisi cepat 1 assignment yang dokumen KM-nya baru saja ditolak — lihat catatan
+  // pembeda dgn save() di KpiMasterService.reviseRejectedAssignment().
+  @Post("assignment/:assignmentId/revise-rejected")
+  reviseRejectedAssignment(
+    @CurrentUser() user: User,
+    @Param("assignmentId") assignmentId: string,
+    @Body() dto: ReviseRejectedAssignmentDto,
+  ) {
+    return this.svc.reviseRejectedAssignment(user, assignmentId, dto);
   }
 
   @Delete(":id")

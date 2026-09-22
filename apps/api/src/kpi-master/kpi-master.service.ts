@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   BadRequestException,
   NotFoundException,
+  ConflictException,
 } from "@nestjs/common";
 import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import { Cache } from "cache-manager";
@@ -85,8 +86,13 @@ type FannedItem = {
   target: string;
   target2: string;
   polaritas: string;
+  holder: string;
   subIndicators?: SubIndicatorInput[];
 };
+
+type MasterDerivedItemPatch = Partial<
+  Pick<FannedItem, "indikator" | "formula" | "satuan" | "bobot" | "polaritas">
+>;
 
 // Item KM legacy dikumpulkan utk backfill (Fase F) — belum bertag masterKpiId.
 type BackfillGroupItem = {
@@ -95,6 +101,31 @@ type BackfillGroupItem = {
   bidang: string;
   item: Record<string, unknown>;
 };
+
+export interface ReviseAssignmentPatch {
+  holder?: string;
+  target?: string;
+  target2?: string;
+  persenAgregasi?: number;
+  subIndicatorTargets?: Array<{ target?: string; target2?: string }>;
+}
+
+// Patch sempit utk reviseRejectedAssignment() — HANYA 4 field ini yang boleh diubah lewat
+// jalur revisi cepat (beda dgn save() yang mengedit definisi penuh / bikin versi baru).
+export interface ReviseRejectedAssignmentInput {
+  persenAgregasi?: number;
+  indikator?: string;
+  formula?: string;
+  satuan?: string;
+  bobotKm?: string; // ditolak jika KPI ini komposit — lihat validasi di bawah
+  targetParent?: string; // field parent saja, tak disalin ke item
+  target?: string;
+  polaritas?: "positive" | "negative";
+  aggregationMethod?: "weighted" | "sum";
+  kmType?: string;
+  subIndicators?: SubIndicatorInput[];
+  otherAssignments?: Array<{ id: string } & ReviseAssignmentPatch>;
+}
 
 @Injectable()
 export class KpiMasterService {
@@ -135,9 +166,10 @@ export class KpiMasterService {
         include,
         orderBy: { createdAt: "desc" },
       });
-      return master.map((m) =>
+      const withFlags = master.map((m) =>
         this.withVersionFlags(m, activePeriod?.yearMonth),
       );
+      return this.attachAssignmentStatuses(withFlags);
     }
 
     const page = currentPage ?? 1;
@@ -153,11 +185,12 @@ export class KpiMasterService {
       }),
       this.prisma.kpiMaster.count({ where }),
     ]);
+    const withFlags = masters.map((m) =>
+      this.withVersionFlags(m, activePeriod?.yearMonth),
+    );
 
     return {
-      data: masters.map((m) =>
-        this.withVersionFlags(m, activePeriod?.yearMonth),
-      ),
+      data: await this.attachAssignmentStatuses(withFlags),
       pagination: {
         currentPage: page,
         perPage: limit,
@@ -165,6 +198,236 @@ export class KpiMasterService {
         totalPage: Math.ceil(totalData / limit),
       },
     };
+  }
+
+  // Sinkronisasi status dokumen KM ke tiap assignment untuk view list(). Satu KpiAssignment
+  // (unit,bidang) tak punya FK langsung ke KontrakManajemen — hubungannya hanya lewat
+  // kpiItems[].masterKpiId di dalam dokumen yang cocok (periodId + kmType + unitCode + bidang),
+  // sama seperti pola pencarian di getPerKpiReview()/getRollup(). Dibatch (bukan query per
+  // assignment) supaya list() tetap O(1) query tambahan terlepas dari jumlah master/assignment.
+  // Nilai status: 'draft' | 'submitted' | 'ready' | 'approved' | 'rejected' | 'none'
+  // ('none' = belum ada dokumen KM untuk kombinasi unit/bidang/periode/kmType ini).
+  // reviewNote & step ikut disalin dari dokumen yang sama (label langkah berjalan/terakhir —
+  // sama pola dengan stepLabel di InputKontrakService.getReviewList()) — null bila status 'none'.
+  private async attachAssignmentStatuses<
+    T extends {
+      id: string;
+      kmType: string;
+      effectiveMonth: string;
+      previousVersionId?: string | null;
+      assignments: Array<
+        Record<string, unknown> & { unitCode: string; bidang: string }
+      >;
+    },
+  >(masters: T[]): Promise<T[]> {
+    const emptyInfo = {
+      status: "none",
+      reviewNote: null,
+      reviewer: null,
+      updatedAt: new Date(0),
+    } as const;
+    if (masters.length === 0) return masters;
+
+    const STATUS_PRIORITY: Record<string, number> = {
+      rejected: 0,
+      revised: 0,
+      submitted: 1,
+      ready: 2,
+      approved: 3,
+      draft: 4,
+      none: 5,
+    };
+
+    // ini — dibatasi hops utk jaga-jaga siklus data yang tak terduga.
+    const ancestorIds = new Set<string>();
+    {
+      const queue = masters
+        .map((m) => m.previousVersionId)
+        .filter((id): id is string => !!id);
+      const seen = new Set(queue);
+      let hops = 0;
+      while (queue.length > 0 && hops < 200) {
+        const id = queue.shift()!;
+        ancestorIds.add(id);
+        const anc = await this.prisma.kpiMaster.findUnique({
+          where: { id },
+          select: { previousVersionId: true },
+        });
+        if (anc?.previousVersionId && !seen.has(anc.previousVersionId)) {
+          seen.add(anc.previousVersionId);
+          queue.push(anc.previousVersionId);
+        }
+        hops++;
+      }
+    }
+    const ancestorMasters = ancestorIds.size
+      ? await this.prisma.kpiMaster.findMany({
+          where: { id: { in: [...ancestorIds] } },
+          include: {
+            assignments: {
+              orderBy: [{ unitCode: "asc" }, { bidang: "asc" }],
+            },
+          },
+        })
+      : [];
+
+    // Gabungan current masters + ancestor masters — dipakai bersama utk resolve periodId
+    // (tiap versi punya effectiveMonth sendiri) & mencari dokumen yang relevan.
+    const allForLookup = [...masters, ...(ancestorMasters as unknown as T[])];
+
+    const yearMonths = [...new Set(allForLookup.map((m) => m.effectiveMonth))];
+    const periods = await this.prisma.period.findMany({
+      where: { yearMonth: { in: yearMonths } },
+    });
+    const periodIdByYearMonth = new Map(
+      periods.map((p) => [p.yearMonth, p.id]),
+    );
+    const periodIds = periods.map((p) => p.id);
+
+    if (periodIds.length === 0) {
+      return masters.map((m) => ({
+        ...m,
+        assignments: m.assignments.map((a) => ({ ...a, ...emptyInfo })),
+      }));
+    }
+
+    const kmTypes = [...new Set(allForLookup.map((m) => m.kmType))];
+
+    // Satu query untuk semua dokumen relevan, diurutkan terbaru dulu — pengisian Map di
+    // bawah pakai "first write wins" sehingga otomatis mengambil status paling mutakhir
+    // (mengakomodasi kasus 1 assignment punya >1 dokumen: submitted lama + draft baru,
+    // lihat catatan di fanOut()).
+    const docs = await this.prisma.kontrakManajemen.findMany({
+      where: { periodId: { in: periodIds }, kmType: { in: kmTypes } },
+      select: {
+        periodId: true,
+        kmType: true,
+        unitCode: true,
+        bidang: true,
+        status: true,
+        reviewNote: true,
+        reviewedAt: true,
+        steps: true,
+        updatedAt: true,
+        currentStepIndex: true,
+        kpiItems: true,
+      },
+      orderBy: { updatedAt: "desc" },
+    });
+
+    type AssignmentDocInfo = {
+      status: string;
+      reviewNote: string | null;
+      reviewer: string | null;
+      updatedAt: Date;
+    };
+
+    type PrimaryDocInfo = AssignmentDocInfo & { updatedAt: Date };
+    const infoByMasterKey = new Map<string, AssignmentDocInfo>();
+
+    for (const doc of docs) {
+      const items = (Array.isArray(doc.kpiItems) ? doc.kpiItems : []) as Record<
+        string,
+        unknown
+      >[];
+      if (items.length === 0) continue;
+      const steps = (Array.isArray(doc.steps) ? doc.steps : []) as Array<
+        Record<string, unknown>
+      >;
+      // Klem index ke batas array — dokumen 'ready'/'approved' punya currentStepIndex ===
+      // steps.length (chain selesai), sehingga step terakhir yang dilewati lebih informatif
+      // daripada undefined.
+      const stepIdx = Math.min(
+        Math.max(doc.currentStepIndex, 0),
+        Math.max(steps.length - 1, 0),
+      );
+      const stepLabel =
+        typeof steps[stepIdx]?.["label"] === "string"
+          ? (steps[stepIdx]["label"] as string)
+          : null;
+      const reviewedAtMs = doc.reviewedAt ? doc.reviewedAt.getTime() : 0;
+      for (const it of items) {
+        const masterId = it["masterKpiId"];
+        if (typeof masterId !== "string") continue;
+
+        // Gating per-item hanya relevan utk dokumen yang sedang dalam alur revisi
+        // ('rejected'/'revised') — status lain berlaku apa adanya ke semua item.
+        let itemStatus = doc.status;
+        if (doc.status === "rejected" || doc.status === "revised") {
+          const revisedAt = it["revisedAt"];
+          const isRevised =
+            typeof revisedAt === "string" &&
+            new Date(revisedAt).getTime() > reviewedAtMs;
+          itemStatus = isRevised ? "draft" : "rejected";
+        }
+
+        const key = `${masterId}|${doc.periodId}|${doc.kmType}|${doc.unitCode}|${doc.bidang}`;
+        const candidate: PrimaryDocInfo = {
+          status: itemStatus,
+          reviewNote: doc.reviewNote ?? null,
+          reviewer: stepLabel,
+          updatedAt: doc.updatedAt,
+        };
+        const candidatePriority = STATUS_PRIORITY[itemStatus] ?? 99;
+        const existing = infoByMasterKey.get(key);
+        const currentPriority = existing
+          ? (STATUS_PRIORITY[existing.status] ?? 99)
+          : Infinity;
+        // Prioritas lebih rendah menang; seri prioritas → dokumen ter-update lebih baru menang.
+        // Perbandingan eksplisit (bukan cuma andalkan orderBy) supaya urutan iterasi docs tak
+        // memengaruhi hasil akhir.
+        if (
+          !existing ||
+          candidatePriority < currentPriority ||
+          (candidatePriority === currentPriority &&
+            candidate.updatedAt > existing.updatedAt)
+        ) {
+          infoByMasterKey.set(key, candidate);
+        }
+      }
+    }
+
+    const masterById = new Map(allForLookup.map((m) => [m.id, m]));
+    const getInfo = (
+      masterId: string,
+      unitCode: string,
+      bidang: string,
+    ): AssignmentDocInfo | undefined => {
+      const master = masterById.get(masterId);
+      if (!master) return undefined;
+      const periodId = periodIdByYearMonth.get(master.effectiveMonth);
+      if (!periodId) return undefined;
+      return infoByMasterKey.get(
+        `${masterId}|${periodId}|${master.kmType}|${unitCode}|${bidang}`,
+      );
+    };
+
+    return masters.map((m) => ({
+      ...m,
+      assignments: m.assignments.map((a) => {
+        const own = getInfo(m.id, a.unitCode, a.bidang) ?? emptyInfo;
+        // Susuri rantai versi lama mencari status paling mendesak utk (unitCode,bidang)
+        // yang sama — assignment versi baru yang tampak 'draft' bersih semestinya tetap
+        // menampilkan isu yang belum selesai dari versi sebelumnya (mis. 'rejected').
+        let best: AssignmentDocInfo = own;
+        let ancestorId = m.previousVersionId ?? null;
+        let hops = 0;
+        while (ancestorId && hops < 20) {
+          const ancInfo = getInfo(ancestorId, a.unitCode, a.bidang);
+          if (
+            ancInfo &&
+            (STATUS_PRIORITY[ancInfo.status] ?? 99) <
+              (STATUS_PRIORITY[best.status] ?? 99)
+          ) {
+            best = ancInfo;
+          }
+          const anc = masterById.get(ancestorId);
+          ancestorId = anc?.previousVersionId ?? null;
+          hops++;
+        }
+        return { ...a, ...best };
+      }),
+    }));
   }
 
   private withVersionFlags<
@@ -396,6 +659,687 @@ export class KpiMasterService {
       where: { isActive: true },
     });
     return this.withVersionFlags(m, activePeriod?.yearMonth);
+  }
+
+  // Sinkronkan TEMPLATE sub-indikator baru ke SELURUH dokumen KM yang memuat item ber-
+  // masterKpiId ini (lintas status, seperti syncMasterFieldsAcrossDocuments), digabung dgn
+  // override per-assignment MASING-MASING dokumen (bukan cuma dokumen yang sedang direvisi).
+  private async syncSubIndicatorsAcrossDocuments(
+    masterId: string,
+    kmType: string,
+    subIndicatorsTemplate: SubIndicatorInput[],
+  ): Promise<number> {
+    const assignments = await this.prisma.kpiAssignment.findMany({
+      where: { kpiMasterId: masterId },
+    });
+    const overridesByPair = new Map<
+      string,
+      Array<{ target?: string; target2?: string }>
+    >();
+    for (const a of assignments) {
+      const ov = Array.isArray(a.subIndicatorTargets)
+        ? (a.subIndicatorTargets as unknown as Array<{
+            target?: string;
+            target2?: string;
+          }>)
+        : [];
+      overridesByPair.set(`${a.unitCode}||${a.bidang}`, ov);
+    }
+
+    const docs = await this.prisma.kontrakManajemen.findMany({
+      where: { kmType },
+    });
+    let updated = 0;
+    for (const doc of docs) {
+      const items = (Array.isArray(doc.kpiItems) ? doc.kpiItems : []) as Record<
+        string,
+        unknown
+      >[];
+      const idx = items.findIndex((it) => it["masterKpiId"] === masterId);
+      if (idx < 0) continue;
+      const overrides =
+        overridesByPair.get(`${doc.unitCode}||${doc.bidang}`) ?? [];
+      const merged = subIndicatorsTemplate.map((si, i) => {
+        const ov = overrides[i];
+        return {
+          ...si,
+          target: ov?.target?.trim() || si.target,
+          target2: ov?.target2?.trim() || si.target2,
+        };
+      });
+      const next = [...items];
+      next[idx] = { ...next[idx], subIndicators: merged };
+      await this.prisma.kontrakManajemen.update({
+        where: { id: doc.id },
+        data: { kpiItems: next as object },
+      });
+      updated++;
+    }
+    return updated;
+  }
+
+  // Sinkronkan perubahan definisi KpiMaster ke SELURUH dokumen KM yang memuat item ber-
+  // masterKpiId ini — lintas status (draft/submitted/ready/approved/rejected), sebab field-field
+  // ini metadata definisi bersama, bukan bagian dari alur review per-dokumen. Hanya field yang
+  // disertakan di itemPatch yang ditulis ulang; field lain pada item (target/holder/bobot yang
+  // tak disertakan, dst.) tidak disentuh.
+  private async syncMasterFieldsAcrossDocuments(
+    masterId: string,
+    kmType: string,
+    itemPatch: MasterDerivedItemPatch,
+  ): Promise<number> {
+    if (Object.keys(itemPatch).length === 0) return 0;
+    const docs = await this.prisma.kontrakManajemen.findMany({
+      where: { kmType },
+    });
+    let updated = 0;
+    for (const doc of docs) {
+      const items = (Array.isArray(doc.kpiItems) ? doc.kpiItems : []) as Record<
+        string,
+        unknown
+      >[];
+      let changed = false;
+      const next = items.map((it) => {
+        if (it["masterKpiId"] !== masterId) return it;
+        const patchedFields: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(itemPatch)) {
+          if (it[k] !== v) {
+            patchedFields[k] = v;
+            changed = true;
+          }
+        }
+        return Object.keys(patchedFields).length
+          ? { ...it, ...patchedFields }
+          : it;
+      });
+      if (changed) {
+        await this.prisma.kontrakManajemen.update({
+          where: { id: doc.id },
+          data: { kpiItems: next as object },
+        });
+        updated++;
+      }
+    }
+    return updated;
+  }
+
+  // Terapkan revisi ke SATU assignment + dokumen KM 'rejected'-nya. Dipanggil sekali per
+  // assignment (utama maupun tiap otherAssignments) — logikanya identik, hanya scoping dokumen
+  // (unitCode/bidang) yang beda per assignment. Nama indikator TIDAK ditangani di sini (sudah
+  // disinkronkan terpisah oleh syncIndikatorAcrossDocuments sebelum loop ini berjalan).
+  private async reviseOneAssignmentDocument(
+    user: User,
+    assignment: { id: string; unitCode: string; bidang: string },
+    master: {
+      id: string;
+      kmType: string;
+      indikator: string;
+      subIndicators?: Prisma.JsonValue | null; // ✅ widened — dipakai utk merge target sub
+    },
+    period: { id: string },
+    patch: ReviseAssignmentPatch,
+  ) {
+    const doc = await this.prisma.kontrakManajemen.findFirst({
+      where: {
+        periodId: period.id,
+        unitCode: assignment.unitCode,
+        bidang: assignment.bidang,
+        kmType: master.kmType,
+        status: "rejected",
+      },
+      orderBy: { updatedAt: "desc" },
+    });
+    if (!doc)
+      throw new BadRequestException(
+        `Tidak ada dokumen KM berstatus 'Dikembalikan' untuk assignment ${assignment.unitCode} — ${assignment.bidang}`,
+      );
+    const items = (Array.isArray(doc.kpiItems) ? doc.kpiItems : []) as Record<
+      string,
+      unknown
+    >[];
+    const idx = items.findIndex((it) => it["masterKpiId"] === master.id);
+    if (idx < 0)
+      throw new BadRequestException(
+        `Item KPI "${master.indikator}" tidak ditemukan pada dokumen KM ${assignment.unitCode} — ${assignment.bidang} yang ditolak`,
+      );
+
+    // Ambil row assignment penuh (perlu subIndicatorTargets LAMA sbg fallback bila patch kali
+    // ini tidak menyertakan override baru — lihat effectiveOverrides di bawah).
+    const currentAssignmentRow = await this.prisma.kpiAssignment.findUnique({
+      where: { id: assignment.id },
+    });
+    if (!currentAssignmentRow)
+      throw new NotFoundException("Assignment tidak ditemukan");
+
+    const subIndicatorsTemplate = Array.isArray(master.subIndicators)
+      ? (master.subIndicators as unknown as SubIndicatorInput[])
+      : undefined;
+
+    // Sanitasi override target sub-indikator (opsional) — HANYA bila field ini disertakan di
+    // patch kali ini; bila tidak, override yang tersimpan di assignment TIDAK disentuh.
+    let sanitizedSubIndicatorTargets: Array<{
+      target: string;
+      target2: string;
+    }> | null = null;
+    if (
+      patch.subIndicatorTargets !== undefined &&
+      subIndicatorsTemplate &&
+      subIndicatorsTemplate.length > 0
+    ) {
+      sanitizedSubIndicatorTargets = this.sanitizeSubIndicatorTargets(
+        patch.subIndicatorTargets,
+        subIndicatorsTemplate.length,
+      );
+    }
+
+    const updatedAssignment = await this.prisma.kpiAssignment.update({
+      where: { id: assignment.id },
+      data: {
+        ...(patch.holder !== undefined ? { holder: patch.holder } : {}),
+        ...(patch.target !== undefined ? { target: patch.target } : {}),
+        ...(patch.target2 !== undefined ? { target2: patch.target2 } : {}),
+        ...(patch.persenAgregasi !== undefined
+          ? { persenAgregasi: Number(patch.persenAgregasi) || 0 }
+          : {}),
+        ...(sanitizedSubIndicatorTargets !== null
+          ? {
+              subIndicatorTargets:
+                sanitizedSubIndicatorTargets as unknown as Prisma.InputJsonValue,
+            }
+          : {}),
+      },
+    });
+
+    // Nilai override yang berlaku utk merge item kali ini: hasil BARU (bila dikirim di patch
+    // ini) atau warisan yang SUDAH tersimpan sebelumnya (bila hanya template yang berubah, atau
+    // tak ada perubahan override sama sekali) — sama seperti pola merge di fanOut().
+    const effectiveOverrides =
+      sanitizedSubIndicatorTargets ??
+      (Array.isArray(currentAssignmentRow.subIndicatorTargets)
+        ? (currentAssignmentRow.subIndicatorTargets as unknown as Array<{
+            target?: string;
+            target2?: string;
+          }>)
+        : []);
+    const mergedSubIndicators = subIndicatorsTemplate?.map((si, i) => {
+      const ov = effectiveOverrides[i];
+      return {
+        ...si,
+        target: ov?.target?.trim() || si.target,
+        target2: ov?.target2?.trim() || si.target2,
+      };
+    });
+
+    const nextItems = [...items];
+    const nowIso = new Date().toISOString();
+    nextItems[idx] = {
+      ...nextItems[idx],
+      target: updatedAssignment.target,
+      target2: updatedAssignment.target2,
+      holder: updatedAssignment.holder,
+      revisedAt: nowIso,
+      ...(mergedSubIndicators ? { subIndicators: mergedSubIndicators } : {}),
+    };
+
+    const reviewedAtMs = doc.reviewedAt ? doc.reviewedAt.getTime() : 0;
+    const itemsWithMaster = nextItems.filter(
+      (it) => typeof it["masterKpiId"] === "string",
+    );
+    const revisedSet = new Set<string>();
+    for (const it of itemsWithMaster) {
+      const revisedAt = it["revisedAt"];
+      if (
+        typeof revisedAt === "string" &&
+        new Date(revisedAt).getTime() > reviewedAtMs
+      ) {
+        revisedSet.add(String(it["masterKpiId"]));
+      }
+    }
+    const totalTrackedItems = itemsWithMaster.length;
+    const revisedCount = revisedSet.size;
+    const allItemsRevised =
+      totalTrackedItems === 0 || revisedCount === totalTrackedItems;
+
+    const history = [
+      ...(Array.isArray(doc.history) ? (doc.history as object[]) : []),
+      allItemsRevised
+        ? {
+            stepIndex: 0,
+            actor: user.name,
+            role: user.role,
+            action: "revised_after_reject",
+            note: `Seluruh ${totalTrackedItems} indikator KPI pada dokumen ini telah direvisi — dikembalikan ke draft`,
+            ts: nowIso,
+          }
+        : {
+            stepIndex: 0,
+            actor: user.name,
+            role: user.role,
+            action: "revised_item_after_reject",
+            note: `Indikator KPI "${master.indikator}" direvisi (${revisedCount}/${totalTrackedItems} indikator KPI pada dokumen ini sudah direvisi) — dokumen masih menunggu revisi indikator lain sebelum dapat dikirim ulang`,
+            ts: nowIso,
+          },
+    ];
+
+    const updatedDoc = await this.prisma.kontrakManajemen.update({
+      where: { id: doc.id },
+      data: {
+        kpiItems: nextItems as object,
+        ...(allItemsRevised
+          ? {
+              status: "draft",
+              reviewer: null,
+              reviewNote: null,
+              reviewedAt: null,
+              currentStepIndex: 0,
+              currentStage: 0,
+            }
+          : {}),
+        ...(patch.holder && allItemsRevised ? { holder: patch.holder } : {}),
+        history,
+      },
+    });
+
+    return {
+      assignmentId: assignment.id,
+      unitCode: assignment.unitCode,
+      bidang: assignment.bidang,
+      document: updatedDoc,
+      allItemsRevised,
+      revisedCount,
+      totalItems: totalTrackedItems,
+    };
+  }
+
+  // ===== Revisi cepat 1 assignment yang dokumen KM-nya baru saja DITOLAK reviewer =====
+  // Dipisah dari save() dengan sengaja:
+  //   - save() selalu mengedit definisi PENUH (indikator/formula/satuan/bobot/polaritas) &
+  //     — untuk master yang sudah berlaku — membuat VERSI BARU yang fan-out ke periode
+  //     BERIKUTNYA (lihat catatan Versioning di save()). Itu bukan yang dibutuhkan di sini:
+  //     dokumen yang ditolak ada di periode BERJALAN & harus diperbaiki DI TEMPAT, bukan
+  //     dibuatkan versi baru bulan depan.
+  //   - fanOut() (dipakai save()) hanya mencari dokumen existing berstatus 'draft' saat
+  //     menyisipkan/memperbarui item — dokumen berstatus 'rejected' tidak match, sehingga
+  //     fanOut akan membuat dokumen BARU (findFirst → null → create) alih-alih memperbaiki
+  //     dokumen yang ditolak → muncul 2 dokumen utk (unit,bidang) yang sama. Method ini
+  //     mencari & meng-update dokumen 'rejected' itu langsung, lalu mengembalikannya ke
+  //     'draft' agar siap dikirim ulang — TANPA menyentuh assignment/dokumen lain.
+  // Field yang boleh diubah SENGAJA dibatasi ke holder/target/target2/persenAgregasi —
+  // definisi item (formula/satuan/bobot/polaritas/subIndicators) tetap warisan dari master,
+  // TIDAK di-refan di sini (beda dgn fanOut() yang selalu menulis ulang definisi penuh).
+  async reviseRejectedAssignment(
+    user: User,
+    assignmentId: string,
+    patch: ReviseRejectedAssignmentInput,
+  ) {
+    const isAdminOverride =
+      user.role === Role.GM ||
+      user.role === Role.SUPERADMIN ||
+      user.role === Role.DEVELOPER;
+    const isRpc = user.unit === "KP" && user.bidang === RPC_BIDANG;
+    if (!isAdminOverride && !isRpc) {
+      throw new ForbiddenException(
+        "Hanya Perencanaan & Project Control (RPC), GM, atau Admin yang dapat merevisi assignment KM",
+      );
+    }
+    if (patch.indikator !== undefined && !patch.indikator.trim())
+      throw new BadRequestException("Nama indikator wajib diisi");
+
+    const assignment = await this.prisma.kpiAssignment.findUnique({
+      where: { id: assignmentId },
+    });
+    if (!assignment) throw new NotFoundException("Assignment tidak ditemukan");
+    let master = await this.prisma.kpiMaster.findUnique({
+      where: { id: assignment.kpiMasterId },
+    });
+    if (!master) throw new NotFoundException("KPI master tidak ditemukan");
+    if (master.status === "superseded")
+      throw new BadRequestException(
+        "Versi KPI ini sudah digantikan versi yang lebih baru — assignment ini tidak dapat direvisi",
+      );
+
+    // Dihoist ke atas — dipakai requireTarget() & validasi subIndicators di bawah, jadi harus
+    // sudah terinisialisasi SEBELUM requireTarget didefinisikan/dipanggil (const dalam TDZ
+    // yang dibaca lebih dulu akan meledak jadi ReferenceError mentah → 500 generik ke client).
+    const wasComposite =
+      Array.isArray(master.subIndicators) &&
+      (master.subIndicators as unknown[]).length > 0;
+
+    const nextAggregationMethod =
+      patch.aggregationMethod === "sum" ||
+      patch.aggregationMethod === "weighted"
+        ? patch.aggregationMethod
+        : undefined;
+    const effectiveAggregationMethod =
+      nextAggregationMethod ?? master.aggregationMethod;
+
+    const period = await this.prisma.period.findUnique({
+      where: { yearMonth: master.effectiveMonth },
+    });
+    if (!period)
+      throw new BadRequestException(
+        `Periode ${master.effectiveMonth} tidak ditemukan`,
+      );
+
+    // ===== Redefinisi template sub-indikator (opsional) — HANYA bila KPI ini sudah komposit.
+    // Tidak dipakai utk mengaktifkan/menonaktifkan mode komposit lewat revisi cepat. =====
+    let newSubIndicators: SubIndicatorInput[] | null = null;
+    let newBobotKm: string | undefined;
+    if (patch.subIndicators !== undefined) {
+      if (!wasComposite)
+        throw new BadRequestException(
+          "KPI ini bukan komposit — sub-indikator hanya dapat ditambahkan lewat edit KPI Master penuh, bukan lewat revisi",
+        );
+      // sanitizeSubIndicators sudah memvalidasi tanda bobot konsisten dgn effectiveAggregationMethod
+      // ('sum' → negatif, 'weighted' → positif) — jadi tak perlu cek ulang tanda di bawah bila
+      // template ini yang dipakai.
+      newSubIndicators = this.sanitizeSubIndicators(
+        patch.subIndicators,
+        effectiveAggregationMethod as "weighted" | "sum",
+      );
+      if (!newSubIndicators || newSubIndicators.length === 0)
+        throw new BadRequestException(
+          "Tidak dapat mengosongkan sub-indikator lewat revisi — hapus KPI komposit ini lewat edit KPI Master penuh bila memang dimaksudkan",
+        );
+      newBobotKm = String(
+        newSubIndicators.reduce(
+          (s, si) => s + (Number(String(si.bobot).replace(",", ".")) || 0),
+          0,
+        ),
+      );
+    }
+    // isComposite EFEKTIF setelah patch ini diterapkan (subIndicators tidak bisa berubah dari
+    // komposit → non-komposit atau sebaliknya lewat jalur ini, jadi selalu sama dgn wasComposite).
+    const isComposite = wasComposite;
+
+    // ===== Validasi & siapkan rebalancing bobot agregasi assignment lain (opsional) =====
+    // Scoped ketat ke master ini — id yang bukan milik KPI Master yang sama ditolak langsung,
+    // supaya satu panggilan revise tidak bisa diam-diam mengubah bobot KPI lain.
+    const otherPatches = patch.otherAssignments ?? [];
+    const otherIds = otherPatches.map((o) => o.id);
+    if (new Set(otherIds).size !== otherIds.length)
+      throw new BadRequestException(
+        "otherAssignments memuat id assignment duplikat",
+      );
+    if (otherIds.includes(assignment.id))
+      throw new BadRequestException(
+        "otherAssignments tidak boleh menyertakan assignment yang sedang direvisi — gunakan field utama",
+      );
+
+    let otherAssignmentRows: (typeof assignment)[] = [];
+    if (otherIds.length > 0) {
+      const rows = await this.prisma.kpiAssignment.findMany({
+        where: { id: { in: otherIds } },
+      });
+      if (rows.length !== otherIds.length)
+        throw new BadRequestException(
+          "Salah satu assignment pada otherAssignments tidak ditemukan",
+        );
+      const foreign = rows.find((r) => r.kpiMasterId !== master!.id);
+      if (foreign)
+        throw new BadRequestException(
+          "Semua otherAssignments harus berada pada KPI Master yang sama",
+        );
+      otherAssignmentRows = otherIds.map(
+        (id) => rows.find((r) => r.id === id)!,
+      );
+    }
+
+    const requireTarget = (t: string | undefined, label: string) => {
+      if (isComposite) return; // composite: target lives per sub-indicator, not on the assignment
+      if (t !== undefined && !t.trim())
+        throw new BadRequestException(`Target Sem I wajib diisi (${label})`);
+    };
+    requireTarget(
+      patch.target,
+      `${assignment.unitCode} — ${assignment.bidang}`,
+    );
+    for (const o of otherPatches) {
+      const row = otherAssignmentRows.find((r) => r.id === o.id)!;
+      requireTarget(o.target, `${row.unitCode} — ${row.bidang}`);
+      if (
+        o.persenAgregasi !== undefined &&
+        !Number.isFinite(Number(o.persenAgregasi))
+      )
+        throw new BadRequestException(
+          "Bobot agregasi pada otherAssignments harus berupa angka",
+        );
+    }
+
+    // ===== Validasi field definisi KPI Master (opsional) — SHARED lintas semua assignment. =====
+    if (patch.kmType !== undefined && patch.kmType !== master.kmType) {
+      throw new BadRequestException(
+        "kmType tidak dapat diubah lewat revisi — Draft dan Final adalah registri dokumen yang independen. Untuk memindahkan KPI ke jenis dokumen lain, buat ulang lewat menu KPI Master.",
+      );
+    }
+
+    if (
+      patch.polaritas !== undefined &&
+      patch.polaritas !== "positive" &&
+      patch.polaritas !== "negative"
+    )
+      throw new BadRequestException(
+        "Polaritas harus 'positive' atau 'negative'",
+      );
+
+    // bobotKm KPI komposit selalu turunan (Σ bobot sub) — ditolak HANYA bila client mengirim
+    // nilai yang beda dari yang tersimpan DAN tidak sekaligus merevisi subIndicators (yang mana
+    // otomatis menghitung ulang bobotKm sendiri, lihat newBobotKm di atas).
+    if (
+      patch.bobotKm !== undefined &&
+      isComposite &&
+      patch.bobotKm !== master.bobotKm &&
+      newSubIndicators === null
+    )
+      throw new BadRequestException(
+        "Bobot KM (poin) KPI komposit diturunkan otomatis dari total bobot sub-indikator — ubah lewat edit KPI Master (Sub-Indikator), bukan lewat revisi",
+      );
+
+    if (
+      nextAggregationMethod &&
+      nextAggregationMethod !== master.aggregationMethod
+    ) {
+      // Bila subIndicators ikut direvisi di payload ini, tanda bobotnya sudah divalidasi
+      // konsisten dgn effectiveAggregationMethod oleh sanitizeSubIndicators() di atas — cek
+      // manual di bawah ini hanya perlu jalan utk sub-indikator LAMA (belum ikut direvisi).
+      if (isComposite && newSubIndicators === null) {
+        const subs = master.subIndicators as unknown as Array<{
+          nama: string;
+          bobot: string;
+        }>;
+        for (const si of subs) {
+          const n = Number(String(si.bobot).replace(",", "."));
+          if (nextAggregationMethod === "sum" && !(n < 0))
+            throw new BadRequestException(
+              `Tidak dapat pindah ke metode 'sum' — sub-indikator "${si.nama}" masih bertanda positif; sesuaikan bobot sub-indikator lebih dulu lewat edit KPI Master`,
+            );
+          if (nextAggregationMethod === "weighted" && !(n > 0))
+            throw new BadRequestException(
+              `Tidak dapat pindah ke metode 'weighted' — sub-indikator "${si.nama}" masih bertanda negatif; sesuaikan bobot sub-indikator lebih dulu lewat edit KPI Master`,
+            );
+        }
+      }
+    }
+
+    // Total 100% (metode weighted, >1 assignment) dihitung dari: nilai BARU assignment yang
+    // direvisi + nilai BARU tiap otherAssignments yang dikirim, digabung dengan nilai EXISTING
+    // assignment lain milik master ini yang tidak ikut dikirim.
+    if (effectiveAggregationMethod !== "sum") {
+      const allAssignments = await this.prisma.kpiAssignment.findMany({
+        where: { kpiMasterId: master.id },
+      });
+      if (allAssignments.length > 1) {
+        const newPersenById = new Map<string, number>();
+        newPersenById.set(
+          assignment.id,
+          patch.persenAgregasi !== undefined
+            ? Number(patch.persenAgregasi) || 0
+            : assignment.persenAgregasi,
+        );
+        for (const o of otherPatches)
+          newPersenById.set(o.id, Number(o.persenAgregasi) || 0);
+        const total = allAssignments.reduce(
+          (s, a) => s + (newPersenById.get(a.id) ?? a.persenAgregasi),
+          0,
+        );
+        if (Math.abs(total - 100) > 0.01)
+          throw new BadRequestException(
+            `Total bobot agregasi seluruh assignment harus 100%, saat ini ${Math.round(total * 100) / 100}%`,
+          );
+      }
+    }
+
+    // ===== Terapkan perubahan definisi KpiMaster (opsional) — SEBELUM memproses per-dokumen,
+    // supaya dokumen yang dibaca berikutnya (termasuk yang direvisi di payload ini) sudah
+    // memuat definisi terbaru. targetParent & kmType TIDAK disinkron ke item (lihat
+    // MasterDerivedItemPatch); kmType sudah ditolak di atas bila berbeda. =====
+    const newIndikator = patch.indikator?.trim();
+    const masterUpdateData: Record<string, unknown> = {};
+    if (newIndikator && newIndikator !== master.indikator)
+      masterUpdateData.indikator = newIndikator;
+    if (patch.formula !== undefined && patch.formula !== master.formula)
+      masterUpdateData.formula = patch.formula;
+    if (patch.satuan !== undefined && patch.satuan !== master.satuan)
+      masterUpdateData.satuan = patch.satuan;
+    if (patch.polaritas !== undefined && patch.polaritas !== master.polaritas)
+      masterUpdateData.polaritas = patch.polaritas;
+    if (newSubIndicators !== null) {
+      // subIndicators & bobotKm turunannya diganti bersamaan — jangan biarkan patch.bobotKm
+      // manual menimpa hasil derivasi ini.
+      masterUpdateData.subIndicators =
+        newSubIndicators as unknown as Prisma.InputJsonValue;
+      if (newBobotKm !== master.bobotKm) masterUpdateData.bobotKm = newBobotKm;
+    } else if (
+      patch.bobotKm !== undefined &&
+      patch.bobotKm !== master.bobotKm &&
+      !isComposite
+    ) {
+      masterUpdateData.bobotKm = patch.bobotKm;
+    }
+    if (
+      patch.targetParent !== undefined &&
+      patch.targetParent !== master.targetParent
+    )
+      masterUpdateData.targetParent = patch.targetParent;
+    if (
+      nextAggregationMethod &&
+      nextAggregationMethod !== master.aggregationMethod
+    )
+      masterUpdateData.aggregationMethod = nextAggregationMethod;
+
+    let syncedDocsCount = 0;
+    if (Object.keys(masterUpdateData).length > 0) {
+      master = await this.prisma.kpiMaster.update({
+        where: { id: master.id },
+        data: masterUpdateData,
+      });
+
+      const itemPatch: MasterDerivedItemPatch = {};
+      if (masterUpdateData.indikator !== undefined)
+        itemPatch.indikator = master.indikator;
+      if (masterUpdateData.formula !== undefined)
+        itemPatch.formula = master.formula;
+      if (masterUpdateData.satuan !== undefined)
+        itemPatch.satuan = master.satuan;
+      if (masterUpdateData.polaritas !== undefined)
+        itemPatch.polaritas = master.polaritas;
+      if (masterUpdateData.bobotKm !== undefined)
+        itemPatch.bobot = master.bobotKm;
+
+      syncedDocsCount = await this.syncMasterFieldsAcrossDocuments(
+        master.id,
+        master.kmType,
+        itemPatch,
+      );
+
+      // Template sub-indikator berubah — sinkronkan (nama/formula/satuan/bobot/polaritas/target
+      // default tiap sub) ke SEMUA dokumen KM yang memuat item ini, digabung dgn override
+      // per-assignment masing2 dokumen (bukan cuma dokumen yang sedang direvisi di payload ini).
+      if (masterUpdateData.subIndicators !== undefined) {
+        syncedDocsCount += await this.syncSubIndicatorsAcrossDocuments(
+          master.id,
+          master.kmType,
+          master.subIndicators as unknown as SubIndicatorInput[],
+        );
+      }
+    }
+
+    // ===== Terapkan revisi (holder/target/target2/persenAgregasi/subIndicatorTargets) ke
+    // SETIAP assignment yang dikirim (utama + otherAssignments) — tiap satu punya dokumen KM
+    // 'rejected' sendiri (unitCode/bidang berbeda), diproses independen supaya SEMUA ikut
+    // ter-update. `master` di sini sudah mencerminkan subIndicators/bobotKm TERBARU (bila
+    // diubah di atas) — dipakai reviseOneAssignmentDocument utk merge target sub-indikator. =====
+    const targets = [
+      { assignment: assignment, patch },
+      ...otherPatches.map((o) => ({
+        assignment: otherAssignmentRows.find((r) => r.id === o.id)!,
+        patch: o,
+      })),
+    ];
+
+    const results: Array<{
+      assignmentId: string;
+      unitCode: string;
+      bidang: string;
+      document: unknown;
+      allItemsRevised: boolean;
+      revisedCount: number;
+      totalItems: number;
+    }> = [];
+    const touchedUnitCodes = new Set<string>();
+
+    for (const t of targets) {
+      const r = await this.reviseOneAssignmentDocument(
+        user,
+        t.assignment,
+        master,
+        period,
+        t.patch,
+      );
+      results.push(r);
+      touchedUnitCodes.add(t.assignment.unitCode);
+    }
+
+    await this.prisma.auditLog.create({
+      data: {
+        actor: user.name,
+        userId: user.id,
+        action: "kpi_master.assignment_revise",
+        entity: "KpiAssignment",
+        targetId: assignment.id,
+        note:
+          `Assignment KPI "${master.indikator}" direvisi pada ${targets.length} unit/bidang (${targets
+            .map((t) => `${t.assignment.unitCode} — ${t.assignment.bidang}`)
+            .join(", ")})` +
+          (Object.keys(masterUpdateData).length > 0
+            ? `; definisi diubah: ${Object.keys(masterUpdateData).join(", ")}${
+                syncedDocsCount > 0
+                  ? ` (disinkronkan ke ${syncedDocsCount} dokumen KM)`
+                  : ""
+              }`
+            : "") +
+          (results.every((r) => r.allItemsRevised)
+            ? "; seluruh dokumen KM terkait dikembalikan ke draft"
+            : "; sebagian dokumen masih menunggu revisi indikator lain"),
+      },
+    });
+    for (const uc of touchedUnitCodes) await this.cache.del(`kontrak:${uc}`);
+
+    return {
+      results,
+      allDone: results.every((r) => r.allItemsRevised),
+      master: {
+        indikator: master.indikator,
+        formula: master.formula,
+        satuan: master.satuan,
+        polaritas: master.polaritas,
+        bobotKm: master.bobotKm,
+        targetParent: master.targetParent,
+        aggregationMethod: master.aggregationMethod,
+        subIndicators: master.subIndicators,
+      },
+      syncedDocsCount,
+    };
   }
 
   // Rollup: gulung realisasi tiap assignment (child) menjadi nilai parent. Realisasi
@@ -814,6 +1758,210 @@ export class KpiMasterService {
     return review;
   }
 
+  private assertCanAuthor(user: User) {
+    const isAdminOverride =
+      user.role === Role.GM ||
+      user.role === Role.SUPERADMIN ||
+      user.role === Role.DEVELOPER;
+    const isRpc = user.unit === "KP" && user.bidang === RPC_BIDANG;
+    if (!isAdminOverride && !isRpc) {
+      throw new ForbiddenException(
+        "KPI Master hanya dapat disusun oleh Perencanaan & Project Control (RPC), GM, atau Admin",
+      );
+    }
+  }
+
+  // Validation + normalisation taken from save(); does NOT mutate dto.
+  private async normalizeMasterPayload(dto: SaveMasterInput) {
+    if (!dto.indikator?.trim())
+      throw new BadRequestException("Nama indikator wajib diisi");
+    if (!Array.isArray(dto.assignments) || dto.assignments.length === 0)
+      throw new BadRequestException(
+        "Pilih minimal satu unit/bidang untuk di-assign",
+      );
+
+    const keys = new Set<string>();
+    for (const a of dto.assignments) {
+      if (!a.unitCode?.trim() || !a.bidang?.trim())
+        throw new BadRequestException(
+          "Setiap assignment wajib punya unit & bidang",
+        );
+      const k = `${a.unitCode}||${a.bidang}`;
+      if (keys.has(k))
+        throw new BadRequestException(
+          `Assignment ganda untuk ${a.unitCode} — ${a.bidang}`,
+        );
+      keys.add(k);
+    }
+
+    const isCompositeDto =
+      Array.isArray(dto.subIndicators) && dto.subIndicators.length > 0;
+    if (!isCompositeDto) {
+      for (const a of dto.assignments) {
+        if (!a.target?.trim())
+          throw new BadRequestException(
+            `Target Sem I wajib diisi untuk ${a.unitCode} — ${a.bidang}`,
+          );
+      }
+    }
+
+    const aggregationMethod: "weighted" | "sum" =
+      dto.aggregationMethod === "sum" ? "sum" : "weighted";
+    let persen = dto.assignments.map((a) => Number(a.persenAgregasi) || 0);
+    if (aggregationMethod === "weighted") {
+      if (dto.assignments.length === 1) {
+        persen = [100];
+      } else {
+        const total = persen.reduce((s, n) => s + n, 0);
+        if (persen.some((n) => n > 0) && Math.abs(total - 100) > 0.01)
+          throw new BadRequestException(
+            `Total bobot agregasi harus 100%, saat ini ${total}%`,
+          );
+      }
+    }
+
+    // undefined = "not sent → leave untouched" on update.
+    const defaultCheckerIds =
+      dto.defaultCheckerIds === undefined
+        ? undefined
+        : dto.defaultCheckerIds.filter(Boolean);
+    const defaultApproverId =
+      dto.defaultApproverId === undefined
+        ? undefined
+        : dto.defaultApproverId.trim() || null;
+    if ((defaultCheckerIds?.length ?? 0) > 0 || defaultApproverId) {
+      const ids = [
+        ...(defaultCheckerIds ?? []),
+        ...(defaultApproverId ? [defaultApproverId] : []),
+      ];
+      const users = await this.prisma.user.findMany({
+        where: { id: { in: ids }, isActive: true },
+      });
+      for (const cid of defaultCheckerIds ?? []) {
+        const u = users.find((x) => x.id === cid);
+        if (!u || !CHECKER_ROLES.includes(u.role))
+          throw new BadRequestException(
+            "Default Checker harus user aktif berperan ASMAN/Manajer",
+          );
+      }
+      if (defaultApproverId) {
+        const u = users.find((x) => x.id === defaultApproverId);
+        if (!u || !APPROVER_ROLES.includes(u.role))
+          throw new BadRequestException(
+            "Default Approver harus user aktif berperan Sr. Manajer/GM",
+          );
+      }
+    }
+
+    const slotsByAssignment: (ReviewerSlots | null)[] = [];
+    for (const a of dto.assignments) {
+      const slots = this.sanitizeReviewerSlots(a.reviewerSlots);
+      slotsByAssignment.push(slots);
+      if (!slots) continue;
+      const check = async (
+        slot: ReviewerSlot,
+        allowed: Role[],
+        label: string,
+      ) => {
+        if (!allowed.includes(slot.role as Role))
+          throw new BadRequestException(
+            `Slot ${label} (${a.unitCode}/${a.bidang}) harus berperan ${allowed.join("/")}`,
+          );
+        if (slot.userId) {
+          const u = await this.prisma.user.findFirst({
+            where: { id: slot.userId, isActive: true },
+          });
+          if (!u || !allowed.includes(u.role))
+            throw new BadRequestException(
+              `Override ${label} (${a.unitCode}/${a.bidang}) harus user aktif berperan ${allowed.join("/")}`,
+            );
+        }
+      };
+      for (const c of slots.checkers) await check(c, CHECKER_ROLES, "Checker");
+      if (slots.approver)
+        await check(slots.approver, APPROVER_ROLES, "Approver");
+    }
+
+    const subIndicators = this.sanitizeSubIndicators(
+      dto.subIndicators,
+      aggregationMethod,
+    );
+    const bobotKm = subIndicators
+      ? String(
+          subIndicators.reduce(
+            (s, si) => s + (Number(String(si.bobot).replace(",", ".")) || 0),
+            0,
+          ),
+        )
+      : (dto.bobotKm ?? "");
+    const subCount = subIndicators?.length ?? 0;
+
+    return {
+      indikator: dto.indikator.trim(),
+      formula: dto.formula ?? "",
+      satuan: dto.satuan ?? "",
+      bobotKm,
+      targetParent: dto.targetParent ?? "",
+      aggregationMethod,
+      polaritas: dto.polaritas === "negative" ? "negative" : "positive",
+      defaultCheckerIds,
+      defaultApproverId,
+      subIndicatorsJson: subIndicators
+        ? (subIndicators as unknown as Prisma.InputJsonValue)
+        : Prisma.JsonNull,
+      assignments: dto.assignments.map((a, i) => {
+        const slots = slotsByAssignment[i];
+        const subTargets = this.sanitizeSubIndicatorTargets(
+          a.subIndicatorTargets,
+          subCount,
+        );
+        return {
+          unitCode: a.unitCode,
+          bidang: a.bidang,
+          holder: a.holder ?? "",
+          target: a.target ?? "",
+          target2: a.target2 ?? "",
+          persenAgregasi: persen[i],
+          reviewerSlots:
+            slots === null
+              ? Prisma.DbNull
+              : (slots as unknown as Prisma.InputJsonValue),
+          subIndicatorTargets:
+            subTargets === null
+              ? Prisma.DbNull
+              : (subTargets as unknown as Prisma.InputJsonValue),
+        };
+      }),
+    };
+  }
+
+  // 409 if any document containing this KPI has left 'draft'.
+  // 409 only if a document containing this KPI is already approved.
+  private async assertDocumentsEditable(
+    db: Prisma.TransactionClient,
+    masterId: string,
+    kmType: string,
+    periodId: string,
+  ) {
+    const docs = await db.kontrakManajemen.findMany({
+      where: { periodId, kmType, status: "approved" },
+      select: { unitCode: true, bidang: true, kpiItems: true },
+    });
+    const approved = docs.filter(
+      (d) =>
+        Array.isArray(d.kpiItems) &&
+        (d.kpiItems as Record<string, unknown>[]).some(
+          (it) => it?.["masterKpiId"] === masterId,
+        ),
+    );
+    if (approved.length > 0) {
+      throw new ConflictException(
+        `KPI tidak dapat diperbarui karena sudah disetujui pada: ` +
+          approved.map((d) => `${d.unitCode} — ${d.bidang}`).join(", "),
+      );
+    }
+  }
+
   // Buat/ubah definisi KPI parent + assignment-nya, lalu sebar (fan-out) ke dokumen KM.
   async save(user: User, dto: SaveMasterInput) {
     // KPI Master mendefinisikan KPI lintas-bidang/unit — dipersempit ke RPC (Perencanaan &
@@ -1143,6 +2291,129 @@ export class KpiMasterService {
     return this.getById(master.id);
   }
 
+  // Update KPI Master IN PLACE: same master row/version, assignments reconciled by
+  // (unitCode,bidang), draft documents re-synced. No new version, no duplicate documents.
+  async update(user: User, id: string, dto: SaveMasterInput) {
+    this.assertCanAuthor(user);
+
+    const existing = await this.prisma.kpiMaster.findUnique({
+      where: { id },
+      include: { assignments: true },
+    });
+    if (!existing) throw new NotFoundException("KPI master tidak ditemukan");
+    if (existing.status === "superseded")
+      throw new BadRequestException(
+        "Versi KPI ini sudah digantikan versi yang lebih baru — edit versi terbaru sebagai gantinya",
+      );
+    if (dto.kmType && dto.kmType !== existing.kmType)
+      throw new BadRequestException(
+        "kmType tidak dapat diubah — Draft dan Final adalah registri dokumen yang independen",
+      );
+
+    const period = await this.prisma.period.findUnique({
+      where: { yearMonth: existing.effectiveMonth },
+    });
+    if (!period)
+      throw new BadRequestException(
+        `Periode ${existing.effectiveMonth} tidak ditemukan`,
+      );
+
+    const n = await this.normalizeMasterPayload(dto);
+
+    const { assignments, docsAffected } = await this.prisma.$transaction(
+      async (tx) => {
+        await this.assertDocumentsEditable(tx, id, existing.kmType, period.id);
+
+        const master = await tx.kpiMaster.update({
+          where: { id },
+          data: {
+            indikator: n.indikator,
+            formula: n.formula,
+            satuan: n.satuan,
+            bobotKm: n.bobotKm,
+            targetParent: n.targetParent,
+            aggregationMethod: n.aggregationMethod,
+            polaritas: n.polaritas,
+            subIndicators: n.subIndicatorsJson,
+            ...(n.defaultCheckerIds !== undefined
+              ? { defaultCheckerIds: n.defaultCheckerIds }
+              : {}),
+            ...(n.defaultApproverId !== undefined
+              ? { defaultApproverId: n.defaultApproverId }
+              : {}),
+          },
+        });
+
+        // Reconcile assignments by (unitCode,bidang): update / create / delete.
+        const existingByKey = new Map(
+          existing.assignments.map((a) => [`${a.unitCode}||${a.bidang}`, a]),
+        );
+        const incomingKeys = new Set<string>();
+        for (const a of n.assignments) {
+          const key = `${a.unitCode}||${a.bidang}`;
+          incomingKeys.add(key);
+          const current = existingByKey.get(key);
+          if (current) {
+            await tx.kpiAssignment.update({
+              where: { id: current.id },
+              data: {
+                holder: a.holder,
+                target: a.target,
+                target2: a.target2,
+                persenAgregasi: a.persenAgregasi,
+                reviewerSlots: a.reviewerSlots,
+                subIndicatorTargets: a.subIndicatorTargets,
+              },
+            });
+          } else {
+            await tx.kpiAssignment.create({
+              data: { kpiMasterId: id, ...a },
+            });
+          }
+        }
+        const removedIds = existing.assignments
+          .filter((a) => !incomingKeys.has(`${a.unitCode}||${a.bidang}`))
+          .map((a) => a.id);
+        if (removedIds.length > 0)
+          await tx.kpiAssignment.deleteMany({
+            where: { id: { in: removedIds } },
+          });
+
+        const fresh = await tx.kpiAssignment.findMany({
+          where: { kpiMasterId: id },
+        });
+        const fan = await this.fanOut(master, fresh, period.id, tx, [
+          "draft",
+          "submitted",
+          "ready",
+          "rejected",
+        ]);
+
+        await tx.auditLog.create({
+          data: {
+            actor: user.name,
+            userId: user.id,
+            action: "kpi_master.update_inplace",
+            entity: "KpiMaster",
+            targetId: id,
+            note: `KPI "${master.indikator}" (v${master.version}) diperbarui di tempat: ${fresh.length} assignment, ${fan.docsAffected} dokumen KM draft disinkronkan`,
+          },
+        });
+        return { assignments: fresh, docsAffected: fan.docsAffected };
+      },
+      { timeout: 20000, maxWait: 5000 },
+    );
+
+    // Cache invalidation after commit, covering both removed and current units.
+    const units = new Set([
+      ...existing.assignments.map((a) => a.unitCode),
+      ...assignments.map((a) => a.unitCode),
+    ]);
+    await Promise.all([...units].map((u) => this.cache.del(`kontrak:${u}`)));
+
+    return { ...(await this.getById(id)), docsAffected };
+  }
+
   private incrementYearMonth(ym: string): string {
     const [y, m] = ym.split("-").map(Number);
     const ny = m === 12 ? y + 1 : y;
@@ -1208,11 +2479,9 @@ export class KpiMasterService {
       subIndicatorTargets?: Prisma.JsonValue | null;
     }>,
     periodId: string,
+    db: Prisma.TransactionClient = this.prisma,
+    editableStatuses: string[] = ["draft"],
   ): Promise<{ docsAffected: number }> {
-    // Sub-indikator (opt-in): definisi (nama/formula/satuan/bobot) sama utk SEMUA assignment,
-    // tapi target/target2 tiap sub BOLEH dioverride per assignment (KpiAssignment.subIndicatorTargets,
-    // array sejajar index) — mis. "Pengendalian NAC" bisa ditarget beda per UPMK sesuai skala
-    // anggaran masing-masing. Kosong/tak diisi di suatu index = warisi target template global.
     const subIndicatorsTemplate = Array.isArray(master.subIndicators)
       ? (master.subIndicators as unknown as SubIndicatorInput[])
       : undefined;
@@ -1221,9 +2490,13 @@ export class KpiMasterService {
     );
     let docsAffected = 0;
 
-    // 1. Bersihkan item KPI ini dari dokumen KM draft yang (unit,bidang)-nya tak lagi di-assign.
-    const draftKms = await this.prisma.kontrakManajemen.findMany({
-      where: { periodId, kmType: master.kmType, status: "draft" },
+    // 1. Remove this KPI from draft documents whose (unit,bidang) is no longer assigned.
+    const draftKms = await db.kontrakManajemen.findMany({
+      where: {
+        periodId,
+        kmType: master.kmType,
+        status: { in: editableStatuses },
+      },
     });
     for (const km of draftKms) {
       const items = (Array.isArray(km.kpiItems) ? km.kpiItems : []) as Record<
@@ -1234,7 +2507,7 @@ export class KpiMasterService {
       const key = `${km.unitCode}||${km.bidang}`;
       if (hasMaster && !assignedKeys.has(key)) {
         const filtered = items.filter((it) => it["masterKpiId"] !== master.id);
-        await this.prisma.kontrakManajemen.update({
+        await db.kontrakManajemen.update({
           where: { id: km.id },
           data: { kpiItems: filtered as object },
         });
@@ -1242,7 +2515,7 @@ export class KpiMasterService {
       }
     }
 
-    // 2. Sisipkan/perbarui item KPI di dokumen KM draft tiap (unit,bidang) yang di-assign.
+    // 2. Insert/update the item in each assigned (unit,bidang) draft document.
     for (const a of assignments) {
       const overrides = Array.isArray(a.subIndicatorTargets)
         ? (a.subIndicatorTargets as unknown as Array<{
@@ -1267,20 +2540,21 @@ export class KpiMasterService {
         target: a.target,
         target2: a.target2,
         polaritas: master.polaritas ?? "positive",
+        holder: a.holder || master.createdBy,
         ...(mergedSubIndicators ? { subIndicators: mergedSubIndicators } : {}),
       };
-      const existingKm = await this.prisma.kontrakManajemen.findFirst({
+      const existingKm = await db.kontrakManajemen.findFirst({
         where: {
           periodId,
           unitCode: a.unitCode,
           bidang: a.bidang,
           kmType: master.kmType,
-          status: "draft",
+          status: { in: editableStatuses },
         },
         orderBy: { updatedAt: "desc" },
       });
       if (!existingKm) {
-        await this.prisma.kontrakManajemen.create({
+        await db.kontrakManajemen.create({
           data: {
             periodId,
             unitCode: a.unitCode,
@@ -1301,7 +2575,7 @@ export class KpiMasterService {
         const idx = items.findIndex((it) => it["masterKpiId"] === master.id);
         if (idx >= 0) items[idx] = item as unknown as Record<string, unknown>;
         else items.push(item as unknown as Record<string, unknown>);
-        await this.prisma.kontrakManajemen.update({
+        await db.kontrakManajemen.update({
           where: { id: existingKm.id },
           data: {
             kpiItems: items as object,

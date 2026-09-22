@@ -30,6 +30,35 @@ export class InputKontrakService {
     @Inject(CACHE_MANAGER) private cache: Cache,
   ) {}
 
+  // Ambil daftar Penanggung Jawab (holder) UNIK dari seluruh kpiItems dokumen. Tiap item
+  // bisa punya holder sendiri (field 'holder' pada FannedItem, disinkronkan dari
+  // KpiAssignment.holder — lihat fanOut()/reviseRejectedAssignment() di kpi-master.service.ts).
+  // Item LEGACY (dibuat sebelum field 'holder' per-item ada, atau via authoring manual lama)
+  // tak punya 'holder' sendiri — fallback ke doc.holder (perilaku lama, satu holder untuk
+  // seluruh dokumen) supaya data historis tetap tampil wajar tanpa migrasi data.
+  private extractHolders(kpiItems: unknown, docHolder: string): string[] {
+    const items = (Array.isArray(kpiItems) ? kpiItems : []) as Record<
+      string,
+      unknown
+    >[];
+    const itemHolders = items
+      .map((it) =>
+        typeof it["holder"] === "string" ? it["holder"].trim() : "",
+      )
+      .filter((h) => h.length > 0);
+    const source = itemHolders.length > 0 ? itemHolders : [docHolder.trim()];
+    return [...new Set(source.filter((h) => h.length > 0))];
+  }
+
+  // Sisipkan 'holders' (array unik, urutan kemunculan) ke sebuah dokumen KM tanpa mengubah
+  // field 'holder' asli — field lama tetap dipertahankan untuk kompatibilitas mundur (mis.
+  // print/export yang masih membaca .holder), 'holders' adalah tambahan untuk tampilan list.
+  private withHolders<T extends { holder: string; kpiItems: unknown }>(
+    doc: T,
+  ): T & { holders: string[] } {
+    return { ...doc, holders: this.extractHolders(doc.kpiItems, doc.holder) };
+  }
+
   async getList(
     unitCode?: string,
     periodId?: string,
@@ -47,10 +76,11 @@ export class InputKontrakService {
     // caller existing (mis. fan-out doc list, bulk-submit readiness check) yang mengharapkan
     // array penuh, bukan { data, pagination }.
     if (!currentPage && !perPage) {
-      return this.prisma.kontrakManajemen.findMany({
+      const docs = await this.prisma.kontrakManajemen.findMany({
         where,
         orderBy: { submittedAt: "desc" },
       });
+      return docs.map((d) => this.withHolders(d));
     }
 
     const page = currentPage ?? 1;
@@ -67,7 +97,7 @@ export class InputKontrakService {
     ]);
 
     return {
-      data,
+      data: data.map((d) => this.withHolders(d)),
       pagination: {
         currentPage: page,
         perPage: limit,
@@ -78,7 +108,10 @@ export class InputKontrakService {
   }
 
   async getById(id: string) {
-    return this.prisma.kontrakManajemen.findUnique({ where: { id } });
+    const doc = await this.prisma.kontrakManajemen.findUnique({
+      where: { id },
+    });
+    return doc ? this.withHolders(doc) : null;
   }
 
   // Registri KM yang sudah DISETUJUI penuh (final oleh GM).
@@ -109,10 +142,11 @@ export class InputKontrakService {
     };
 
     if (!currentPage && !perPage) {
-      return this.prisma.kontrakManajemen.findMany({
+      const docs = await this.prisma.kontrakManajemen.findMany({
         where,
         orderBy: [{ unitCode: "asc" }, { reviewedAt: "desc" }],
       });
+      return docs.map((d) => this.withHolders(d));
     }
 
     const page = currentPage ?? 1;
@@ -129,7 +163,7 @@ export class InputKontrakService {
     ]);
 
     return {
-      data,
+      data: data.map((d) => this.withHolders(d)),
       pagination: {
         currentPage: page,
         perPage: limit,
@@ -143,7 +177,12 @@ export class InputKontrakService {
   // dengan alur reviewnya sendiri (Staff RPC → Checker → Approver), BUKAN prasyarat serial.
   // Begitu Staff RPC men-submit (keluar dari 'draft'), unit/bidang yang dituju sudah dapat
   // mengisi realisasi terhadapnya; dokumen KM lanjut direview independen di tab Dokumen KM.
-  async getForRealisasi(unitCode?: string, year?: string, kmType?: string) {
+  async getForRealisasi(
+    unitCode?: string,
+    year?: string,
+    kmType?: string,
+    periodId?: string,
+  ) {
     let periodIdsInYear: string[] | undefined;
     if (year) {
       const periods = await this.prisma.period.findMany({
@@ -152,14 +191,83 @@ export class InputKontrakService {
       });
       periodIdsInYear = periods.map((p) => p.id);
     }
-    return this.prisma.kontrakManajemen.findMany({
+    const docs = await this.prisma.kontrakManajemen.findMany({
       where: {
-        status: { in: ["submitted", "ready", "approved"] },
+        status: "approved",
         ...(unitCode ? { unitCode } : {}),
         ...(periodIdsInYear ? { periodId: { in: periodIdsInYear } } : {}),
         ...(kmType ? { kmType } : {}),
       },
       orderBy: [{ unitCode: "asc" }, { submittedAt: "desc" }],
+    });
+
+    if (!periodId) return docs;
+
+    const realisasiRecords = await this.prisma.inputRealisasi.findMany({
+      where: { periodId, ...(unitCode ? { unitCode } : {}) },
+    });
+    const valuesByBidang = new Map<string, Record<string, unknown>>();
+    for (const r of realisasiRecords) {
+      valuesByBidang.set(
+        r.bidang,
+        (r.values && typeof r.values === "object" ? r.values : {}) as Record<
+          string,
+          unknown
+        >,
+      );
+    }
+    if (valuesByBidang.size === 0) return docs;
+
+    return docs.map((doc) => {
+      const bidangValues = valuesByBidang.get(doc.bidang);
+      if (!bidangValues) return doc;
+
+      const kpiEntries = Object.values(bidangValues) as Record<
+        string,
+        unknown
+      >[];
+      const kpiItems = (
+        Array.isArray(doc.kpiItems) ? doc.kpiItems : []
+      ) as Record<string, unknown>[];
+
+      const mergedItems = kpiItems.map((item) => {
+        const match = kpiEntries.find(
+          (v) =>
+            (item["masterKpiId"] && v["masterKpiId"] === item["masterKpiId"]) ||
+            v["indikator"] === item["indikator"],
+        );
+        if (!match) return item;
+
+        if (
+          Array.isArray(item["subIndicators"]) &&
+          (item["subIndicators"] as unknown[]).length > 0
+        ) {
+          const matchSubs =
+            (match["subIndicators"] as Record<string, unknown>[]) ?? [];
+          const subIndicators = (
+            item["subIndicators"] as Record<string, unknown>[]
+          ).map((si, j) => {
+            const subMatch =
+              matchSubs.find((ms) => ms["nama"] === si["nama"]) ?? matchSubs[j];
+            return subMatch
+              ? {
+                  ...si,
+                  realisasi: subMatch["realisasi"],
+                  capaianSaran: subMatch["capaianSaran"],
+                }
+              : si;
+          });
+          return { ...item, subIndicators };
+        }
+
+        return {
+          ...item,
+          realisasi: match["realisasi"],
+          capaianSaran: match["capaianSaran"],
+        };
+      });
+
+      return { ...doc, kpiItems: mergedItems };
     });
   }
 
@@ -452,10 +560,6 @@ export class InputKontrakService {
       );
     }
 
-    // Hapus juga KpiAssignment terkait (unit/bidang dokumen ini) untuk tiap masterKpiId yang
-    // ada di kpiItems — tanpa ini, KPI Master masih menganggap unit/bidang ini "di-assign",
-    // sehingga fanOut() (dipicu KpiMasterService.save() berikutnya) akan membuat ulang dokumen
-    // yang baru saja dihapus manual.
     const items = (
       Array.isArray(kontrak.kpiItems) ? kontrak.kpiItems : []
     ) as Record<string, unknown>[];
@@ -466,26 +570,50 @@ export class InputKontrakService {
           .filter((v): v is string => typeof v === "string"),
       ),
     ];
-    if (masterIds.length > 0) {
-      await this.prisma.kpiAssignment.deleteMany({
-        where: {
-          kpiMasterId: { in: masterIds },
-          unitCode: kontrak.unitCode,
-          bidang: kontrak.bidang,
+
+    await this.prisma.$transaction(async (tx) => {
+      if (masterIds.length > 0) {
+        await tx.kpiAssignment.deleteMany({
+          where: {
+            kpiMasterId: { in: masterIds },
+            unitCode: kontrak.unitCode,
+            bidang: kontrak.bidang,
+          },
+        });
+
+        // Cascade: any master left with zero assignments is orphaned — remove it too,
+        // so it doesn't linger in Definisi KPI with assignments: [].
+        const remaining = await tx.kpiAssignment.groupBy({
+          by: ["kpiMasterId"],
+          where: { kpiMasterId: { in: masterIds } },
+          _count: { _all: true },
+        });
+        const stillHasAssignments = new Set(
+          remaining.map((r) => r.kpiMasterId),
+        );
+        const orphanedMasterIds = masterIds.filter(
+          (mid) => !stillHasAssignments.has(mid),
+        );
+
+        if (orphanedMasterIds.length > 0) {
+          await tx.kpiMaster.deleteMany({
+            where: { id: { in: orphanedMasterIds } },
+          });
+        }
+      }
+
+      await tx.kontrakManajemen.delete({ where: { id } });
+      await tx.auditLog.create({
+        data: {
+          actor: user.name,
+          userId: user.id,
+          action: "kontrak.delete",
+          entity: "KontrakManajemen",
+          targetId: id,
         },
       });
-    }
-
-    await this.prisma.kontrakManajemen.delete({ where: { id } });
-    await this.prisma.auditLog.create({
-      data: {
-        actor: user.name,
-        userId: user.id,
-        action: "kontrak.delete",
-        entity: "KontrakManajemen",
-        targetId: id,
-      },
     });
+
     await this.cache.del(`kontrak:${kontrak.unitCode}`);
     return { success: true };
   }
@@ -856,6 +984,7 @@ export class InputKontrakService {
         status: c.status,
         submitter: c.submitter,
         holder: c.holder,
+        holders: this.extractHolders(c.kpiItems, c.holder),
         history: c.history,
         kpiItems: (Array.isArray(c.kpiItems)
           ? (c.kpiItems as Record<string, unknown>[])

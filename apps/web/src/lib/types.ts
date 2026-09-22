@@ -1,3 +1,5 @@
+import { ReviewerSlots, SubIndicatorTargetOverride } from "./api";
+
 export type Role =
   | "STAFF"
   | "ASMAN"
@@ -253,6 +255,7 @@ export interface KontrakManajemenItem {
   unitCode: string;
   bidang: string;
   holder: string;
+  holders: string[];
   kpiItems: Record<string, unknown>[];
   status: "draft" | "submitted" | "ready" | "approved" | "rejected";
   kmType: "draft" | "final";
@@ -266,6 +269,65 @@ export interface KontrakManajemenItem {
   submittedAt: string;
   updatedAt: string;
 }
+
+export interface ReviseAssignmentPatch {
+  holder?: string;
+  target?: string;
+  target2?: string;
+  persenAgregasi?: number;
+}
+
+export interface ReviseRejectedAssignmentInput extends ReviseAssignmentPatch {
+  indikator?: string;
+  formula?: string;
+  satuan?: string;
+  bobotKm?: string;
+  targetParent?: string;
+  polaritas?: "positive" | "negative";
+  aggregationMethod?: "weighted" | "sum";
+  kmType?: string;
+  otherAssignments?: Array<{ id: string } & ReviseAssignmentPatch>;
+}
+
+export interface ReviseRejectedAssignmentResult {
+  results: Array<{
+    assignmentId: string;
+    unitCode: string;
+    bidang: string;
+    document: {
+      id: string;
+      status: string;
+      [key: string]: unknown;
+    };
+    allItemsRevised: boolean;
+    revisedCount: number;
+    totalItems: number;
+  }>;
+  allDone: boolean;
+  master: {
+    indikator: string;
+    formula: string;
+    satuan: string;
+    polaritas: string;
+    bobotKm: string;
+    targetParent: string;
+    aggregationMethod: string;
+  };
+  syncedDocsCount: number;
+}
+
+export type Assignment = {
+  id?: string; // present only when loaded from an existing KpiAssignment (edit mode)
+  status?: string; // carried read-only from backend — drives the inline "Revisi" affordance
+  unitCode: string;
+  bidang: string[];
+  holder: string;
+  target: string;
+  target2: string;
+  persenAgregasi: number;
+  reviewerSlots: ReviewerSlots | null;
+  subIndicatorTargets: SubIndicatorTargetOverride[] | null;
+};
 
 export interface PaginationPropsList {
   currentPage: number;
@@ -310,8 +372,16 @@ export interface DocRow {
   stepLabel: string;
   stepIndex: number;
   stepCount: number;
+  kmType?: "draft" | "final" | null;
   kpiItems?: Record<string, unknown>[];
 }
+
+export interface DocStatusSummary  {
+  submitted: number;
+  ready: number;
+  approved: number;
+  rejected: number;
+};
 
 export interface PaginatedDocRows {
   data: DocRow[];
@@ -321,4 +391,5 @@ export interface PaginatedDocRows {
     totalData: number;
     totalPage: number;
   };
-}
+  summary: DocStatusSummary;
+};

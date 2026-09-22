@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, Fragment } from "react";
+import { useEffect, useRef, useState, Fragment, useCallback } from "react";
 import {
   inputRealisasi,
   inputKontrak,
@@ -49,6 +49,7 @@ type SubIndicatorItem = {
   realisasi?: number | string;
   formula?: string;
   polaritas?: "positive" | "negative";
+  capaianSaran?: string;
 };
 
 type KpiItem = {
@@ -64,6 +65,7 @@ type KpiItem = {
   masterKpiId?: string; // tautan ke KpiAssignment untuk resolusi living target (KM Sementara)
   subIndicators?: SubIndicatorItem[]; // non-kosong = item ini "komposit" — realisasi diisi per-sub
   polaritas?: "positive" | "negative";
+  capaianSaran?: string;
 };
 
 // Saran Pencapaian (%) murni tampilan — mirror ringkas resolvePolarity+computeCapaian backend
@@ -238,10 +240,81 @@ export function InputRealisasiPage() {
   // periode terpilih — sengaja tak dibatasi user.bidang (lihat catatan di getMyDecisions()
   // backend: reviewer seperti SM RPC memutuskan dokumen lintas-bidang lewat rantai konsolidasi).
   const [myDecisions, setMyDecisions] = useState<MyDecision[]>([]);
+  const [submitProgress, setSubmitProgress] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
+
+  // Guard against out-of-order async responses: every loadData() call gets an id, and only
+  // the MOST RECENTLY ISSUED call is allowed to commit state. This protects across ALL callers
+  // (the effect, submit, delete, evidence handlers) — not just the effect racing itself.
+  const loadReqId = useRef(0);
+
+  // Central data loader — fetches history + KPI reference (inputKontrak.forRealisasi) +
+  // period targets TOGETHER, so any caller that needs a refresh after a server-side change
+  // (submit/delete/evidence) gets ALL three back in sync instead of hand-rolling a partial
+  // (and previously bug-prone) history-only refetch.
+  const loadData = useCallback(async () => {
+    if (!selectedPeriodId) return;
+    const reqId = ++loadReqId.current;
+    try {
+      // KM bersifat tahunan → acuan realisasi ditarik per TAHUN dari periode terpilih.
+      // kmReference periode menentukan apakah KPI ditarik dari KM Draft atau KM Final.
+      const periodObj = periods.find((p) => p.id === selectedPeriodId);
+      const selectedYear = periodObj?.yearMonth?.slice(0, 4);
+      const kmType = periodObj?.kmReference ?? "draft";
+      const [histRes, kmRes, ptRes] = await Promise.allSettled([
+        inputRealisasi.history(selectedUnit, selectedPeriodId),
+        inputKontrak.forRealisasi(
+          selectedUnit,
+          selectedYear,
+          kmType,
+          selectedPeriodId,
+        ),
+        periodTarget.list(selectedPeriodId),
+      ]);
+
+      // A newer loadData() call has started (or the effect re-ran) since this one began —
+      // discard this stale result entirely, don't let it clobber newer state.
+      if (reqId !== loadReqId.current) return;
+
+      if (histRes.status === "fulfilled")
+        setHistory(histRes.value as unknown[]);
+      // Living-target: KM Sementara per assignment periode ini (untuk package view).
+      setPeriodTargets(ptRes.status === "fulfilled" ? ptRes.value : []);
+      if (kmRes.status === "fulfilled") {
+        // Acuan realisasi = KPI dari KM yang sudah DISUBMIT Staff RPC (KM Sementara berjalan
+        // paralel dengan alur review-nya sendiri — bukan menunggu approval penuh).
+        const kontrak = kmRes.value as KontrakManajemenItem[];
+        let merged: KpiItem[] = kontrak.flatMap((k) =>
+          (k.kpiItems as KpiItem[]).map((it) => ({
+            ...it,
+            bidang: k.bidang,
+          })),
+        );
+        // Semua role kecuali GM hanya melihat KPI bidangnya sendiri.
+        if (user?.bidang && user?.role !== "GM") {
+          merged = merged.filter((it) => it.bidang === user.bidang);
+        }
+        merged = merged.sort(
+          (a, b) =>
+            (BIDANG_SORT[a.bidang ?? ""] ?? 99) -
+            (BIDANG_SORT[b.bidang ?? ""] ?? 99),
+        );
+        setKpiList(merged);
+        setValues({});
+        setCapaianValues({});
+      }
+    } catch (e) {
+      if (reqId === loadReqId.current)
+        setError((e as Error)?.message ?? "Gagal memuat data");
+    } finally {
+      if (reqId === loadReqId.current) setLoading(false);
+    }
+  }, [selectedUnit, selectedPeriodId, periods, user?.bidang, user?.role]);
 
   const reloadHistory = async () => {
-    const hist = await inputRealisasi.history(selectedUnit, selectedPeriodId);
-    setHistory(hist as unknown[]);
+    await loadData();
   };
   const handleUploadEvid = async (id: string, files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -309,55 +382,11 @@ export function InputRealisasiPage() {
       .catch(() => setLoading(false));
   }, []);
 
+  // Delegasi penuh ke loadData() — efek ini HANYA bertanggung jawab memicu load saat
+  // dependency berubah; logic fetch & guard staleness sepenuhnya di loadData().
   useEffect(() => {
-    if (!selectedPeriodId) return;
-    const loadData = async () => {
-      try {
-        // KM bersifat tahunan → acuan realisasi ditarik per TAHUN dari periode terpilih.
-        // kmReference periode menentukan apakah KPI ditarik dari KM Draft atau KM Final.
-        const periodObj = periods.find((p) => p.id === selectedPeriodId);
-        const selectedYear = periodObj?.yearMonth?.slice(0, 4);
-        const kmType = periodObj?.kmReference ?? "draft";
-        const [histRes, kmRes, ptRes] = await Promise.allSettled([
-          inputRealisasi.history(selectedUnit, selectedPeriodId),
-          inputKontrak.forRealisasi(selectedUnit, selectedYear, kmType),
-          periodTarget.list(selectedPeriodId),
-        ]);
-        if (histRes.status === "fulfilled")
-          setHistory(histRes.value as unknown[]);
-        // Living-target: KM Sementara per assignment periode ini (untuk package view).
-        setPeriodTargets(ptRes.status === "fulfilled" ? ptRes.value : []);
-        if (kmRes.status === "fulfilled") {
-          // Acuan realisasi = KPI dari KM yang sudah DISUBMIT Staff RPC (KM Sementara berjalan
-          // paralel dengan alur review-nya sendiri — bukan menunggu approval penuh).
-          const kontrak = kmRes.value as KontrakManajemenItem[];
-          let merged: KpiItem[] = kontrak.flatMap((k) =>
-            (k.kpiItems as KpiItem[]).map((it) => ({
-              ...it,
-              bidang: k.bidang,
-            })),
-          );
-          // Semua role kecuali GM hanya melihat KPI bidangnya sendiri.
-          if (user?.bidang && user?.role !== "GM") {
-            merged = merged.filter((it) => it.bidang === user.bidang);
-          }
-          merged = merged.sort(
-            (a, b) =>
-              (BIDANG_SORT[a.bidang ?? ""] ?? 99) -
-              (BIDANG_SORT[b.bidang ?? ""] ?? 99),
-          );
-          setKpiList(merged);
-          setValues({});
-          setCapaianValues({});
-        }
-      } catch (e) {
-        setError((e as Error)?.message ?? "Gagal memuat data");
-      } finally {
-        setLoading(false);
-      }
-    };
     loadData();
-  }, [selectedUnit, selectedPeriodId, isStaff, user?.bidang]);
+  }, [loadData]);
 
   // Riwayat Keputusan Saya — hanya reviewer, periode terpilih, TAK terikat selectedUnit/bidang
   // (lihat catatan di getMyDecisions() backend).
@@ -382,7 +411,7 @@ export function InputRealisasiPage() {
     checkerIds: string[],
     approverIds: string[],
   ) => {
-    if (!user) return;
+    if (!user || submitting) return;
     setSubmitting(true);
     try {
       // Realisasi dipecah per bidang: kelompokkan baris KPI per bidang, kirim satu submit per bidang
@@ -423,10 +452,10 @@ export function InputRealisasiPage() {
       }
       setPickerOpen(false);
       setSubmitted(true);
-      setValues({});
-      setCapaianValues({});
-      const hist = await inputRealisasi.history(selectedUnit, selectedPeriodId);
-      setHistory(hist as unknown[]);
+      // Refresh SEMUA data terkait (history, kpiList/acuan KM, periodTargets) sekaligus —
+      // sebelumnya hanya history yang di-refetch di sini, sehingga tabel KPI Realisasi bisa
+      // menampilkan data KM/acuan basi sampai selectedPeriodId diubah manual.
+      await loadData();
       setTimeout(() => setSubmitted(false), 3000);
     } catch (e) {
       const msg =
@@ -437,6 +466,7 @@ export function InputRealisasiPage() {
       setError(msg);
     } finally {
       setSubmitting(false);
+      setSubmitProgress(null);
     }
   };
 
@@ -445,8 +475,7 @@ export function InputRealisasiPage() {
       return;
     try {
       await inputRealisasi.delete(id);
-      const hist = await inputRealisasi.history(selectedUnit, selectedPeriodId);
-      setHistory(hist as unknown[]);
+      await loadData();
     } catch (e) {
       const msg =
         (e as { response?: { data?: { message?: string } } })?.response?.data
@@ -505,7 +534,13 @@ export function InputRealisasiPage() {
             h.bidang === user.bidang &&
             IN_FLIGHT_STATUSES.includes(String(h.status ?? "")),
         )
-      : undefined;
+      : user?.bidang === null
+        ? (history as Record<string, unknown>[]).find(
+            (h) =>
+              h.unitCode === user.unit &&
+              IN_FLIGHT_STATUSES.includes(String(h.status ?? "")),
+          )
+        : undefined;
   const myActiveStatus = myActivePackage
     ? String(myActivePackage.status ?? "")
     : null;
@@ -774,7 +809,7 @@ export function InputRealisasiPage() {
                   <tr>
                     <th>No</th>
                     <th>Bidang</th>
-                    <th>Indikator</th>
+                    <th style={{ width: 390 }}>Indikator</th>
                     <th>Formula</th>
                     <th>Satuan</th>
                     <th className="num">Bobot</th>
@@ -799,6 +834,7 @@ export function InputRealisasiPage() {
                       !!kpi.subIndicators && kpi.subIndicators.length > 0;
                     const hasVal = isItemFilled(kpi, i);
                     const lt = livingTargetFor(kpi);
+
                     return (
                       <Fragment key={i}>
                         <tr
@@ -817,7 +853,7 @@ export function InputRealisasiPage() {
                             }}>
                             {kpi.bidang ?? "—"}
                           </td>
-                          <td style={{ maxWidth: 220, fontWeight: 500 }}>
+                          <td style={{ minWidth: 260, fontWeight: 500 }}>
                             {kpi.indikator ?? "—"}
                             {isComposite && (
                               <span
@@ -839,7 +875,7 @@ export function InputRealisasiPage() {
                             style={{
                               fontSize: 14,
                               color: "var(--color-text-muted)",
-                              maxWidth: 200,
+                              minWidth: 260,
                             }}>
                             {kpi.formula ?? "—"}
                           </td>
@@ -847,8 +883,9 @@ export function InputRealisasiPage() {
                             style={{
                               color: "var(--color-text-muted)",
                               whiteSpace: "nowrap",
-                            }}>
-                            {kpi.satuan ?? "—"}
+                            }}
+                            className="num">
+                            {kpi.satuan || "—"}
                           </td>
                           <td
                             className="num"
@@ -859,10 +896,10 @@ export function InputRealisasiPage() {
                             {kpi.bobot ?? "—"}
                           </td>
                           <td className="num">
-                            {isComposite ? "— (per sub)" : (kpi.target ?? "—")}
+                            {isComposite ? "— (per sub)" : kpi.target || "—"}
                           </td>
                           <td className="num">
-                            {isComposite ? "— (per sub)" : (kpi.target2 ?? "—")}
+                            {isComposite ? "— (per sub)" : kpi.target2 || "—"}
                           </td>
                           {anyLivingTarget && (
                             <td
@@ -897,7 +934,11 @@ export function InputRealisasiPage() {
                               )}
                             </td>
                           )}
-                          <td style={{ minWidth: 340 }}>
+                          <td
+                            style={{
+                              minWidth: 340,
+                            }}
+                            className={!formOpen ? "num" : ""}>
                             {formOpen ? (
                               isComposite ? (
                                 <span
@@ -938,13 +979,12 @@ export function InputRealisasiPage() {
                                 />
                               )
                             ) : (
-                              <span
-                                style={{ color: "var(--color-text-subtle)" }}>
-                                —
+                              <span style={{ color: "var(--color-text)" }}>
+                                {isComposite ? "" : kpi.realisasi || "—"}
                               </span>
                             )}
                           </td>
-                          <td style={{ minWidth: 100 }}>
+                          <td style={{ minWidth: 100 }} className="num">
                             {formOpen ? (
                               isComposite ? (
                                 <span
@@ -969,17 +1009,17 @@ export function InputRealisasiPage() {
                                 />
                               )
                             ) : (
-                              <span
-                                style={{ color: "var(--color-text-subtle)" }}>
-                                —
+                              <span style={{ color: "var(--color-text)" }}>
+                                {isComposite ? "" : kpi.capaianSaran || "—"}
                               </span>
                             )}
                           </td>
                         </tr>
                         {isComposite &&
                           kpi.subIndicators!.map((si, j) => {
-                            const subVal = values[`${i}.${j}`] ?? "";
-                            const subHasVal = subVal.trim() !== "";
+                            const subVal =
+                              values[`${i}.${j}`] || si.realisasi || "";
+                            const subHasVal = String(subVal).trim() !== "";
                             return (
                               <tr
                                 key={`${i}.${j}`}
@@ -1000,7 +1040,7 @@ export function InputRealisasiPage() {
                                 </td>
                                 <td
                                   style={{
-                                    fontSize: 12,
+                                    fontSize: 14,
                                     color: "var(--color-text-muted)",
                                     maxWidth: 200,
                                   }}>
@@ -1017,7 +1057,9 @@ export function InputRealisasiPage() {
                                 <td className="num">{si.target}</td>
                                 <td className="num">{si.target2 ?? "—"}</td>
                                 {anyLivingTarget && <td />}
-                                <td style={{ minWidth: 340 }}>
+                                <td
+                                  style={{ minWidth: 340 }}
+                                  className={!formOpen ? "num" : ""}>
                                   {formOpen ? (
                                     <input
                                       type="text"
@@ -1050,13 +1092,13 @@ export function InputRealisasiPage() {
                                   ) : (
                                     <span
                                       style={{
-                                        color: "var(--color-text-subtle)",
+                                        color: "var(--color-text)",
                                       }}>
                                       {subVal || "—"}
                                     </span>
                                   )}
                                 </td>
-                                <td style={{ minWidth: 100 }}>
+                                <td style={{ minWidth: 100 }} className="num">
                                   {formOpen ? (
                                     <input
                                       type="text"
@@ -1073,9 +1115,11 @@ export function InputRealisasiPage() {
                                   ) : (
                                     <span
                                       style={{
-                                        color: "var(--color-text-subtle)",
+                                        color: "var(--color-text)",
                                       }}>
-                                      {capaianValues[`${i}.${j}`] || "—"}
+                                      {capaianValues[`${i}.${j}`] ||
+                                        si.capaianSaran ||
+                                        "—"}
                                     </span>
                                   )}
                                 </td>
@@ -1580,6 +1624,11 @@ export function InputRealisasiPage() {
         open={pickerOpen}
         title="Alur Reviewer Realisasi"
         busy={submitting}
+        busyLabel={
+          submitProgress && submitProgress.total > 1
+            ? `Mengirim ${submitProgress.done}/${submitProgress.total} bidang…`
+            : undefined
+        }
         fetchCandidates={() =>
           inputRealisasi.reviewerCandidates(selectedUnit, kpiList[0]?.bidang)
         }
